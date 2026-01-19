@@ -12,6 +12,7 @@ This package provides Target classes for working with Python source code:
 - LineBlockTarget: Line ranges
 - CodeBlockTarget: Code structures (if, for, while, try, with)
 - CommentTarget: Python comments
+- TodoTarget: TODO/FIXME/XXX/HACK/NOTE/BUG comments
 - StringLiteralTarget: String literals
 """
 
@@ -26,6 +27,7 @@ from rejig.targets.python.method import MethodTarget
 from rejig.targets.python.module import ModuleTarget
 from rejig.targets.python.package import PackageTarget
 from rejig.targets.python.string import StringLiteralTarget
+from rejig.targets.python.todo import TodoTarget, TodoTargetList, TodoType, TODO_TYPES
 
 __all__ = [
     "FileTarget",
@@ -38,5 +40,9 @@ __all__ = [
     "LineBlockTarget",
     "CodeBlockTarget",
     "CommentTarget",
+    "TodoTarget",
+    "TodoTargetList",
+    "TodoType",
+    "TODO_TYPES",
     "StringLiteralTarget",
 ]

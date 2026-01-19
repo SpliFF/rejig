@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         YamlTarget,
     )
     from rejig.targets.base import TargetList
+    from rejig.targets.python.todo import TodoTargetList
 
 
 class Rejig:
@@ -995,3 +996,42 @@ class Rejig:
                 success=False,
                 message=f"Error moving {function_name}: {e}",
             )
+
+    # -------------------------------------------------------------------------
+    # TODO Comment Operations
+    # -------------------------------------------------------------------------
+
+    def find_todos(self) -> TodoTargetList:
+        """
+        Find all TODO/FIXME/XXX/HACK/NOTE/BUG comments in the codebase.
+
+        Returns a TodoTargetList with filtering capabilities and batch operations.
+
+        Returns
+        -------
+        TodoTargetList
+            All TODO comments found in the working set.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> todos = rj.find_todos()
+        >>> print(f"Found {len(todos)} TODOs")
+        >>>
+        >>> # Filter by type
+        >>> fixmes = todos.by_type("FIXME")
+        >>>
+        >>> # Filter to high priority
+        >>> urgent = todos.high_priority()
+        >>>
+        >>> # Find unlinked TODOs
+        >>> unlinked = todos.without_issues()
+        >>>
+        >>> # Operations on individual TODOs
+        >>> for todo in unlinked:
+        ...     todo.link_to_issue("#123")
+        """
+        from rejig.todos.finder import TodoFinder
+
+        finder = TodoFinder(self)
+        return finder.find_all()
