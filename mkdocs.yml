@@ -1,0 +1,72 @@
+site_name: Rejig
+site_description: Programmatic Python refactoring with LibCST
+site_url: https://github.com/your-org/rejig
+
+repo_name: your-org/rejig
+repo_url: https://github.com/your-org/rejig
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quickstart: getting-started/quickstart.md
+    - Core Concepts: getting-started/concepts.md
+  - Guides:
+    - Finding Code: guides/finding-code.md
+    - Modifying Code: guides/modifying-code.md
+    - Line Operations: guides/line-operations.md
+    - Batch Operations: guides/batch-operations.md
+    - Config Files: guides/config-files.md
+    - Error Handling: guides/error-handling.md
+  - API Reference:
+    - Rejig: reference/rejig.md
+    - Targets: reference/targets.md
+    - Results: reference/results.md
+  - Examples:
+    - Refactoring Patterns: examples/refactoring-patterns.md
+    - Codemod Recipes: examples/codemod-recipes.md
