@@ -421,7 +421,7 @@ class LineBlockTarget(Target):
             return self._operation_failed("delete", f"Failed to delete block: {e}", e)
 
     def move_to(self, destination: int | Target) -> Result:
-        """Move this line block to a different location.
+        """Move this line block to a different location in the same file.
 
         Parameters
         ----------
@@ -485,6 +485,94 @@ class LineBlockTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("move_to", f"Failed to move block: {e}", e)
+
+    def move_to_file(self, file_path: str | Path, line_number: int) -> Result:
+        """Move this line block to a different file.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path to the destination file.
+        line_number : int
+            1-based line number to insert at in the destination file.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> block = rj.file("source.py").lines(10, 20)
+        >>> block.move_to_file("destination.py", 5)
+        """
+        if not self.path.exists():
+            return self._operation_failed("move_to_file", f"Source file not found: {self.path}")
+
+        dest_path = Path(file_path) if isinstance(file_path, str) else file_path
+
+        # Resolve relative paths against rejig root
+        if not dest_path.is_absolute():
+            dest_path = self._rejig.root / dest_path
+
+        if not dest_path.exists():
+            return self._operation_failed("move_to_file", f"Destination file not found: {dest_path}")
+
+        try:
+            # Read source file
+            source_content = self.path.read_text()
+            source_lines = source_content.splitlines(keepends=True)
+
+            error = self._validate_range([l.rstrip("\n\r") for l in source_lines])
+            if error:
+                return error
+
+            # Extract the block from source
+            block = source_lines[self.start_line - 1 : self.end_line]
+
+            # Read destination file
+            dest_content = dest_path.read_text()
+            dest_lines = dest_content.splitlines(keepends=True)
+
+            # Ensure last line has newline
+            if dest_lines and not dest_lines[-1].endswith("\n"):
+                dest_lines[-1] += "\n"
+
+            # Validate destination line number
+            if not (1 <= line_number <= len(dest_lines) + 1):
+                return self._operation_failed(
+                    "move_to_file",
+                    f"Destination line {line_number} out of range (file has {len(dest_lines)} lines)",
+                )
+
+            # Insert block at destination
+            for i, line in enumerate(block):
+                dest_lines.insert(line_number - 1 + i, line)
+
+            # Remove block from source
+            del source_lines[self.start_line - 1 : self.end_line]
+
+            new_source_content = "".join(source_lines)
+            new_dest_content = "".join(dest_lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would move lines {self.start_line}-{self.end_line} from {self.path} to {dest_path}:{line_number}",
+                    files_changed=[self.path, dest_path],
+                )
+
+            # Write both files
+            self.path.write_text(new_source_content)
+            dest_path.write_text(new_dest_content)
+
+            return Result(
+                success=True,
+                message=f"Moved lines {self.start_line}-{self.end_line} from {self.path} to {dest_path}:{line_number}",
+                files_changed=[self.path, dest_path],
+            )
+        except Exception as e:
+            return self._operation_failed("move_to_file", f"Failed to move block: {e}", e)
 
     def replace(self, pattern: str, replacement: str) -> Result:
         """Replace pattern in this line block.

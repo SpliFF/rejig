@@ -12,6 +12,7 @@ from rejig.targets.base import ErrorResult, ErrorTarget, Result, Target, TargetL
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
     from rejig.targets.python.class_ import ClassTarget
+    from rejig.targets.python.code_block import CodeBlockTarget
     from rejig.targets.python.function import FunctionTarget
     from rejig.targets.python.line import LineTarget
     from rejig.targets.python.line_block import LineBlockTarget
@@ -251,6 +252,38 @@ class FileTarget(Target):
         from rejig.targets.python.line_block import LineBlockTarget
 
         return LineBlockTarget(self._rejig, self.path, start, end)
+
+    def block_at_line(self, line_number: int) -> Target:
+        """Get the code block containing the given line.
+
+        Finds the innermost code structure (class, function, if, for, while,
+        try, with) that contains the specified line.
+
+        Parameters
+        ----------
+        line_number : int
+            1-based line number.
+
+        Returns
+        -------
+        CodeBlockTarget | ErrorTarget
+            CodeBlockTarget if a block is found, ErrorTarget otherwise.
+
+        Examples
+        --------
+        >>> block = rj.file("utils.py").block_at_line(42)
+        >>> print(block.kind)  # "class", "function", "if", etc.
+        >>> block.delete()  # Delete the entire block
+        """
+        from rejig.targets.python.code_block import CodeBlockTarget
+
+        block = CodeBlockTarget.find_at_line(self._rejig, self.path, line_number)
+        if block is None:
+            return ErrorTarget(
+                self._rejig,
+                f"No code block found containing line {line_number} in {self.path}",
+            )
+        return block
 
     # ===== Modification operations =====
 

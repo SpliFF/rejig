@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Literal
 import libcst as cst
 
 from rejig.targets.base import Result, Target
-from rejig.targets.python.line_block import LineBlockTarget
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
+    from rejig.targets.python.line_block import LineBlockTarget
 
 CodeBlockKind = Literal["class", "function", "method", "if", "for", "while", "try", "with"]
 
@@ -115,6 +115,8 @@ class CodeBlockTarget(Target):
         LineBlockTarget
             A LineBlockTarget covering the same lines.
         """
+        from rejig.targets.python.line_block import LineBlockTarget
+
         return LineBlockTarget(self._rejig, self.path, self.start_line, self.end_line)
 
     # ===== Delegate common operations to LineBlockTarget =====
@@ -205,7 +207,7 @@ class CodeBlockTarget(Target):
         return self.to_line_block().delete()
 
     def move_to(self, destination: int | Target) -> Result:
-        """Move this code block to a different location.
+        """Move this code block to a different location in the same file.
 
         Parameters
         ----------
@@ -218,6 +220,28 @@ class CodeBlockTarget(Target):
             Result of the operation.
         """
         return self.to_line_block().move_to(destination)
+
+    def move_to_file(self, file_path: str | Path, line_number: int) -> Result:
+        """Move this code block to a different file.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path to the destination file.
+        line_number : int
+            1-based line number to insert at in the destination file.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> block = rj.file("source.py").block_at_line(10)
+        >>> block.move_to_file("destination.py", 5)
+        """
+        return self.to_line_block().move_to_file(file_path, line_number)
 
     def replace(self, pattern: str, replacement: str) -> Result:
         """Replace pattern in this code block.
