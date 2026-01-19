@@ -102,10 +102,47 @@ IniTarget
 
 TextFileTarget
     Target for generic text files.
+
+Packaging
+---------
+Dependency
+    Unified representation of a Python dependency.
+
+PackageConfig
+    Complete package configuration.
+
+PackageMetadata
+    Package metadata (name, version, authors, etc.).
+
+RequirementsParser
+    Parse requirements.txt files.
+
+PEP621Parser
+    Parse PEP 621 pyproject.toml files.
+
+PoetryParser
+    Parse Poetry pyproject.toml files.
+
+FormatDetector
+    Detect package configuration format.
+
+PackageConfigConverter
+    Convert between different formats.
 """
 from __future__ import annotations
 
 from .core import Rejig
+from .packaging import (
+    Dependency,
+    FormatDetector,
+    PackageConfig,
+    PackageConfigConverter,
+    PackageMetadata,
+    PEP621Parser,
+    PoetryParser,
+    RequirementsParser,
+    UVParser,
+)
 from .result import FindResult, Match, RefactorResult
 from .scope import ClassScope, FunctionScope, MethodScope
 from .targets import (
@@ -171,4 +208,14 @@ __all__ = [
     "IniTarget",
     # Text targets
     "TextFileTarget",
+    # Packaging
+    "Dependency",
+    "PackageMetadata",
+    "PackageConfig",
+    "RequirementsParser",
+    "PEP621Parser",
+    "PoetryParser",
+    "UVParser",
+    "FormatDetector",
+    "PackageConfigConverter",
 ]

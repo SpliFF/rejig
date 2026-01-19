@@ -11,6 +11,7 @@ import libcst as cst
 from rejig.result import FindResult, Match, RefactorResult
 
 if TYPE_CHECKING:
+    from rejig.packaging.models import PackageConfig
     from rejig.scope import ClassScope, FunctionScope
     from rejig.targets import (
         ClassTarget,
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
         TomlTarget,
         YamlTarget,
     )
-    from rejig.targets.base import TargetList
+    from rejig.targets.base import Result, TargetList
     from rejig.targets.python.todo import TodoTargetList
 
 
@@ -1035,3 +1036,338 @@ class Rejig:
 
         finder = TodoFinder(self)
         return finder.find_all()
+
+    # -------------------------------------------------------------------------
+    # Package Configuration Operations
+    # -------------------------------------------------------------------------
+
+    def get_package_config(self) -> PackageConfig | None:
+        """
+        Detect and parse package configuration from the project root.
+
+        Automatically detects the package format (requirements.txt, PEP 621,
+        Poetry, UV) and returns a unified PackageConfig object.
+
+        Returns
+        -------
+        PackageConfig | None
+            Parsed package configuration, or None if not found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> config = rj.get_package_config()
+        >>> if config:
+        ...     print(f"Format: {config.format}")
+        ...     print(f"Dependencies: {len(config.dependencies)}")
+        """
+        from rejig.packaging.detector import get_package_config
+
+        return get_package_config(self.root)
+
+    def add_dependency(
+        self,
+        name: str,
+        version: str | None = None,
+        dev: bool = False,
+        group: str | None = None,
+    ) -> RefactorResult:
+        """
+        Add a dependency to the project's package configuration.
+
+        Automatically detects the package format and adds the dependency
+        in the appropriate format.
+
+        Parameters
+        ----------
+        name : str
+            Package name to add.
+        version : str | None
+            Version specification (e.g., ">=2.0", "^1.0").
+        dev : bool
+            Whether this is a development dependency.
+        group : str | None
+            Optional dependency group name.
+
+        Returns
+        -------
+        RefactorResult
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.add_dependency("requests", ">=2.28.0")
+        >>> rj.add_dependency("pytest", ">=7.0", dev=True)
+        """
+        from rejig.packaging.detector import FormatDetector
+
+        detector = FormatDetector(self)
+        fmt = detector.detect(self.root)
+        config_path = detector.get_config_path(self.root)
+
+        if fmt is None or config_path is None:
+            return RefactorResult(
+                success=False,
+                message="No package configuration found in project",
+            )
+
+        result: Result
+        if fmt == "pep621":
+            from rejig.packaging.pep621 import PEP621Parser
+            parser = PEP621Parser(self)
+            result = parser.add_dependency(
+                config_path, name, version, dev=dev, group=group, dry_run=self.dry_run
+            )
+        elif fmt == "poetry":
+            from rejig.packaging.poetry import PoetryParser
+            parser = PoetryParser(self)
+            result = parser.add_dependency(
+                config_path, name, version, dev=dev, group=group, dry_run=self.dry_run
+            )
+        elif fmt == "uv":
+            from rejig.packaging.uv import UVParser
+            parser = UVParser(self)
+            result = parser.add_dependency(
+                config_path, name, version, dev=dev, group=group, dry_run=self.dry_run
+            )
+        elif fmt == "requirements":
+            # For requirements.txt, append directly
+            from rejig.packaging.models import Dependency
+            dep = Dependency(name=name, version_spec=version)
+            spec = dep.to_pip_spec()
+
+            if self.dry_run:
+                return RefactorResult(
+                    success=True,
+                    message=f"[DRY RUN] Would add {spec} to {config_path}",
+                    files_changed=[config_path],
+                )
+
+            try:
+                content = config_path.read_text() if config_path.exists() else ""
+                if spec not in content:
+                    with open(config_path, "a") as f:
+                        f.write(f"{spec}\n")
+                return RefactorResult(
+                    success=True,
+                    message=f"Added {spec} to {config_path}",
+                    files_changed=[config_path],
+                )
+            except Exception as e:
+                return RefactorResult(success=False, message=f"Failed to add dependency: {e}")
+        else:
+            return RefactorResult(
+                success=False,
+                message=f"Unsupported package format: {fmt}",
+            )
+
+        return RefactorResult(
+            success=result.success,
+            message=result.message,
+            files_changed=result.files_changed,
+        )
+
+    def remove_dependency(self, name: str) -> RefactorResult:
+        """
+        Remove a dependency from the project's package configuration.
+
+        Parameters
+        ----------
+        name : str
+            Package name to remove.
+
+        Returns
+        -------
+        RefactorResult
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.remove_dependency("requests")
+        """
+        from rejig.packaging.detector import FormatDetector
+
+        detector = FormatDetector(self)
+        fmt = detector.detect(self.root)
+        config_path = detector.get_config_path(self.root)
+
+        if fmt is None or config_path is None:
+            return RefactorResult(
+                success=False,
+                message="No package configuration found in project",
+            )
+
+        result: Result
+        if fmt == "pep621":
+            from rejig.packaging.pep621 import PEP621Parser
+            parser = PEP621Parser(self)
+            result = parser.remove_dependency(config_path, name, dry_run=self.dry_run)
+        elif fmt == "poetry":
+            from rejig.packaging.poetry import PoetryParser
+            parser = PoetryParser(self)
+            result = parser.remove_dependency(config_path, name, dry_run=self.dry_run)
+        elif fmt == "uv":
+            from rejig.packaging.uv import UVParser
+            parser = UVParser(self)
+            result = parser.remove_dependency(config_path, name, dry_run=self.dry_run)
+        elif fmt == "requirements":
+            # For requirements.txt, filter out the line
+            from rejig.packaging.models import Dependency
+            normalized = Dependency._normalize_name(name)
+
+            if not config_path.exists():
+                return RefactorResult(success=True, message=f"Dependency {name} not found")
+
+            try:
+                content = config_path.read_text()
+                lines = content.splitlines()
+                new_lines = []
+                found = False
+
+                for line in lines:
+                    dep = Dependency.from_pip_line(line)
+                    if dep and dep.name == normalized:
+                        found = True
+                    else:
+                        new_lines.append(line)
+
+                if not found:
+                    return RefactorResult(success=True, message=f"Dependency {name} not found")
+
+                if self.dry_run:
+                    return RefactorResult(
+                        success=True,
+                        message=f"[DRY RUN] Would remove {name} from {config_path}",
+                        files_changed=[config_path],
+                    )
+
+                config_path.write_text("\n".join(new_lines) + "\n" if new_lines else "")
+                return RefactorResult(
+                    success=True,
+                    message=f"Removed {name} from {config_path}",
+                    files_changed=[config_path],
+                )
+            except Exception as e:
+                return RefactorResult(success=False, message=f"Failed to remove dependency: {e}")
+        else:
+            return RefactorResult(
+                success=False,
+                message=f"Unsupported package format: {fmt}",
+            )
+
+        return RefactorResult(
+            success=result.success,
+            message=result.message,
+            files_changed=result.files_changed,
+        )
+
+    def export_requirements(
+        self, output: Path | None = None, include_dev: bool = False
+    ) -> RefactorResult:
+        """
+        Export dependencies as a requirements.txt file.
+
+        Parameters
+        ----------
+        output : Path | None
+            Output file path. Defaults to "requirements.txt" in project root.
+        include_dev : bool
+            Whether to include development dependencies.
+
+        Returns
+        -------
+        RefactorResult
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.export_requirements()
+        >>> rj.export_requirements(Path("requirements-dev.txt"), include_dev=True)
+        """
+        from rejig.packaging.converter import PackageConfigConverter
+        from rejig.packaging.detector import get_package_config
+
+        config = get_package_config(self.root)
+        if config is None:
+            return RefactorResult(
+                success=False,
+                message="No package configuration found in project",
+            )
+
+        if output is None:
+            output = self.root / "requirements.txt"
+
+        converter = PackageConfigConverter(self)
+        result = converter.to_requirements(
+            config, output, include_dev=include_dev, dry_run=self.dry_run
+        )
+
+        return RefactorResult(
+            success=result.success,
+            message=result.message,
+            files_changed=result.files_changed,
+        )
+
+    def convert_package_config(
+        self, target_format: str, output: Path | None = None
+    ) -> RefactorResult:
+        """
+        Convert package configuration to a different format.
+
+        Parameters
+        ----------
+        target_format : str
+            Target format: "requirements", "pep621", "poetry".
+        output : Path | None
+            Output file path. Defaults based on format.
+
+        Returns
+        -------
+        RefactorResult
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.convert_package_config("pep621")  # Poetry -> PEP 621
+        >>> rj.convert_package_config("requirements", Path("requirements.txt"))
+        """
+        from rejig.packaging.converter import PackageConfigConverter
+        from rejig.packaging.detector import get_package_config
+
+        config = get_package_config(self.root)
+        if config is None:
+            return RefactorResult(
+                success=False,
+                message="No package configuration found in project",
+            )
+
+        converter = PackageConfigConverter(self)
+
+        if target_format == "requirements":
+            if output is None:
+                output = self.root / "requirements.txt"
+            result = converter.to_requirements(config, output, dry_run=self.dry_run)
+        elif target_format == "pep621":
+            if output is None:
+                output = self.root / "pyproject.toml"
+
+            # Special case: Poetry to PEP 621 in-place conversion
+            if config.format == "poetry" and output == config.source_path:
+                result = converter.poetry_to_pep621(output, dry_run=self.dry_run)
+            else:
+                result = converter.to_pep621(config, output, dry_run=self.dry_run)
+        else:
+            return RefactorResult(
+                success=False,
+                message=f"Conversion to {target_format} not yet supported",
+            )
+
+        return RefactorResult(
+            success=result.success,
+            message=result.message,
+            files_changed=result.files_changed,
+        )
