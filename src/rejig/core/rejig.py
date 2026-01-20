@@ -2285,3 +2285,293 @@ class Rejig:
         >>> rj.replace_deprecated("collections.MutableMapping", "collections.abc.MutableMapping")
         """
         return self.replace_all_deprecated_code({old_pattern: new_pattern})
+
+    # -------------------------------------------------------------------------
+    # Linting Directive Operations
+    # -------------------------------------------------------------------------
+
+    def find_type_ignores(self):
+        """
+        Find all type: ignore comments in the codebase.
+
+        Returns a DirectiveTargetList with all type: ignore directives found.
+
+        Returns
+        -------
+        DirectiveTargetList
+            All type: ignore directives found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> ignores = rj.find_type_ignores()
+        >>> print(f"Found {len(ignores)} type: ignore comments")
+        >>>
+        >>> # Filter to bare type: ignore (without codes)
+        >>> bare = ignores.bare()
+        >>>
+        >>> # Filter to specific codes
+        >>> arg_type = ignores.with_code("arg-type")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_type_ignores()
+
+    def find_bare_type_ignores(self):
+        """
+        Find type: ignore comments without specific error codes.
+
+        Returns
+        -------
+        DirectiveTargetList
+            Bare type: ignore directives (without [error-code]).
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> bare = rj.find_bare_type_ignores()
+        >>> for d in bare:
+        ...     print(f"{d.location}: needs error code")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_bare_type_ignores()
+
+    def find_noqa_comments(self):
+        """
+        Find all noqa comments in the codebase.
+
+        Returns
+        -------
+        DirectiveTargetList
+            All noqa directives found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> noqa = rj.find_noqa_comments()
+        >>> print(f"Found {len(noqa)} noqa comments")
+        >>>
+        >>> # Filter to bare noqa (without codes)
+        >>> bare = noqa.bare()
+        >>>
+        >>> # Filter to specific codes
+        >>> e501 = noqa.with_code("E501")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_noqa_comments()
+
+    def find_bare_noqa(self):
+        """
+        Find noqa comments without specific error codes.
+
+        Returns
+        -------
+        DirectiveTargetList
+            Bare noqa directives (without specific codes).
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> bare = rj.find_bare_noqa()
+        >>> for d in bare:
+        ...     print(f"{d.location}: needs error code")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_bare_noqa()
+
+    def find_pylint_disables(self):
+        """
+        Find all pylint: disable comments in the codebase.
+
+        Returns
+        -------
+        DirectiveTargetList
+            All pylint: disable directives found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> disables = rj.find_pylint_disables()
+        >>> print(f"Found {len(disables)} pylint: disable comments")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_pylint_disables()
+
+    def find_no_cover(self):
+        """
+        Find all pragma: no cover comments in the codebase.
+
+        Returns
+        -------
+        DirectiveTargetList
+            All no cover directives found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> no_cover = rj.find_no_cover()
+        >>> print(f"Found {len(no_cover)} no cover comments")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_no_cover()
+
+    def find_all_directives(self):
+        """
+        Find all linting directives in the codebase.
+
+        Returns
+        -------
+        DirectiveTargetList
+            All directives found (type: ignore, noqa, pylint, fmt, no cover).
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> all_directives = rj.find_all_directives()
+        >>> print(f"Found {len(all_directives)} directives")
+        >>>
+        >>> # Filter by type
+        >>> type_ignores = all_directives.by_type("type_ignore")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self)
+        return finder.find_all()
+
+    def audit_directives(self):
+        """
+        Generate a comprehensive audit of all linting directives.
+
+        Returns
+        -------
+        DirectiveReport
+            Report on all linting directives in the codebase.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> report = rj.audit_directives()
+        >>> print(report)
+        >>> print(f"Total suppressions: {report.total_count}")
+        >>> print(f"Bare directives: {report.bare_count}")
+        """
+        from rejig.directives.reporter import DirectiveReporter
+
+        reporter = DirectiveReporter(self)
+        return reporter.audit()
+
+    def count_directives_by_type(self):
+        """
+        Get counts of directives by type.
+
+        Returns
+        -------
+        dict[DirectiveType, int]
+            Counts by directive type.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> counts = rj.count_directives_by_type()
+        >>> for dtype, count in counts.items():
+        ...     print(f"{dtype}: {count}")
+        """
+        from rejig.directives.reporter import DirectiveReporter
+
+        reporter = DirectiveReporter(self)
+        return reporter.count_by_type()
+
+    def remove_all_type_ignores(self) -> Result:
+        """
+        Remove all type: ignore comments from the codebase.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.remove_all_type_ignores()
+        """
+        ignores = self.find_type_ignores()
+        if not ignores:
+            return Result(success=True, message="No type: ignore comments found")
+
+        result = ignores.remove_all()
+        return Result(
+            success=result.success_count > 0,
+            message=f"Removed {result.success_count} type: ignore comments",
+            files_changed=list(set(
+                f for r in result.results if r.files_changed for f in r.files_changed
+            )),
+        )
+
+    def remove_all_noqa(self) -> Result:
+        """
+        Remove all noqa comments from the codebase.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.remove_all_noqa()
+        """
+        noqa = self.find_noqa_comments()
+        if not noqa:
+            return Result(success=True, message="No noqa comments found")
+
+        result = noqa.remove_all()
+        return Result(
+            success=result.success_count > 0,
+            message=f"Removed {result.success_count} noqa comments",
+            files_changed=list(set(
+                f for r in result.results if r.files_changed for f in r.files_changed
+            )),
+        )
+
+    def remove_all_directives(self) -> Result:
+        """
+        Remove all linting directive comments from the codebase.
+
+        Removes all: type: ignore, noqa, pylint: disable, fmt: skip/off/on,
+        pragma: no cover.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.remove_all_directives()
+        """
+        all_directives = self.find_all_directives()
+        if not all_directives:
+            return Result(success=True, message="No directives found")
+
+        result = all_directives.remove_all()
+        return Result(
+            success=result.success_count > 0,
+            message=f"Removed {result.success_count} directives",
+            files_changed=list(set(
+                f for r in result.results if r.files_changed for f in r.files_changed
+            )),
+        )

@@ -1175,3 +1175,79 @@ class FunctionTarget(Target):
                 files_changed=result.files_changed,
             )
         return result
+
+    # ===== Directive operations =====
+
+    def add_no_cover(self) -> Result:
+        """Add pragma: no cover to exclude this function from coverage.
+
+        Adds the pragma comment to the function definition line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_no_cover()
+        """
+        file_path = self._find_function()
+        if not file_path:
+            return self._operation_failed("add_no_cover", f"Function '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            # Find the line number of the function
+            for node in tree.body:
+                if isinstance(node, cst.FunctionDef) and node.name.value == self.name:
+                    # Get the position
+                    pos = tree.code_for_node(node).split("\n")[0]
+                    line_num = content[:content.find(pos)].count("\n") + 1 if pos in content else None
+                    if line_num:
+                        from rejig.targets.python.line import LineTarget
+                        return LineTarget(self._rejig, file_path, line_num).add_no_cover()
+
+            return self._operation_failed("add_no_cover", f"Function '{self.name}' not found")
+        except Exception as e:
+            return self._operation_failed("add_no_cover", f"Failed to add no cover: {e}", e)
+
+    def add_pylint_disable(self, codes: str | list[str]) -> Result:
+        """Add pylint: disable comment to this function's definition line.
+
+        Parameters
+        ----------
+        codes : str | list[str]
+            Pylint error codes to disable.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_pylint_disable("C0114")
+        >>> func.add_pylint_disable(["C0114", "C0115"])
+        """
+        file_path = self._find_function()
+        if not file_path:
+            return self._operation_failed("add_pylint_disable", f"Function '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            for node in tree.body:
+                if isinstance(node, cst.FunctionDef) and node.name.value == self.name:
+                    pos = tree.code_for_node(node).split("\n")[0]
+                    line_num = content[:content.find(pos)].count("\n") + 1 if pos in content else None
+                    if line_num:
+                        from rejig.targets.python.line import LineTarget
+                        return LineTarget(self._rejig, file_path, line_num).add_pylint_disable(codes)
+
+            return self._operation_failed("add_pylint_disable", f"Function '{self.name}' not found")
+        except Exception as e:
+            return self._operation_failed("add_pylint_disable", f"Failed to add pylint disable: {e}", e)

@@ -634,3 +634,194 @@ class LineBlockTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("replace", f"Failed to replace: {e}", e)
+
+    # ===== Directive wrapping operations =====
+
+    def wrap_with_pylint_disable(self, codes: str | list[str]) -> Result:
+        """Wrap this line block with pylint: disable/enable comments.
+
+        Adds:
+        - `# pylint: disable=codes` before the block
+        - `# pylint: enable=codes` after the block
+
+        Parameters
+        ----------
+        codes : str | list[str]
+            Pylint error codes to disable (e.g., "line-too-long" or ["C0114", "C0115"]).
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> block = rj.file("utils.py").lines(10, 20)
+        >>> block.wrap_with_pylint_disable("C0114")
+        >>> block.wrap_with_pylint_disable(["C0114", "C0115"])
+        """
+        if not self.path.exists():
+            return self._operation_failed("wrap_with_pylint_disable", f"File not found: {self.path}")
+
+        try:
+            content = self.path.read_text()
+            lines = content.splitlines(keepends=True)
+
+            error = self._validate_range([l.rstrip("\n\r") for l in lines])
+            if error:
+                return error
+
+            if isinstance(codes, list):
+                codes_str = ",".join(codes)
+            else:
+                codes_str = codes
+
+            # Get indentation from the first line of the block
+            first_line = lines[self.start_line - 1]
+            indent = len(first_line) - len(first_line.lstrip())
+            indent_str = " " * indent
+
+            disable_line = f"{indent_str}# pylint: disable={codes_str}\n"
+            enable_line = f"{indent_str}# pylint: enable={codes_str}\n"
+
+            # Insert enable line after the block
+            lines.insert(self.end_line, enable_line)
+            # Insert disable line before the block
+            lines.insert(self.start_line - 1, disable_line)
+
+            new_content = "".join(lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would wrap lines {self.start_line}-{self.end_line} with pylint: disable",
+                    files_changed=[self.path],
+                )
+
+            self.path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Wrapped lines {self.start_line}-{self.end_line} with pylint: disable={codes_str}",
+                files_changed=[self.path],
+            )
+        except Exception as e:
+            return self._operation_failed("wrap_with_pylint_disable", f"Failed to wrap: {e}", e)
+
+    def wrap_with_fmt_off(self) -> Result:
+        """Wrap this line block with fmt: off/on comments.
+
+        Adds:
+        - `# fmt: off` before the block
+        - `# fmt: on` after the block
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> block = rj.file("utils.py").lines(10, 20)
+        >>> block.wrap_with_fmt_off()
+        """
+        if not self.path.exists():
+            return self._operation_failed("wrap_with_fmt_off", f"File not found: {self.path}")
+
+        try:
+            content = self.path.read_text()
+            lines = content.splitlines(keepends=True)
+
+            error = self._validate_range([l.rstrip("\n\r") for l in lines])
+            if error:
+                return error
+
+            # Get indentation from the first line of the block
+            first_line = lines[self.start_line - 1]
+            indent = len(first_line) - len(first_line.lstrip())
+            indent_str = " " * indent
+
+            off_line = f"{indent_str}# fmt: off\n"
+            on_line = f"{indent_str}# fmt: on\n"
+
+            # Insert on line after the block
+            lines.insert(self.end_line, on_line)
+            # Insert off line before the block
+            lines.insert(self.start_line - 1, off_line)
+
+            new_content = "".join(lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would wrap lines {self.start_line}-{self.end_line} with fmt: off/on",
+                    files_changed=[self.path],
+                )
+
+            self.path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Wrapped lines {self.start_line}-{self.end_line} with fmt: off/on",
+                files_changed=[self.path],
+            )
+        except Exception as e:
+            return self._operation_failed("wrap_with_fmt_off", f"Failed to wrap: {e}", e)
+
+    def wrap_with_no_cover(self) -> Result:
+        """Wrap this line block with pragma: no cover comment.
+
+        For multi-line blocks, this adds the pragma comment to the first
+        statement line. For better coverage exclusion of blocks, consider
+        using the pragma on the controlling statement (if/for/while/etc.)
+        or wrapping in a function.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> block = rj.file("utils.py").lines(10, 20)
+        >>> block.wrap_with_no_cover()
+        """
+        if not self.path.exists():
+            return self._operation_failed("wrap_with_no_cover", f"File not found: {self.path}")
+
+        try:
+            content = self.path.read_text()
+            lines = content.splitlines(keepends=True)
+
+            error = self._validate_range([l.rstrip("\n\r") for l in lines])
+            if error:
+                return error
+
+            # Add pragma to the first line of the block
+            idx = self.start_line - 1
+            first_line = lines[idx].rstrip("\n\r")
+
+            if "# pragma: no cover" in first_line:
+                return Result(
+                    success=True,
+                    message="Block already has pragma: no cover",
+                )
+
+            # Add pragma comment
+            lines[idx] = f"{first_line}  # pragma: no cover\n"
+
+            new_content = "".join(lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would add pragma: no cover to line {self.start_line}",
+                    files_changed=[self.path],
+                )
+
+            self.path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Added pragma: no cover to line {self.start_line}",
+                files_changed=[self.path],
+            )
+        except Exception as e:
+            return self._operation_failed("wrap_with_no_cover", f"Failed to wrap: {e}", e)

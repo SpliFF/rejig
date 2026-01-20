@@ -1597,3 +1597,78 @@ class ClassTarget(Target):
             success=True,
             message=f"{self.name} does not inherit from object",
         )
+
+    # ===== Directive operations =====
+
+    def add_no_cover(self) -> Result:
+        """Add pragma: no cover to exclude this class from coverage.
+
+        Adds the pragma comment to the class definition line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.add_no_cover()
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("add_no_cover", f"Class '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            for node in tree.body:
+                if isinstance(node, cst.ClassDef) and node.name.value == self.name:
+                    # Get the first line of the class definition
+                    pos = tree.code_for_node(node).split("\n")[0]
+                    line_num = content[:content.find(pos)].count("\n") + 1 if pos in content else None
+                    if line_num:
+                        from rejig.targets.python.line import LineTarget
+                        return LineTarget(self._rejig, file_path, line_num).add_no_cover()
+
+            return self._operation_failed("add_no_cover", f"Class '{self.name}' not found")
+        except Exception as e:
+            return self._operation_failed("add_no_cover", f"Failed to add no cover: {e}", e)
+
+    def add_pylint_disable(self, codes: str | list[str]) -> Result:
+        """Add pylint: disable comment to this class's definition line.
+
+        Parameters
+        ----------
+        codes : str | list[str]
+            Pylint error codes to disable.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.add_pylint_disable("R0903")  # too-few-public-methods
+        >>> cls.add_pylint_disable(["R0903", "R0901"])
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("add_pylint_disable", f"Class '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            for node in tree.body:
+                if isinstance(node, cst.ClassDef) and node.name.value == self.name:
+                    pos = tree.code_for_node(node).split("\n")[0]
+                    line_num = content[:content.find(pos)].count("\n") + 1 if pos in content else None
+                    if line_num:
+                        from rejig.targets.python.line import LineTarget
+                        return LineTarget(self._rejig, file_path, line_num).add_pylint_disable(codes)
+
+            return self._operation_failed("add_pylint_disable", f"Class '{self.name}' not found")
+        except Exception as e:
+            return self._operation_failed("add_pylint_disable", f"Failed to add pylint disable: {e}", e)

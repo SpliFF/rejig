@@ -1564,3 +1564,183 @@ class FileTarget(Target):
             message=f"Modernized {self.path}: {', '.join(changes_made)}",
             files_changed=[self.path],
         )
+
+    # ===== Directive operations =====
+
+    def find_type_ignores(self) -> TargetList[Target]:
+        """Find all type: ignore comments in this file.
+
+        Returns
+        -------
+        TargetList[LineTarget]
+            List of LineTarget objects for lines with type: ignore.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> ignores = file.find_type_ignores()
+        >>> print(f"Found {len(ignores)} type: ignore comments")
+        """
+        from rejig.directives.finder import DirectiveFinder
+        from rejig.targets.python.line import LineTarget
+
+        finder = DirectiveFinder(self._rejig)
+        directives = finder.find_in_file(self.path).by_type("type_ignore")
+
+        # Convert to LineTargets for easier manipulation
+        targets = [
+            LineTarget(self._rejig, self.path, d.line_number) for d in directives
+        ]
+        return TargetList(self._rejig, targets)
+
+    def find_noqa_comments(self) -> TargetList[Target]:
+        """Find all noqa comments in this file.
+
+        Returns
+        -------
+        TargetList[LineTarget]
+            List of LineTarget objects for lines with noqa comments.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> noqa = file.find_noqa_comments()
+        >>> print(f"Found {len(noqa)} noqa comments")
+        """
+        from rejig.directives.finder import DirectiveFinder
+        from rejig.targets.python.line import LineTarget
+
+        finder = DirectiveFinder(self._rejig)
+        directives = finder.find_in_file(self.path).by_type("noqa")
+
+        targets = [
+            LineTarget(self._rejig, self.path, d.line_number) for d in directives
+        ]
+        return TargetList(self._rejig, targets)
+
+    def find_directives(self):
+        """Find all linting directives in this file.
+
+        Returns
+        -------
+        DirectiveTargetList
+            List of DirectiveTarget objects.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> directives = file.find_directives()
+        >>> for d in directives:
+        ...     print(f"Line {d.line_number}: {d.directive_type}")
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self._rejig)
+        return finder.find_in_file(self.path)
+
+    def remove_all_type_ignores(self) -> Result:
+        """Remove all type: ignore comments from this file.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.remove_all_type_ignores()
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self._rejig)
+        directives = finder.find_in_file(self.path).by_type("type_ignore")
+
+        if not directives:
+            return Result(success=True, message=f"No type: ignore comments found in {self.path}")
+
+        # Remove in reverse order to avoid line number shifts
+        sorted_directives = sorted(directives.to_list(), key=lambda d: d.line_number, reverse=True)
+        count = 0
+        for directive in sorted_directives:
+            result = directive.remove()
+            if result.success:
+                count += 1
+
+        return Result(
+            success=True,
+            message=f"Removed {count} type: ignore comments from {self.path}",
+            files_changed=[self.path] if count > 0 else [],
+        )
+
+    def remove_all_noqa(self) -> Result:
+        """Remove all noqa comments from this file.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.remove_all_noqa()
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self._rejig)
+        directives = finder.find_in_file(self.path).by_type("noqa")
+
+        if not directives:
+            return Result(success=True, message=f"No noqa comments found in {self.path}")
+
+        sorted_directives = sorted(directives.to_list(), key=lambda d: d.line_number, reverse=True)
+        count = 0
+        for directive in sorted_directives:
+            result = directive.remove()
+            if result.success:
+                count += 1
+
+        return Result(
+            success=True,
+            message=f"Removed {count} noqa comments from {self.path}",
+            files_changed=[self.path] if count > 0 else [],
+        )
+
+    def remove_all_directives(self) -> Result:
+        """Remove all linting directive comments from this file.
+
+        Removes all: type: ignore, noqa, pylint: disable, fmt: skip/off/on,
+        pragma: no cover.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.remove_all_directives()
+        """
+        from rejig.directives.finder import DirectiveFinder
+
+        finder = DirectiveFinder(self._rejig)
+        directives = finder.find_in_file(self.path)
+
+        if not directives:
+            return Result(success=True, message=f"No directives found in {self.path}")
+
+        # Remove in reverse order to avoid line number shifts
+        sorted_directives = sorted(directives.to_list(), key=lambda d: d.line_number, reverse=True)
+        count = 0
+        for directive in sorted_directives:
+            result = directive.remove()
+            if result.success:
+                count += 1
+
+        return Result(
+            success=True,
+            message=f"Removed {count} directives from {self.path}",
+            files_changed=[self.path] if count > 0 else [],
+        )

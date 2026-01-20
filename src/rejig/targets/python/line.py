@@ -238,6 +238,146 @@ class LineTarget(Target):
 
         return self._modify_line(add_fmt)
 
+    def add_pylint_disable(self, codes: str | list[str]) -> Result:
+        """Add a pylint: disable comment to this line.
+
+        Parameters
+        ----------
+        codes : str | list[str]
+            Pylint error codes to disable (e.g., "line-too-long" or ["C0114", "C0115"]).
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> line.add_pylint_disable("line-too-long")
+        >>> line.add_pylint_disable(["C0114", "C0115"])
+        """
+        import re
+
+        def add_pylint(line: str) -> str:
+            # Check if pylint: disable already exists
+            if re.search(r"#\s*pylint:\s*disable", line, re.IGNORECASE):
+                return line
+
+            if isinstance(codes, list):
+                codes_str = ",".join(codes)
+            else:
+                codes_str = codes
+            comment = f"# pylint: disable={codes_str}"
+
+            if "  #" in line:
+                parts = line.rsplit("  #", 1)
+                return f"{parts[0]}  {comment}  #{parts[1]}"
+            return f"{line}  {comment}"
+
+        return self._modify_line(add_pylint)
+
+    def remove_type_ignore(self) -> Result:
+        """Remove the type: ignore comment from this line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        import re
+
+        def remove_ignore(line: str) -> str:
+            # Remove type: ignore with optional codes and reason
+            return re.sub(
+                r"\s*#\s*type:\s*ignore(?:\[[^\]]*\])?(?:\s*#\s*[^\n]*)?",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).rstrip()
+
+        return self._modify_line(remove_ignore)
+
+    def remove_noqa(self) -> Result:
+        """Remove the noqa comment from this line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        import re
+
+        def remove_noqa_comment(line: str) -> str:
+            # Remove noqa with optional codes and reason
+            return re.sub(
+                r"\s*#\s*noqa(?::\s*[A-Z0-9,\s]+)?(?:\s*#\s*[^\n]*)?",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).rstrip()
+
+        return self._modify_line(remove_noqa_comment)
+
+    def remove_no_cover(self) -> Result:
+        """Remove the pragma: no cover comment from this line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        import re
+
+        def remove_pragma(line: str) -> str:
+            return re.sub(
+                r"\s*#\s*pragma:\s*no\s*cover",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).rstrip()
+
+        return self._modify_line(remove_pragma)
+
+    def remove_fmt_skip(self) -> Result:
+        """Remove the fmt: skip comment from this line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        import re
+
+        def remove_fmt(line: str) -> str:
+            return re.sub(
+                r"\s*#\s*fmt:\s*skip",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).rstrip()
+
+        return self._modify_line(remove_fmt)
+
+    def remove_pylint_disable(self) -> Result:
+        """Remove the pylint: disable comment from this line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        import re
+
+        def remove_pylint(line: str) -> str:
+            return re.sub(
+                r"\s*#\s*pylint:\s*disable\s*=\s*[a-z0-9-,\s]+(?:\s*#\s*[^\n]*)?",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).rstrip()
+
+        return self._modify_line(remove_pylint)
+
     # ===== General modification operations =====
 
     def rewrite(self, new_content: str) -> Result:

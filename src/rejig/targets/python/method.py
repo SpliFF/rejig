@@ -1472,3 +1472,131 @@ class MethodTarget(Target):
                 files_changed=result.files_changed,
             )
         return result
+
+    # ===== Directive operations =====
+
+    def add_no_cover(self) -> Result:
+        """Add pragma: no cover to exclude this method from coverage.
+
+        Adds the pragma comment to the method definition line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_no_cover()
+        """
+        file_path = self._find_method()
+        if not file_path:
+            return self._operation_failed(
+                "add_no_cover", f"Method '{self.class_name}.{self.name}' not found"
+            )
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            class MethodLineFinder(cst.CSTVisitor):
+                def __init__(self, target_class: str, target_method: str):
+                    self.target_class = target_class
+                    self.target_method = target_method
+                    self.in_target_class = False
+                    self.line_num: int | None = None
+                    self.method_code: str | None = None
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = True
+                    return True
+
+                def leave_ClassDef(self, node: cst.ClassDef) -> None:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = False
+
+                def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+                    if self.in_target_class and node.name.value == self.target_method:
+                        # Store the method's first line
+                        self.method_code = tree.code_for_node(node).split("\n")[0]
+                    return False
+
+            finder = MethodLineFinder(self.class_name, self.name)
+            tree.walk(finder)
+
+            if finder.method_code:
+                line_num = content[:content.find(finder.method_code)].count("\n") + 1 if finder.method_code in content else None
+                if line_num:
+                    from rejig.targets.python.line import LineTarget
+                    return LineTarget(self._rejig, file_path, line_num).add_no_cover()
+
+            return self._operation_failed(
+                "add_no_cover", f"Method '{self.class_name}.{self.name}' not found"
+            )
+        except Exception as e:
+            return self._operation_failed("add_no_cover", f"Failed to add no cover: {e}", e)
+
+    def add_pylint_disable(self, codes: str | list[str]) -> Result:
+        """Add pylint: disable comment to this method's definition line.
+
+        Parameters
+        ----------
+        codes : str | list[str]
+            Pylint error codes to disable.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_pylint_disable("C0116")  # missing-function-docstring
+        >>> method.add_pylint_disable(["C0116", "R0201"])
+        """
+        file_path = self._find_method()
+        if not file_path:
+            return self._operation_failed(
+                "add_pylint_disable", f"Method '{self.class_name}.{self.name}' not found"
+            )
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            class MethodLineFinder(cst.CSTVisitor):
+                def __init__(self, target_class: str, target_method: str):
+                    self.target_class = target_class
+                    self.target_method = target_method
+                    self.in_target_class = False
+                    self.method_code: str | None = None
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = True
+                    return True
+
+                def leave_ClassDef(self, node: cst.ClassDef) -> None:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = False
+
+                def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+                    if self.in_target_class and node.name.value == self.target_method:
+                        self.method_code = tree.code_for_node(node).split("\n")[0]
+                    return False
+
+            finder = MethodLineFinder(self.class_name, self.name)
+            tree.walk(finder)
+
+            if finder.method_code:
+                line_num = content[:content.find(finder.method_code)].count("\n") + 1 if finder.method_code in content else None
+                if line_num:
+                    from rejig.targets.python.line import LineTarget
+                    return LineTarget(self._rejig, file_path, line_num).add_pylint_disable(codes)
+
+            return self._operation_failed(
+                "add_pylint_disable", f"Method '{self.class_name}.{self.name}' not found"
+            )
+        except Exception as e:
+            return self._operation_failed("add_pylint_disable", f"Failed to add pylint disable: {e}", e)
