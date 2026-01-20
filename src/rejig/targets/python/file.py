@@ -11,6 +11,7 @@ from rejig.targets.base import ErrorResult, ErrorTarget, Result, Target, TargetL
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
+    from rejig.imports.targets import ImportTarget, ImportTargetList
     from rejig.targets.python.class_ import ClassTarget
     from rejig.targets.python.code_block import CodeBlockTarget
     from rejig.targets.python.function import FunctionTarget
@@ -475,3 +476,356 @@ class FileTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete file: {e}", e)
+
+    # ===== Import management methods =====
+
+    def find_imports(self) -> ImportTargetList:
+        """Find all imports in this file.
+
+        Returns
+        -------
+        ImportTargetList
+            List of ImportTarget objects for all imports in this file.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> imports = file.find_imports()
+        >>> for imp in imports:
+        ...     print(f"Line {imp.line_number}: {imp.import_info.import_statement}")
+        """
+        from rejig.imports.analyzer import ImportAnalyzer
+        from rejig.imports.targets import ImportTarget, ImportTargetList
+
+        analyzer = ImportAnalyzer(self._rejig)
+        import_infos = analyzer.get_imports(self.path)
+
+        targets = [
+            ImportTarget(self._rejig, self.path, info) for info in import_infos
+        ]
+        return ImportTargetList(self._rejig, targets)
+
+    def find_unused_imports(self) -> ImportTargetList:
+        """Find all unused imports in this file.
+
+        Returns
+        -------
+        ImportTargetList
+            List of ImportTarget objects for unused imports.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> unused = file.find_unused_imports()
+        >>> print(f"Found {len(unused)} unused imports")
+        >>> unused.delete()  # Remove all unused imports
+        """
+        from rejig.imports.analyzer import ImportAnalyzer
+        from rejig.imports.targets import ImportTarget, ImportTargetList
+
+        analyzer = ImportAnalyzer(self._rejig)
+        unused_infos = analyzer.find_unused_imports(self.path)
+
+        targets = [
+            ImportTarget(self._rejig, self.path, info) for info in unused_infos
+        ]
+        return ImportTargetList(self._rejig, targets)
+
+    def organize_imports(
+        self, first_party_packages: set[str] | None = None
+    ) -> Result:
+        """Organize imports in this file (isort-like).
+
+        Groups imports into:
+        1. __future__ imports
+        2. Standard library imports
+        3. Third-party imports
+        4. Local/first-party imports
+
+        Within each group, imports are sorted alphabetically.
+
+        Parameters
+        ----------
+        first_party_packages : set[str] | None
+            Set of package names to treat as first-party. If None, will
+            try to auto-detect from the project root.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.organize_imports()
+        """
+        from rejig.imports.organizer import ImportOrganizer
+
+        organizer = ImportOrganizer(self._rejig, first_party_packages)
+        return organizer.organize(self.path)
+
+    def remove_unused_imports(self) -> Result:
+        """Remove all unused imports from this file.
+
+        Returns
+        -------
+        Result
+            Result of the operation, including count of removed imports.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> result = file.remove_unused_imports()
+        >>> print(result.message)
+        """
+        unused = self.find_unused_imports()
+        if not unused:
+            return Result(success=True, message="No unused imports found")
+
+        # Delete in reverse order to avoid line number shifts
+        unused_sorted = sorted(
+            unused.to_list(),
+            key=lambda t: t.line_number,
+            reverse=True,
+        )
+
+        count = 0
+        for imp in unused_sorted:
+            result = imp.delete()
+            if result.success:
+                count += 1
+
+        return Result(
+            success=True,
+            message=f"Removed {count} unused imports from {self.path}",
+            files_changed=[self.path] if count > 0 else [],
+        )
+
+    def add_missing_imports(self, import_mapping: dict[str, str] | None = None) -> Result:
+        """Add imports for undefined names in this file.
+
+        Note: This is a heuristic operation. It detects names that appear
+        to be undefined (not imported or defined locally) and adds imports
+        for them if a mapping is provided.
+
+        Parameters
+        ----------
+        import_mapping : dict[str, str] | None
+            Mapping of name to import statement. For example:
+            {"Optional": "from typing import Optional"}
+            If None, uses a default mapping for common names.
+
+        Returns
+        -------
+        Result
+            Result with the list of potentially missing imports in `data`.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> result = file.add_missing_imports({
+        ...     "Optional": "from typing import Optional",
+        ...     "Path": "from pathlib import Path",
+        ... })
+        """
+        from rejig.imports.analyzer import ImportAnalyzer
+
+        analyzer = ImportAnalyzer(self._rejig)
+        missing = analyzer.find_potentially_missing_imports(self.path)
+
+        if not missing:
+            return Result(
+                success=True,
+                message="No missing imports detected",
+                data=[],
+            )
+
+        # Default mapping for common names
+        default_mapping = {
+            "Optional": "from typing import Optional",
+            "List": "from typing import List",
+            "Dict": "from typing import Dict",
+            "Set": "from typing import Set",
+            "Tuple": "from typing import Tuple",
+            "Union": "from typing import Union",
+            "Any": "from typing import Any",
+            "Callable": "from typing import Callable",
+            "Iterable": "from typing import Iterable",
+            "Iterator": "from typing import Iterator",
+            "Generator": "from typing import Generator",
+            "Sequence": "from typing import Sequence",
+            "Mapping": "from typing import Mapping",
+            "TypeVar": "from typing import TypeVar",
+            "Generic": "from typing import Generic",
+            "Protocol": "from typing import Protocol",
+            "TYPE_CHECKING": "from typing import TYPE_CHECKING",
+            "Path": "from pathlib import Path",
+            "dataclass": "from dataclasses import dataclass",
+            "field": "from dataclasses import field",
+            "Enum": "from enum import Enum",
+            "auto": "from enum import auto",
+            "ABC": "from abc import ABC",
+            "abstractmethod": "from abc import abstractmethod",
+            "contextmanager": "from contextlib import contextmanager",
+            "suppress": "from contextlib import suppress",
+            "defaultdict": "from collections import defaultdict",
+            "Counter": "from collections import Counter",
+            "OrderedDict": "from collections import OrderedDict",
+            "namedtuple": "from collections import namedtuple",
+            "datetime": "from datetime import datetime",
+            "date": "from datetime import date",
+            "time": "from datetime import time",
+            "timedelta": "from datetime import timedelta",
+        }
+
+        mapping = {**default_mapping, **(import_mapping or {})}
+        added = []
+        not_found = []
+
+        for name in missing:
+            if name in mapping:
+                result = self.add_import(mapping[name])
+                if result.success:
+                    added.append(name)
+            else:
+                not_found.append(name)
+
+        message_parts = []
+        if added:
+            message_parts.append(f"Added imports for: {', '.join(sorted(added))}")
+        if not_found:
+            message_parts.append(f"No mapping found for: {', '.join(sorted(not_found))}")
+
+        return Result(
+            success=True,
+            message="; ".join(message_parts) if message_parts else "No changes made",
+            files_changed=[self.path] if added else [],
+            data={"added": added, "not_found": not_found},
+        )
+
+    def convert_relative_to_absolute(self, package_name: str | None = None) -> Result:
+        """Convert all relative imports to absolute imports.
+
+        Parameters
+        ----------
+        package_name : str | None
+            The package name to use as the base for absolute imports.
+            If None, attempts to detect from project configuration.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("myapp/utils.py")
+        >>> file.convert_relative_to_absolute("myapp")
+        """
+        imports = self.find_imports()
+        relative_imports = imports.filter_relative()
+
+        if not relative_imports:
+            return Result(success=True, message="No relative imports found")
+
+        # Auto-detect package name if not provided
+        if package_name is None:
+            package_name = self._detect_package_name()
+
+        if package_name is None:
+            return self._operation_failed(
+                "convert_relative_to_absolute",
+                "Could not determine package name. Please provide it explicitly.",
+            )
+
+        count = 0
+        for imp in relative_imports:
+            result = imp.convert_to_absolute(package_name)
+            if result.success:
+                count += 1
+
+        return Result(
+            success=True,
+            message=f"Converted {count} relative imports to absolute in {self.path}",
+            files_changed=[self.path] if count > 0 else [],
+        )
+
+    def convert_absolute_to_relative(self) -> Result:
+        """Convert all absolute imports to relative imports where possible.
+
+        Only converts imports that are within the same package.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("myapp/utils.py")
+        >>> file.convert_absolute_to_relative()
+        """
+        imports = self.find_imports()
+        absolute_imports = imports.filter_absolute()
+
+        if not absolute_imports:
+            return Result(success=True, message="No absolute imports to convert")
+
+        # Get the current package path
+        package_name = self._detect_package_name()
+
+        count = 0
+        for imp in absolute_imports:
+            # Only convert imports that are within the same package
+            if imp.module and package_name and imp.module.startswith(package_name + "."):
+                result = imp.convert_to_relative()
+                if result.success:
+                    count += 1
+
+        return Result(
+            success=True,
+            message=f"Converted {count} absolute imports to relative in {self.path}",
+            files_changed=[self.path] if count > 0 else [],
+        )
+
+    def _detect_package_name(self) -> str | None:
+        """Detect the package name for this file."""
+        try:
+            # Check pyproject.toml
+            root = self._rejig.root
+            pyproject = root / "pyproject.toml"
+
+            if pyproject.exists():
+                try:
+                    import tomllib
+
+                    with open(pyproject, "rb") as f:
+                        data = tomllib.load(f)
+
+                    # PEP 621
+                    if "project" in data and "name" in data["project"]:
+                        return data["project"]["name"].replace("-", "_")
+
+                    # Poetry
+                    if "tool" in data and "poetry" in data["tool"]:
+                        if "name" in data["tool"]["poetry"]:
+                            return data["tool"]["poetry"]["name"].replace("-", "_")
+                except Exception:
+                    pass
+
+            # Try to infer from directory structure
+            rel_path = self.path.relative_to(root)
+            parts = list(rel_path.parts)
+
+            # Check for src/ layout
+            if parts[0] == "src" and len(parts) > 1:
+                return parts[1]
+
+            # Otherwise use the first directory
+            if len(parts) > 1:
+                return parts[0]
+
+            return None
+        except Exception:
+            return None

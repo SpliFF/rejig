@@ -136,11 +136,43 @@ FormatDetector
 
 PackageConfigConverter
     Convert between different formats.
+
+Import Management
+-----------------
+ImportTarget
+    Target for individual import statements.
+
+ImportTargetList
+    List of import targets for batch operations.
+
+ImportAnalyzer
+    Analyze imports in Python files.
+
+ImportInfo
+    Information about an import statement.
+
+ImportOrganizer
+    Organize imports (isort-like).
+
+ImportGraph
+    Import dependency graph for analysis.
+
+CircularImport
+    Represents a circular import chain.
 """
 from __future__ import annotations
 
 from .core import BatchResult, ErrorResult, Rejig, Result
 from .core.transaction import Transaction
+from .imports import (
+    CircularImport,
+    ImportAnalyzer,
+    ImportGraph,
+    ImportInfo,
+    ImportOrganizer,
+    ImportTarget,
+    ImportTargetList,
+)
 from .packaging import (
     Dependency,
     FormatDetector,
@@ -221,4 +253,12 @@ __all__ = [
     "UVParser",
     "FormatDetector",
     "PackageConfigConverter",
+    # Import Management
+    "ImportTarget",
+    "ImportTargetList",
+    "ImportAnalyzer",
+    "ImportInfo",
+    "ImportOrganizer",
+    "ImportGraph",
+    "CircularImport",
 ]

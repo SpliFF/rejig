@@ -1417,3 +1417,253 @@ class Rejig:
             message=result.message,
             files_changed=result.files_changed,
         )
+
+    # -------------------------------------------------------------------------
+    # Import Management Operations
+    # -------------------------------------------------------------------------
+
+    def find_unused_imports(self) -> TargetList:
+        """
+        Find all unused imports across all files in the project.
+
+        Returns
+        -------
+        TargetList
+            List of ImportTarget objects for all unused imports.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> unused = rj.find_unused_imports()
+        >>> print(f"Found {len(unused)} unused imports")
+        >>> for imp in unused:
+        ...     print(f"{imp.file_path}:{imp.line_number}: {imp.import_info.import_statement}")
+        """
+        from rejig.imports.analyzer import ImportAnalyzer
+        from rejig.imports.targets import ImportTarget, ImportTargetList
+
+        analyzer = ImportAnalyzer(self)
+        all_targets: list[ImportTarget] = []
+
+        for file_path in self.files:
+            unused = analyzer.find_unused_imports(file_path)
+            for info in unused:
+                all_targets.append(ImportTarget(self, file_path, info))
+
+        return ImportTargetList(self, all_targets)
+
+    def find_circular_imports(self) -> list:
+        """
+        Find all circular import chains in the project.
+
+        Returns
+        -------
+        list[CircularImport]
+            List of circular import chains found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> cycles = rj.find_circular_imports()
+        >>> for cycle in cycles:
+        ...     print(f"Circular import: {cycle}")
+        """
+        from rejig.imports.graph import ImportGraph
+
+        graph = ImportGraph(self)
+        graph.build()
+        return graph.find_circular_imports()
+
+    def get_import_graph(self):
+        """
+        Get the import dependency graph for the project.
+
+        Returns
+        -------
+        ImportGraph
+            The import graph object with methods for analysis.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> graph = rj.get_import_graph()
+        >>>
+        >>> # Get dependencies of a module
+        >>> deps = graph.get_dependencies("myapp.models")
+        >>>
+        >>> # Get modules that depend on a module
+        >>> dependents = graph.get_dependents("myapp.utils")
+        >>>
+        >>> # Export as dictionary
+        >>> dep_dict = graph.to_dict()
+        """
+        from rejig.imports.graph import ImportGraph
+
+        graph = ImportGraph(self)
+        graph.build()
+        return graph
+
+    def rename_import(self, old_path: str, new_path: str) -> Result:
+        """
+        Rename an import across all files in the project.
+
+        Updates all import statements that reference the old path to use
+        the new path. This is useful after moving or renaming modules.
+
+        Parameters
+        ----------
+        old_path : str
+            The old import path (e.g., "old_module.OldClass").
+        new_path : str
+            The new import path (e.g., "new_module.NewClass").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.rename_import("myapp.old_module.OldClass", "myapp.new_module.NewClass")
+        """
+        import re as regex_module
+
+        old_module = ".".join(old_path.rsplit(".", 1)[:-1]) if "." in old_path else old_path
+        old_name = old_path.rsplit(".", 1)[-1] if "." in old_path else None
+        new_module = ".".join(new_path.rsplit(".", 1)[:-1]) if "." in new_path else new_path
+        new_name = new_path.rsplit(".", 1)[-1] if "." in new_path else None
+
+        files_changed = []
+        total_changes = 0
+
+        for file_path in self.files:
+            try:
+                content = file_path.read_text()
+                original = content
+
+                # Handle 'from module import name' -> 'from new_module import new_name'
+                if old_name and new_name:
+                    # Pattern: from old_module import ..., old_name, ...
+                    pattern = rf"(from\s+{regex_module.escape(old_module)}\s+import\s+)(\w+(?:\s*,\s*\w+)*)"
+
+                    def replace_import(m):
+                        prefix = m.group(1)
+                        names = m.group(2)
+                        new_names = regex_module.sub(rf"\b{regex_module.escape(old_name)}\b", new_name, names)
+                        if old_module != new_module:
+                            prefix = f"from {new_module} import "
+                        return prefix + new_names
+
+                    content = regex_module.sub(pattern, replace_import, content)
+
+                # Handle 'import module' -> 'import new_module'
+                if old_module and not old_name:
+                    content = regex_module.sub(
+                        rf"(import\s+){regex_module.escape(old_module)}\b",
+                        rf"\1{new_module}",
+                        content,
+                    )
+                    content = regex_module.sub(
+                        rf"(from\s+){regex_module.escape(old_module)}(\s+import)",
+                        rf"\1{new_module}\2",
+                        content,
+                    )
+
+                if content != original:
+                    if self.dry_run:
+                        files_changed.append(file_path)
+                        total_changes += 1
+                    else:
+                        file_path.write_text(content)
+                        files_changed.append(file_path)
+                        total_changes += 1
+
+            except Exception:
+                continue
+
+        if self.dry_run:
+            return Result(
+                success=True,
+                message=f"[DRY RUN] Would update {total_changes} files",
+                files_changed=files_changed,
+            )
+
+        return Result(
+            success=True,
+            message=f"Updated imports in {total_changes} files",
+            files_changed=files_changed,
+        )
+
+    def organize_all_imports(
+        self, first_party_packages: set[str] | None = None
+    ) -> Result:
+        """
+        Organize imports in all Python files in the project.
+
+        Parameters
+        ----------
+        first_party_packages : set[str] | None
+            Set of package names to treat as first-party.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.organize_all_imports()
+        """
+        from rejig.imports.organizer import ImportOrganizer
+
+        organizer = ImportOrganizer(self, first_party_packages)
+        files_changed = []
+
+        for file_path in self.files:
+            result = organizer.organize(file_path)
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Organized imports in {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def remove_all_unused_imports(self) -> Result:
+        """
+        Remove all unused imports from all files in the project.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.remove_all_unused_imports()
+        """
+        files_changed = []
+        total_removed = 0
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            unused = file_target.find_unused_imports()
+
+            if unused:
+                # Delete in reverse order to avoid line number shifts
+                for imp in sorted(unused.to_list(), key=lambda t: t.line_number, reverse=True):
+                    result = imp.delete()
+                    if result.success:
+                        total_removed += 1
+
+                files_changed.append(file_path)
+
+        return Result(
+            success=True,
+            message=f"Removed {total_removed} unused imports from {len(files_changed)} files",
+            files_changed=files_changed,
+        )
