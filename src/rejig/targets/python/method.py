@@ -7,11 +7,14 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
+from rejig.core.position import find_method_line
 from rejig.targets.base import Result, Target
 from rejig.transformers import (
     AddFirstParameter,
     AddMethodDecorator,
+    AddParameter,
     InsertAtMatch,
+    InsertAtMethodEnd,
     InsertAtMethodStart,
     RemoveMethodDecorator,
     RenameMethod,
@@ -105,38 +108,9 @@ class MethodTarget(Target):
         """Verify the method exists in the specified class in the file."""
         try:
             content = file_path.read_text()
-            tree = cst.parse_module(content)
-
-            class MethodFinder(cst.CSTVisitor):
-                def __init__(self, target_class: str, target_method: str):
-                    self.target_class = target_class
-                    self.target_method = target_method
-                    self.in_target_class = False
-                    self.found = False
-                    self.line_number: int | None = None
-
-                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
-                    if node.name.value == self.target_class:
-                        self.in_target_class = True
-                    return True
-
-                def leave_ClassDef(self, node: cst.ClassDef) -> None:
-                    if node.name.value == self.target_class:
-                        self.in_target_class = False
-
-                def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
-                    if self.in_target_class and node.name.value == self.target_method:
-                        self.found = True
-                        # Get line number from the content
-                        code = tree.code_for_node(node)
-                        self.line_number = content[: content.find(code)].count("\n") + 1
-                    return False
-
-            finder = MethodFinder(self.class_name, self.name)
-            tree.walk(finder)
-
-            if finder.found:
-                self._line_number = finder.line_number
+            line_number = find_method_line(content, self.class_name, self.name)
+            if line_number is not None:
+                self._line_number = line_number
                 return True
         except Exception:
             pass
@@ -255,7 +229,10 @@ class MethodTarget(Target):
         >>> method.insert_statement("self.validate()")
         >>> method.insert_statement("return result", position="end")
         """
-        transformer = InsertAtMethodStart(self.class_name, self.name, statement)
+        if position == "end":
+            transformer = InsertAtMethodEnd(self.class_name, self.name, statement)
+        else:
+            transformer = InsertAtMethodStart(self.class_name, self.name, statement)
         return self._transform(transformer)
 
     def add_parameter(
@@ -284,51 +261,15 @@ class MethodTarget(Target):
         Result
             Result of the operation.
         """
-        if position == "start":
-            transformer = AddFirstParameter(self.class_name, self.name, param_name)
-            return self._transform(transformer)
-
-        # For end position, use regex-based approach
-        file_path = self._find_method()
-        if not file_path:
-            return self._operation_failed(
-                "add_parameter", f"Method '{self.class_name}.{self.name}' not found"
-            )
-
-        try:
-            content = file_path.read_text()
-
-            # Build the parameter string
-            param_str = param_name
-            if type_annotation:
-                param_str = f"{param_name}: {type_annotation}"
-            if default_value is not None:
-                param_str = f"{param_str} = {default_value}"
-
-            # Find and update the method signature
-            pattern = rf"(def\s+{re.escape(self.name)}\s*\([^)]*)()\)"
-            new_content = re.sub(pattern, rf"\1, {param_str})", content)
-
-            if new_content == content:
-                return self._operation_failed(
-                    "add_parameter", f"Could not add parameter to {self.name}"
-                )
-
-            if self.dry_run:
-                return Result(
-                    success=True,
-                    message=f"[DRY RUN] Would add parameter {param_name} to {self.name}",
-                    files_changed=[file_path],
-                )
-
-            file_path.write_text(new_content)
-            return Result(
-                success=True,
-                message=f"Added parameter {param_name} to {self.name}",
-                files_changed=[file_path],
-            )
-        except Exception as e:
-            return self._operation_failed("add_parameter", f"Failed to add parameter: {e}", e)
+        transformer = AddParameter(
+            self.class_name,
+            self.name,
+            param_name,
+            type_annotation,
+            default_value,
+            position,
+        )
+        return self._transform(transformer)
 
     def replace_identifier(self, old_name: str, new_name: str) -> Result:
         """Replace identifier references within the method.

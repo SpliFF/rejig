@@ -7,8 +7,14 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
+from rejig.core.position import find_function_line
 from rejig.targets.base import ErrorResult, Result, Target
-from rejig.transformers import InsertAtMethodStart
+from rejig.transformers import (
+    AddFunctionDecorator,
+    AddParameter,
+    InsertAtMethodEnd,
+    InsertAtMethodStart,
+)
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
@@ -75,14 +81,13 @@ class FunctionTarget(Target):
             return None
 
         # Search across all files - look for module-level function
-        pattern = rf"^def\s+{re.escape(self.name)}\b"
         for fp in self._rejig.files:
             try:
                 content = fp.read_text()
-                match = re.search(pattern, content, re.MULTILINE)
-                if match:
+                line_number = find_function_line(content, self.name)
+                if line_number is not None:
                     self._file_path = fp
-                    self._line_number = content[: match.start()].count("\n") + 1
+                    self._line_number = line_number
                     return fp
             except Exception:
                 continue
@@ -92,10 +97,9 @@ class FunctionTarget(Target):
         """Verify the function exists in the specified file."""
         try:
             content = file_path.read_text()
-            pattern = rf"^def\s+{re.escape(self.name)}\b"
-            match = re.search(pattern, content, re.MULTILINE)
-            if match:
-                self._line_number = content[: match.start()].count("\n") + 1
+            line_number = find_function_line(content, self.name)
+            if line_number is not None:
+                self._line_number = line_number
                 return True
         except Exception:
             pass
@@ -186,8 +190,11 @@ class FunctionTarget(Target):
         >>> func.insert_statement("logger.info('Starting')")
         >>> func.insert_statement("return result", position="end")
         """
-        # Use InsertAtMethodStart with no class context for module-level functions
-        transformer = InsertAtMethodStart(None, self.name, statement)
+        # Use transformers with no class context for module-level functions
+        if position == "end":
+            transformer = InsertAtMethodEnd(None, self.name, statement)
+        else:
+            transformer = InsertAtMethodStart(None, self.name, statement)
         return self._transform(transformer)
 
     def add_parameter(
@@ -221,71 +228,16 @@ class FunctionTarget(Target):
         >>> func.add_parameter("timeout", "int", "30")
         >>> func.add_parameter("verbose", "bool", "False")
         """
-        file_path = self._find_function()
-        if not file_path:
-            return self._operation_failed(
-                "add_parameter", f"Function '{self.name}' not found"
-            )
-
-        try:
-            content = file_path.read_text()
-
-            # Build the parameter string
-            param_str = param_name
-            if type_annotation:
-                param_str = f"{param_name}: {type_annotation}"
-            if default_value is not None:
-                param_str = f"{param_str} = {default_value}"
-
-            # Find and update the function signature
-            # Handle both empty and non-empty parameter lists
-            if position == "start":
-                # Insert after opening paren
-                pattern = rf"(def\s+{re.escape(self.name)}\s*\()([^)]*)\)"
-                match = re.search(pattern, content)
-                if match:
-                    existing_params = match.group(2).strip()
-                    if existing_params:
-                        new_params = f"{param_str}, {existing_params}"
-                    else:
-                        new_params = param_str
-                    new_content = (
-                        content[: match.start(2)] + new_params + content[match.end(2) :]
-                    )
-                else:
-                    return self._operation_failed(
-                        "add_parameter", f"Could not find function signature for {self.name}"
-                    )
-            else:
-                # Insert at end
-                pattern = rf"(def\s+{re.escape(self.name)}\s*\([^)]*)()\)"
-                new_content = re.sub(pattern, rf"\1, {param_str})", content)
-
-                # Handle empty parameter list
-                if new_content == content:
-                    pattern = rf"(def\s+{re.escape(self.name)}\s*\(\s*)(\))"
-                    new_content = re.sub(pattern, rf"\1{param_str})", content)
-
-            if new_content == content:
-                return self._operation_failed(
-                    "add_parameter", f"Could not add parameter to {self.name}"
-                )
-
-            if self.dry_run:
-                return Result(
-                    success=True,
-                    message=f"[DRY RUN] Would add parameter {param_name} to {self.name}",
-                    files_changed=[file_path],
-                )
-
-            file_path.write_text(new_content)
-            return Result(
-                success=True,
-                message=f"Added parameter {param_name} to {self.name}",
-                files_changed=[file_path],
-            )
-        except Exception as e:
-            return self._operation_failed("add_parameter", f"Failed to add parameter: {e}", e)
+        # Use None for class_name to target module-level functions
+        transformer = AddParameter(
+            None,
+            self.name,
+            param_name,
+            type_annotation,
+            default_value,
+            position,
+        )
+        return self._transform(transformer)
 
     def add_decorator(self, decorator: str) -> Result:
         """Add a decorator to this function.
@@ -293,43 +245,24 @@ class FunctionTarget(Target):
         Parameters
         ----------
         decorator : str
-            Decorator to add (without @ prefix).
+            Decorator to add (without @ prefix). Can include arguments,
+            e.g., "lru_cache(maxsize=128)".
 
         Returns
         -------
         Result
             Result of the operation.
         """
-        file_path = self._find_function()
-        if not file_path:
-            return self._operation_failed("add_decorator", f"Function '{self.name}' not found")
+        transformer = AddFunctionDecorator(self.name, decorator)
+        result = self._transform(transformer)
 
-        try:
-            content = file_path.read_text()
-            pattern = rf"(^def\s+{re.escape(self.name)}\b)"
-            replacement = f"@{decorator}\n\\1"
-            new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
-
-            if new_content == content:
-                return self._operation_failed(
-                    "add_decorator", f"Could not add decorator to {self.name}"
-                )
-
-            if self.dry_run:
-                return Result(
-                    success=True,
-                    message=f"[DRY RUN] Would add @{decorator} to {self.name}",
-                    files_changed=[file_path],
-                )
-
-            file_path.write_text(new_content)
+        if result.success and transformer.added:
             return Result(
                 success=True,
                 message=f"Added @{decorator} to {self.name}",
-                files_changed=[file_path],
+                files_changed=result.files_changed,
             )
-        except Exception as e:
-            return self._operation_failed("add_decorator", f"Failed to add decorator: {e}", e)
+        return result
 
     def remove_decorator(self, decorator: str) -> Result:
         """Remove a decorator from this function.

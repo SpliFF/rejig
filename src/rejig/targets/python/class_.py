@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING, Any
 
 import libcst as cst
 
+from rejig.core.position import find_class_line
 from rejig.targets.base import ErrorResult, ErrorTarget, Result, Target, TargetList
 from rejig.transformers import (
     AddClassAttribute,
+    AddClassDecorator,
     RemoveClassAttribute,
     RemoveDecorator,
     RenameClass,
@@ -82,15 +84,13 @@ class ClassTarget(Target):
             return None
 
         # Search across all files in the project
-        pattern = rf"\bclass\s+{re.escape(self.name)}\b"
         for fp in self._rejig.files:
             try:
                 content = fp.read_text()
-                match = re.search(pattern, content)
-                if match:
+                line_number = find_class_line(content, self.name)
+                if line_number is not None:
                     self._file_path = fp
-                    # Calculate line number
-                    self._line_number = content[: match.start()].count("\n") + 1
+                    self._line_number = line_number
                     return fp
             except Exception:
                 continue
@@ -100,10 +100,9 @@ class ClassTarget(Target):
         """Verify the class exists in the specified file."""
         try:
             content = file_path.read_text()
-            pattern = rf"\bclass\s+{re.escape(self.name)}\b"
-            match = re.search(pattern, content)
-            if match:
-                self._line_number = content[: match.start()].count("\n") + 1
+            line_number = find_class_line(content, self.name)
+            if line_number is not None:
+                self._line_number = line_number
                 return True
         except Exception:
             pass
@@ -430,43 +429,24 @@ class ClassTarget(Target):
         Parameters
         ----------
         decorator : str
-            Decorator to add (without @ prefix).
+            Decorator to add (without @ prefix). Can include arguments,
+            e.g., "dataclass(frozen=True)".
 
         Returns
         -------
         Result
             Result of the operation.
         """
-        file_path = self._find_class()
-        if not file_path:
-            return self._operation_failed("add_decorator", f"Class '{self.name}' not found")
+        transformer = AddClassDecorator(self.name, decorator)
+        result = self._transform(transformer)
 
-        try:
-            content = file_path.read_text()
-            pattern = rf"(^class\s+{re.escape(self.name)}\b)"
-            replacement = f"@{decorator}\n\\1"
-            new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
-
-            if new_content == content:
-                return self._operation_failed(
-                    "add_decorator", f"Could not add decorator to {self.name}"
-                )
-
-            if self.dry_run:
-                return Result(
-                    success=True,
-                    message=f"[DRY RUN] Would add @{decorator} to {self.name}",
-                    files_changed=[file_path],
-                )
-
-            file_path.write_text(new_content)
+        if result.success and transformer.added:
             return Result(
                 success=True,
                 message=f"Added @{decorator} to {self.name}",
-                files_changed=[file_path],
+                files_changed=result.files_changed,
             )
-        except Exception as e:
-            return self._operation_failed("add_decorator", f"Failed to add decorator: {e}", e)
+        return result
 
     def remove_decorator(self, decorator: str) -> Result:
         """Remove a decorator from this class.
