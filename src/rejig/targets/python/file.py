@@ -477,6 +477,100 @@ class FileTarget(Target):
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete file: {e}", e)
 
+    # ===== Test operations =====
+
+    def add_pytest_fixture(
+        self,
+        fixture_name: str,
+        body: str,
+        scope: str = "function",
+        autouse: bool = False,
+        params: list[str] | None = None,
+    ) -> Result:
+        """Add a pytest fixture to this file.
+
+        Typically used with conftest.py files to add shared fixtures.
+
+        Parameters
+        ----------
+        fixture_name : str
+            Name of the fixture function.
+        body : str
+            Body of the fixture function.
+        scope : str
+            Fixture scope: "function", "class", "module", or "session".
+            Defaults to "function".
+        autouse : bool
+            If True, fixture is automatically used. Default False.
+        params : list[str] | None
+            Optional list of fixture parameters for parametrized fixtures.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> conftest = rj.file("tests/conftest.py")
+        >>> conftest.add_pytest_fixture(
+        ...     "db_session",
+        ...     scope="function",
+        ...     body="yield get_db()"
+        ... )
+        """
+        from rejig.generation.tests import AddPytestFixtureTransformer
+
+        if not self.exists():
+            return self._operation_failed(
+                "add_pytest_fixture",
+                f"File not found: {self.path}",
+            )
+
+        try:
+            content = self.path.read_text()
+
+            # Check if fixture already exists
+            if f"def {fixture_name}(" in content:
+                return Result(
+                    success=True,
+                    message=f"Fixture '{fixture_name}' already exists in {self.path}",
+                )
+
+            tree = cst.parse_module(content)
+            transformer = AddPytestFixtureTransformer(
+                fixture_name, body, scope, autouse, params
+            )
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if new_content == content:
+                return Result(success=True, message="No changes made")
+
+            # Ensure pytest import exists
+            if "import pytest" not in new_content:
+                new_content = "import pytest\n\n" + new_content
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would add fixture '{fixture_name}' to {self.path}",
+                    data=new_content,
+                )
+
+            self.path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Added pytest fixture '{fixture_name}' to {self.path}",
+                files_changed=[self.path],
+            )
+        except Exception as e:
+            return self._operation_failed(
+                "add_pytest_fixture",
+                f"Failed to add fixture: {e}",
+                e,
+            )
+
     # ===== Import management methods =====
 
     def find_imports(self) -> ImportTargetList:

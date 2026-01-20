@@ -1242,6 +1242,132 @@ class ClassTarget(Target):
             files_changed=[file_path],
         )
 
+    # ===== Test generation operations =====
+
+    def generate_test_file(
+        self,
+        output_path: str | Path,
+        include_setup: bool = True,
+        include_teardown: bool = False,
+    ) -> Result:
+        """Generate a complete test file for this class.
+
+        Creates a pytest test file with test stubs for all public methods.
+
+        Parameters
+        ----------
+        output_path : str | Path
+            Path where the test file should be written.
+        include_setup : bool
+            Whether to include a setup_method. Default True.
+        include_teardown : bool
+            Whether to include a teardown_method. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.generate_test_file("tests/test_calculator.py")
+        >>> cls.generate_test_file("tests/test_user.py", include_teardown=True)
+        """
+        from rejig.generation.tests import TestGenerator, extract_class_signatures
+
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("generate_test_file", f"Class '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            methods, class_docstring = extract_class_signatures(content, self.name)
+
+            if not methods:
+                return Result(
+                    success=True,
+                    message=f"No methods found in class {self.name}",
+                )
+
+            # Determine module path for import
+            module_path = None
+            if self._rejig.root_path:
+                try:
+                    rel_path = file_path.relative_to(self._rejig.root_path)
+                    # Convert path to module format
+                    module_path = str(rel_path.with_suffix("")).replace("/", ".").replace("\\", ".")
+                    # Remove leading src. if present
+                    if module_path.startswith("src."):
+                        module_path = module_path[4:]
+                except ValueError:
+                    pass
+
+            generator = TestGenerator()
+            test_content = generator.generate_class_test_file(
+                self.name,
+                methods,
+                class_docstring=class_docstring,
+                module_path=module_path,
+                include_setup=include_setup,
+                include_teardown=include_teardown,
+            )
+
+            output_path = Path(output_path)
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would create test file at {output_path}",
+                    data=test_content,
+                )
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(test_content)
+
+            return Result(
+                success=True,
+                message=f"Generated test file for {self.name} at {output_path}",
+                files_changed=[output_path],
+                data=test_content,
+            )
+        except Exception as e:
+            return self._operation_failed("generate_test_file", f"Failed to generate test file: {e}", e)
+
+    def generate_test_stub(self, test_dir: str | Path | None = None) -> Result:
+        """Generate a test stub in the default location.
+
+        Creates a test file in the tests/ directory mirroring the source structure.
+
+        Parameters
+        ----------
+        test_dir : str | Path | None
+            Base directory for tests. Defaults to "tests" in project root.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.generate_test_stub()  # Creates tests/test_mymodule.py
+        >>> cls.generate_test_stub("test_suite/unit")
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("generate_test_stub", f"Class '{self.name}' not found")
+
+        # Determine output path
+        if test_dir is None:
+            test_dir = self._rejig.root_path / "tests" if self._rejig.root_path else Path("tests")
+        else:
+            test_dir = Path(test_dir)
+
+        # Generate test filename from source filename
+        test_filename = f"test_{file_path.stem}.py"
+        output_path = test_dir / test_filename
+
+        return self.generate_test_file(output_path)
+
     def extract_protocol(
         self,
         protocol_name: str,

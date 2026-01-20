@@ -368,6 +368,258 @@ class PackageTarget(Target):
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete package: {e}", e)
 
+    # ===== Test operations =====
+
+    def convert_unittest_to_pytest(self) -> Result:
+        """Convert unittest test cases to pytest style.
+
+        Transforms all test files in this package (recursively) from
+        unittest style to pytest style, converting:
+        - self.assertEqual(a, b) -> assert a == b
+        - self.assertTrue(x) -> assert x
+        - self.assertFalse(x) -> assert not x
+        - self.assertIsNone(x) -> assert x is None
+        - self.assertRaises(X) -> pytest.raises(X)
+        - And many more assertion methods
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> tests_pkg = rj.package("tests/")
+        >>> tests_pkg.convert_unittest_to_pytest()
+        """
+        import libcst as cst
+
+        from rejig.generation.tests import UnittestToPytestConverter
+
+        if not self.exists():
+            return self._operation_failed(
+                "convert_unittest_to_pytest",
+                f"Package not found: {self.path}",
+            )
+
+        converted_files: list[Path] = []
+        errors: list[str] = []
+
+        # Find all Python files recursively
+        for file_path in self.path.rglob("*.py"):
+            # Skip __pycache__ and other non-test files
+            if "__pycache__" in str(file_path):
+                continue
+
+            try:
+                content = file_path.read_text()
+
+                # Skip files that don't contain unittest patterns
+                if "self.assert" not in content and "TestCase" not in content:
+                    continue
+
+                tree = cst.parse_module(content)
+                transformer = UnittestToPytestConverter()
+                new_tree = tree.visit(transformer)
+                new_content = new_tree.code
+
+                if new_content != content and transformer.converted:
+                    # Add pytest import if needed
+                    if transformer._needs_pytest_import and "import pytest" not in new_content:
+                        new_content = "import pytest\n" + new_content
+
+                    if not self.dry_run:
+                        file_path.write_text(new_content)
+                    converted_files.append(file_path)
+            except Exception as e:
+                errors.append(f"{file_path}: {e}")
+
+        if errors:
+            return Result(
+                success=len(converted_files) > 0,
+                message=f"Converted {len(converted_files)} files with {len(errors)} errors",
+                files_changed=converted_files,
+                data={"errors": errors},
+            )
+
+        if not converted_files:
+            return Result(
+                success=True,
+                message="No unittest files found to convert",
+            )
+
+        prefix = "[DRY RUN] Would convert" if self.dry_run else "Converted"
+        return Result(
+            success=True,
+            message=f"{prefix} {len(converted_files)} files to pytest style",
+            files_changed=converted_files,
+        )
+
+    def update_test_imports(
+        self,
+        old_module: str,
+        new_module: str,
+    ) -> Result:
+        """Update imports in test files after refactoring.
+
+        Useful for updating test imports when source modules are moved or renamed.
+
+        Parameters
+        ----------
+        old_module : str
+            The old module path (e.g., "myapp.utils").
+        new_module : str
+            The new module path (e.g., "myapp.helpers.utils").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> tests_pkg = rj.package("tests/")
+        >>> tests_pkg.update_test_imports("myapp.utils", "myapp.helpers.utils")
+        """
+        if not self.exists():
+            return self._operation_failed(
+                "update_test_imports",
+                f"Package not found: {self.path}",
+            )
+
+        updated_files: list[Path] = []
+
+        # Find all Python files recursively
+        for file_path in self.path.rglob("*.py"):
+            if "__pycache__" in str(file_path):
+                continue
+
+            try:
+                content = file_path.read_text()
+
+                if old_module not in content:
+                    continue
+
+                new_content = content.replace(old_module, new_module)
+
+                if new_content != content:
+                    if not self.dry_run:
+                        file_path.write_text(new_content)
+                    updated_files.append(file_path)
+            except Exception as e:
+                continue  # Skip files that can't be read
+
+        if not updated_files:
+            return Result(
+                success=True,
+                message=f"No imports of '{old_module}' found to update",
+            )
+
+        prefix = "[DRY RUN] Would update" if self.dry_run else "Updated"
+        return Result(
+            success=True,
+            message=f"{prefix} imports in {len(updated_files)} files",
+            files_changed=updated_files,
+        )
+
+    def generate_test_stubs(self, test_dir: str | Path | None = None) -> Result:
+        """Generate test stubs for all classes and functions in this package.
+
+        Creates test files with stub test functions for all public
+        classes and functions found in the package.
+
+        Parameters
+        ----------
+        test_dir : str | Path | None
+            Base directory for tests. Defaults to "tests" in project root.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> pkg = rj.package("src/myapp")
+        >>> pkg.generate_test_stubs()  # Creates tests/test_*.py files
+        """
+        from rejig.generation.tests import TestGenerator, extract_class_signatures, extract_function_signature
+
+        if not self.exists():
+            return self._operation_failed(
+                "generate_test_stubs",
+                f"Package not found: {self.path}",
+            )
+
+        # Determine test directory
+        if test_dir is None:
+            test_dir = self._rejig.root_path / "tests" if self._rejig.root_path else Path("tests")
+        else:
+            test_dir = Path(test_dir)
+
+        generated_files: list[Path] = []
+        generator = TestGenerator()
+
+        # Process all Python files recursively
+        for file_path in self.path.rglob("*.py"):
+            if "__pycache__" in str(file_path) or file_path.name.startswith("_"):
+                continue
+
+            try:
+                content = file_path.read_text()
+                test_content_parts: list[str] = []
+
+                # Extract class signatures
+                # Look for class definitions
+                import re
+
+                for match in re.finditer(r"class\s+(\w+)", content):
+                    class_name = match.group(1)
+                    if class_name.startswith("_"):
+                        continue
+                    methods, docstring = extract_class_signatures(content, class_name)
+                    if methods:
+                        test_content_parts.append(
+                            generator.generate_class_test_file(
+                                class_name, methods, class_docstring=docstring
+                            )
+                        )
+
+                # Extract function signatures
+                for match in re.finditer(r"^def\s+(\w+)", content, re.MULTILINE):
+                    func_name = match.group(1)
+                    if func_name.startswith("_"):
+                        continue
+                    sig = extract_function_signature(content, func_name)
+                    if sig:
+                        test_content_parts.append(generator.generate_function_test_stub(sig))
+
+                if test_content_parts:
+                    test_filename = f"test_{file_path.stem}.py"
+                    output_path = test_dir / test_filename
+
+                    test_content = "\n\n".join(test_content_parts)
+
+                    if not self.dry_run:
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        output_path.write_text(test_content)
+                    generated_files.append(output_path)
+            except Exception:
+                continue
+
+        if not generated_files:
+            return Result(
+                success=True,
+                message="No classes or functions found to generate tests for",
+            )
+
+        prefix = "[DRY RUN] Would generate" if self.dry_run else "Generated"
+        return Result(
+            success=True,
+            message=f"{prefix} {len(generated_files)} test files",
+            files_changed=generated_files,
+        )
+
     # ===== Type hint operations =====
 
     def generate_stubs(self, output: str | Path | None = None) -> Result:

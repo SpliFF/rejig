@@ -2575,3 +2575,257 @@ class Rejig:
                 f for r in result.results if r.files_changed for f in r.files_changed
             )),
         )
+
+    # -------------------------------------------------------------------------
+    # Test Generation Operations
+    # -------------------------------------------------------------------------
+
+    def find_functions_without_tests(
+        self,
+        test_patterns: list[str] | None = None,
+    ) -> TargetList[FunctionTarget]:
+        """
+        Find all functions that don't have corresponding test functions.
+
+        Searches for test files matching test_*.py or *_test.py patterns
+        and checks for test functions named test_{function_name}.
+
+        Parameters
+        ----------
+        test_patterns : list[str] | None
+            Glob patterns for test files. Defaults to ["test_*.py", "*_test.py"].
+
+        Returns
+        -------
+        TargetList[FunctionTarget]
+            List of functions without corresponding tests.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> untested = rj.find_functions_without_tests()
+        >>> print(f"Found {len(untested)} functions without tests")
+        >>> untested.generate_test_stubs()  # Generate stubs for all
+        """
+        from rejig.targets.base import TargetList
+        from rejig.targets.python.function import FunctionTarget
+
+        if test_patterns is None:
+            test_patterns = ["test_*.py", "*_test.py"]
+
+        # Collect all test function names from test files
+        tested_functions: set[str] = set()
+
+        for pattern in test_patterns:
+            for test_file in self.root_path.rglob(pattern) if self.root_path else []:
+                try:
+                    content = test_file.read_text()
+                    # Extract test function names (test_xyz -> xyz)
+                    import re
+
+                    for match in re.finditer(r"def test_(\w+)", content):
+                        tested_functions.add(match.group(1))
+                except Exception:
+                    continue
+
+        # Find functions without tests
+        targets: list[FunctionTarget] = []
+
+        for file_path in self.files:
+            # Skip test files
+            if file_path.name.startswith("test_") or file_path.name.endswith("_test.py"):
+                continue
+
+            try:
+                content = file_path.read_text()
+                tree = cst.parse_module(content)
+
+                for node in tree.body:
+                    if isinstance(node, cst.FunctionDef):
+                        func_name = node.name.value
+                        # Skip private functions
+                        if func_name.startswith("_"):
+                            continue
+                        # Check if tested
+                        if func_name not in tested_functions:
+                            targets.append(
+                                FunctionTarget(self, func_name, file_path=file_path)
+                            )
+            except Exception:
+                continue
+
+        return TargetList(self, targets)
+
+    def find_classes_without_tests(
+        self,
+        test_patterns: list[str] | None = None,
+    ) -> TargetList[ClassTarget]:
+        """
+        Find all classes that don't have corresponding test classes.
+
+        Searches for test files and checks for test classes named Test{ClassName}.
+
+        Parameters
+        ----------
+        test_patterns : list[str] | None
+            Glob patterns for test files. Defaults to ["test_*.py", "*_test.py"].
+
+        Returns
+        -------
+        TargetList[ClassTarget]
+            List of classes without corresponding tests.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> untested = rj.find_classes_without_tests()
+        >>> for cls in untested:
+        ...     cls.generate_test_file(f"tests/test_{cls.name.lower()}.py")
+        """
+        from rejig.targets.base import TargetList
+
+        if test_patterns is None:
+            test_patterns = ["test_*.py", "*_test.py"]
+
+        # Collect all test class names from test files
+        tested_classes: set[str] = set()
+
+        for pattern in test_patterns:
+            for test_file in self.root_path.rglob(pattern) if self.root_path else []:
+                try:
+                    content = test_file.read_text()
+                    import re
+
+                    # Extract test class names (TestXyz -> Xyz)
+                    for match in re.finditer(r"class Test(\w+)", content):
+                        tested_classes.add(match.group(1))
+                except Exception:
+                    continue
+
+        # Find classes without tests
+        targets: list[ClassTarget] = []
+
+        for file_path in self.files:
+            # Skip test files
+            if file_path.name.startswith("test_") or file_path.name.endswith("_test.py"):
+                continue
+
+            try:
+                content = file_path.read_text()
+                tree = cst.parse_module(content)
+
+                for node in tree.body:
+                    if isinstance(node, cst.ClassDef):
+                        class_name = node.name.value
+                        # Skip private classes
+                        if class_name.startswith("_"):
+                            continue
+                        # Check if tested
+                        if class_name not in tested_classes:
+                            targets.append(ClassTarget(self, class_name, file_path=file_path))
+            except Exception:
+                continue
+
+        return TargetList(self, targets)
+
+    def generate_test_class(
+        self,
+        class_name: str,
+        output_path: str | Path | None = None,
+        include_setup: bool = True,
+        include_teardown: bool = False,
+    ) -> Result:
+        """
+        Generate a test class structure without referencing an existing class.
+
+        Creates a new test class with optional setup/teardown methods.
+        Useful for generating test scaffolding before implementation.
+
+        Parameters
+        ----------
+        class_name : str
+            Name for the test class (will be prefixed with "Test" if needed).
+        output_path : str | Path | None
+            Where to write the test file. Defaults to tests/test_{class}.py.
+        include_setup : bool
+            Whether to include a setup_method. Default True.
+        include_teardown : bool
+            Whether to include a teardown_method. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_test_class("MyClass", include_setup=True)
+        """
+        # Normalize class name
+        if not class_name.startswith("Test"):
+            test_class_name = f"Test{class_name}"
+        else:
+            test_class_name = class_name
+
+        # Generate test file content
+        lines = ['"""Tests for {name}."""'.format(name=class_name.replace("Test", ""))]
+        lines.append("from __future__ import annotations")
+        lines.append("")
+        lines.append("import pytest")
+        lines.append("")
+        lines.append("")
+        lines.append(f"class {test_class_name}:")
+        lines.append('    """Test class for {name}."""'.format(name=class_name.replace("Test", "")))
+        lines.append("")
+
+        if include_setup:
+            lines.append("    def setup_method(self):")
+            lines.append('        """Set up test fixtures."""')
+            lines.append("        # TODO: Initialize test fixtures")
+            lines.append("        pass")
+            lines.append("")
+
+        if include_teardown:
+            lines.append("    def teardown_method(self):")
+            lines.append('        """Tear down test fixtures."""')
+            lines.append("        # TODO: Clean up test fixtures")
+            lines.append("        pass")
+            lines.append("")
+
+        # Add placeholder test method
+        lines.append("    def test_placeholder(self):")
+        lines.append('        """TODO: Implement tests."""')
+        lines.append("        assert True")
+        lines.append("")
+
+        test_content = "\n".join(lines)
+
+        # Determine output path
+        if output_path is None:
+            test_dir = self.root_path / "tests" if self.root_path else Path("tests")
+            # Convert TestMyClass or MyClass to test_my_class.py
+            import re
+
+            base_name = class_name.replace("Test", "")
+            snake_name = re.sub(r"(?<!^)(?=[A-Z])", "_", base_name).lower()
+            output_path = test_dir / f"test_{snake_name}.py"
+        else:
+            output_path = Path(output_path)
+
+        if self.dry_run:
+            return Result(
+                success=True,
+                message=f"[DRY RUN] Would create test class at {output_path}",
+                data=test_content,
+            )
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(test_content)
+
+        return Result(
+            success=True,
+            message=f"Generated test class {test_class_name} at {output_path}",
+            files_changed=[output_path],
+            data=test_content,
+        )

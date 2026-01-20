@@ -1176,6 +1176,187 @@ class FunctionTarget(Target):
             )
         return result
 
+    # ===== Test generation operations =====
+
+    def generate_test_stub(self, test_dir: str | Path | None = None) -> Result:
+        """Generate a test stub for this function.
+
+        Creates a pytest test function stub in the test directory.
+
+        Parameters
+        ----------
+        test_dir : str | Path | None
+            Base directory for tests. Defaults to "tests" in project root.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.generate_test_stub()  # Creates tests/test_mymodule.py
+        >>> func.generate_test_stub("test_suite/unit")
+        """
+        from rejig.generation.tests import TestGenerator, extract_function_signature
+
+        file_path = self._find_function()
+        if not file_path:
+            return self._operation_failed("generate_test_stub", f"Function '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            signature = extract_function_signature(content, self.name)
+
+            if not signature:
+                return self._operation_failed(
+                    "generate_test_stub",
+                    f"Could not extract signature for function '{self.name}'",
+                )
+
+            generator = TestGenerator()
+            test_code = generator.generate_function_test_stub(signature)
+
+            # Determine output path
+            if test_dir is None:
+                test_dir = self._rejig.root_path / "tests" if self._rejig.root_path else Path("tests")
+            else:
+                test_dir = Path(test_dir)
+
+            test_filename = f"test_{file_path.stem}.py"
+            output_path = test_dir / test_filename
+
+            # Generate imports
+            module_path = None
+            if self._rejig.root_path:
+                try:
+                    rel_path = file_path.relative_to(self._rejig.root_path)
+                    module_path = str(rel_path.with_suffix("")).replace("/", ".").replace("\\", ".")
+                    if module_path.startswith("src."):
+                        module_path = module_path[4:]
+                except ValueError:
+                    pass
+
+            # Build test file content
+            lines = ['"""Tests for {module}."""'.format(module=file_path.stem)]
+            lines.append("from __future__ import annotations")
+            lines.append("")
+            lines.append("import pytest")
+            if module_path:
+                lines.append(f"from {module_path} import {self.name}")
+            lines.append("")
+            lines.append("")
+            lines.append(test_code)
+            test_content = "\n".join(lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would create test at {output_path}",
+                    data=test_content,
+                )
+
+            # Append to existing file or create new
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path.exists():
+                existing = output_path.read_text()
+                if f"def test_{self.name}" not in existing:
+                    output_path.write_text(existing + "\n\n" + test_code)
+            else:
+                output_path.write_text(test_content)
+
+            return Result(
+                success=True,
+                message=f"Generated test stub for {self.name} at {output_path}",
+                files_changed=[output_path],
+                data=test_content,
+            )
+        except Exception as e:
+            return self._operation_failed("generate_test_stub", f"Failed to generate test stub: {e}", e)
+
+    def generate_tests_from_doctest(self, output_path: str | Path | None = None) -> Result:
+        """Convert doctest examples in this function to pytest tests.
+
+        Extracts doctest examples from the function's docstring and
+        generates equivalent pytest test functions.
+
+        Parameters
+        ----------
+        output_path : str | Path | None
+            Where to write the tests. If None, writes to tests/test_{module}.py.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.generate_tests_from_doctest()
+        >>> func.generate_tests_from_doctest("tests/test_doctests.py")
+        """
+        from rejig.generation.tests import TestGenerator, extract_doctests
+
+        file_path = self._find_function()
+        if not file_path:
+            return self._operation_failed(
+                "generate_tests_from_doctest",
+                f"Function '{self.name}' not found",
+            )
+
+        try:
+            content = file_path.read_text()
+            examples = extract_doctests(content, function_name=self.name)
+
+            if not examples:
+                return Result(
+                    success=True,
+                    message=f"No doctest examples found in function '{self.name}'",
+                )
+
+            generator = TestGenerator()
+            test_code = generator.doctest_to_pytest(examples, function_name=self.name)
+
+            # Determine output path
+            if output_path is None:
+                test_dir = self._rejig.root_path / "tests" if self._rejig.root_path else Path("tests")
+                output_path = test_dir / f"test_{file_path.stem}_doctest.py"
+            else:
+                output_path = Path(output_path)
+
+            # Build test file
+            lines = ['"""Doctest conversions for {func}."""'.format(func=self.name)]
+            lines.append("from __future__ import annotations")
+            lines.append("")
+            lines.append("import pytest")
+            lines.append("")
+            lines.append("")
+            lines.append(test_code)
+            test_content = "\n".join(lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would convert {len(examples)} doctests at {output_path}",
+                    data=test_content,
+                )
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(test_content)
+
+            return Result(
+                success=True,
+                message=f"Converted {len(examples)} doctests to pytest at {output_path}",
+                files_changed=[output_path],
+                data=test_content,
+            )
+        except Exception as e:
+            return self._operation_failed(
+                "generate_tests_from_doctest",
+                f"Failed to convert doctests: {e}",
+                e,
+            )
+
     # ===== Directive operations =====
 
     def add_no_cover(self) -> Result:

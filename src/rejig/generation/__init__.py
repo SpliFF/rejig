@@ -32,6 +32,18 @@ from .inheritance import (
     AddMixinTransformer,
     RemoveBaseClassTransformer,
 )
+from .tests import (
+    AddPytestFixtureTransformer,
+    DoctestExtractor,
+    FunctionSignature,
+    SignatureExtractor,
+    TestCase,
+    TestGenerator,
+    UnittestToPytestConverter,
+    extract_class_signatures,
+    extract_doctests,
+    extract_function_signature,
+)
 
 __all__ = [
     # Dunder generation
@@ -55,4 +67,15 @@ __all__ = [
     "AddBaseClassTransformer",
     "AddMixinTransformer",
     "RemoveBaseClassTransformer",
+    # Test generation
+    "AddPytestFixtureTransformer",
+    "DoctestExtractor",
+    "FunctionSignature",
+    "SignatureExtractor",
+    "TestCase",
+    "TestGenerator",
+    "UnittestToPytestConverter",
+    "extract_class_signatures",
+    "extract_doctests",
+    "extract_function_signature",
 ]

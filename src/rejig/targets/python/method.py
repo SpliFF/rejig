@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import libcst as cst
 
@@ -1472,6 +1472,138 @@ class MethodTarget(Target):
                 files_changed=result.files_changed,
             )
         return result
+
+    # ===== Test generation operations =====
+
+    def generate_test(
+        self,
+        test_cases: list[dict[str, Any]] | None = None,
+        output_path: str | Path | None = None,
+    ) -> Result:
+        """Generate a test for this method.
+
+        Generates either a simple test stub or a parameterized test
+        if test cases are provided.
+
+        Parameters
+        ----------
+        test_cases : list[dict] | None
+            Optional list of test cases. Each dict should have:
+            - "input": dict of parameter name to value
+            - "expected": expected return value
+            - "description": optional test case description
+        output_path : str | Path | None
+            Where to write the test. Defaults to tests/test_{class}.py.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.generate_test()
+        >>> method.generate_test(
+        ...     test_cases=[
+        ...         {"input": {"data": "valid"}, "expected": True},
+        ...         {"input": {"data": ""}, "expected": False},
+        ...     ]
+        ... )
+        """
+        from rejig.generation.tests import (
+            TestCase,
+            TestGenerator,
+            extract_function_signature,
+        )
+
+        file_path = self._find_method()
+        if not file_path:
+            return self._operation_failed(
+                "generate_test",
+                f"Method '{self.class_name}.{self.name}' not found",
+            )
+
+        try:
+            content = file_path.read_text()
+            signature = extract_function_signature(content, self.name, self.class_name)
+
+            if not signature:
+                return self._operation_failed(
+                    "generate_test",
+                    f"Could not extract signature for method '{self.name}'",
+                )
+
+            generator = TestGenerator()
+
+            if test_cases:
+                # Generate parameterized test
+                cases = [
+                    TestCase(
+                        input=tc.get("input", {}),
+                        expected=tc.get("expected"),
+                        description=tc.get("description", ""),
+                    )
+                    for tc in test_cases
+                ]
+                test_code = generator.generate_parameterized_test(signature, cases)
+            else:
+                # Generate simple stub
+                test_code = generator.generate_function_test_stub(signature)
+
+            # Determine output path
+            if output_path is None:
+                test_dir = self._rejig.root_path / "tests" if self._rejig.root_path else Path("tests")
+                output_path = test_dir / f"test_{file_path.stem}.py"
+            else:
+                output_path = Path(output_path)
+
+            # Build test file content
+            module_path = None
+            if self._rejig.root_path:
+                try:
+                    rel_path = file_path.relative_to(self._rejig.root_path)
+                    module_path = str(rel_path.with_suffix("")).replace("/", ".").replace("\\", ".")
+                    if module_path.startswith("src."):
+                        module_path = module_path[4:]
+                except ValueError:
+                    pass
+
+            lines = ['"""Tests for {cls}.{method}."""'.format(cls=self.class_name, method=self.name)]
+            lines.append("from __future__ import annotations")
+            lines.append("")
+            lines.append("import pytest")
+            if module_path:
+                lines.append(f"from {module_path} import {self.class_name}")
+            lines.append("")
+            lines.append("")
+            lines.append(test_code)
+            test_content = "\n".join(lines)
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would create test at {output_path}",
+                    data=test_content,
+                )
+
+            # Append to existing file or create new
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path.exists():
+                existing = output_path.read_text()
+                test_func_name = f"test_{self.name}" if not test_cases else f"test_{self.name}"
+                if test_func_name not in existing:
+                    output_path.write_text(existing + "\n\n" + test_code)
+            else:
+                output_path.write_text(test_content)
+
+            return Result(
+                success=True,
+                message=f"Generated test for {self.class_name}.{self.name} at {output_path}",
+                files_changed=[output_path],
+                data=test_content,
+            )
+        except Exception as e:
+            return self._operation_failed("generate_test", f"Failed to generate test: {e}", e)
 
     # ===== Directive operations =====
 
