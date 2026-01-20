@@ -654,3 +654,247 @@ class PackageTarget(Target):
         output_dir = Path(output) if output else None
         generator = StubGenerator(self._rejig)
         return generator.generate_for_package(self.path, output_dir)
+
+    # ===== Module operations =====
+
+    def merge_modules(
+        self,
+        module_names: list[str],
+        into: str,
+        delete_originals: bool = False,
+        generate_all: bool = True,
+    ) -> Result:
+        """Merge multiple modules in this package into one.
+
+        Parameters
+        ----------
+        module_names : list[str]
+            List of module names to merge (without .py extension).
+        into : str
+            Target module name (without .py extension).
+        delete_originals : bool
+            Whether to delete the original files after merging.
+        generate_all : bool
+            Whether to generate an __all__ list.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> pkg = rj.package("mypackage/")
+        >>> pkg.merge_modules(["utils_a", "utils_b"], into="utils")
+        """
+        from rejig.modules.merge import ModuleMerger
+
+        if not self.exists():
+            return self._operation_failed(
+                "merge_modules", f"Package not found: {self.path}"
+            )
+
+        # Convert module names to paths
+        module_paths = [self.path / f"{name}.py" for name in module_names]
+
+        # Validate all modules exist
+        for i, module_path in enumerate(module_paths):
+            if not module_path.exists():
+                return self._operation_failed(
+                    "merge_modules",
+                    f"Module not found: {module_names[i]}",
+                )
+
+        output_path = self.path / f"{into}.py"
+
+        merger = ModuleMerger(self._rejig)
+        return merger.merge(module_paths, output_path, delete_originals, generate_all)
+
+    # ===== Header management operations =====
+
+    def add_copyright_header(
+        self,
+        copyright_text: str,
+        year: int | None = None,
+        recursive: bool = True,
+    ) -> Result:
+        """Add a copyright header to all Python files in this package.
+
+        Parameters
+        ----------
+        copyright_text : str
+            Copyright holder text (e.g., "MyCompany Inc.").
+        year : int | None
+            Copyright year. Defaults to current year.
+        recursive : bool
+            Whether to include files in subpackages. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> pkg = rj.package("mypackage/")
+        >>> pkg.add_copyright_header("Copyright 2024 MyCompany")
+        """
+        from rejig.modules.headers import HeaderManager
+
+        if not self.exists():
+            return self._operation_failed(
+                "add_copyright_header", f"Package not found: {self.path}"
+            )
+
+        manager = HeaderManager(self._rejig)
+        files_changed: list[Path] = []
+
+        # Get all Python files
+        pattern = "**/*.py" if recursive else "*.py"
+        for file_path in self.path.glob(pattern):
+            if "__pycache__" in str(file_path):
+                continue
+
+            result = manager.add_copyright_header(file_path, copyright_text, year)
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        if not files_changed:
+            return Result(
+                success=True,
+                message=f"No files needed copyright header in {self.path}",
+            )
+
+        prefix = "[DRY RUN] Would add" if self.dry_run else "Added"
+        return Result(
+            success=True,
+            message=f"{prefix} copyright header to {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def add_license_header(
+        self,
+        license_name: str,
+        copyright_holder: str | None = None,
+        year: int | None = None,
+        recursive: bool = True,
+    ) -> Result:
+        """Add a license header to all Python files in this package.
+
+        Parameters
+        ----------
+        license_name : str
+            License identifier: "MIT", "Apache-2.0", "GPL-3.0",
+            "BSD-3-Clause", or "Proprietary".
+        copyright_holder : str | None
+            Copyright holder name. If None, uses a placeholder.
+        year : int | None
+            Copyright year. Defaults to current year.
+        recursive : bool
+            Whether to include files in subpackages. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> pkg = rj.package("mypackage/")
+        >>> pkg.add_license_header("MIT", "MyCompany Inc.")
+        """
+        from rejig.modules.headers import HeaderManager
+
+        if not self.exists():
+            return self._operation_failed(
+                "add_license_header", f"Package not found: {self.path}"
+            )
+
+        manager = HeaderManager(self._rejig)
+        files_changed: list[Path] = []
+
+        # Get all Python files
+        pattern = "**/*.py" if recursive else "*.py"
+        for file_path in self.path.glob(pattern):
+            if "__pycache__" in str(file_path):
+                continue
+
+            result = manager.add_license_header(
+                file_path, license_name, copyright_holder, year
+            )
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        if not files_changed:
+            return Result(
+                success=True,
+                message=f"No files needed license header in {self.path}",
+            )
+
+        prefix = "[DRY RUN] Would add" if self.dry_run else "Added"
+        return Result(
+            success=True,
+            message=f"{prefix} license header to {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def update_copyright_year(
+        self,
+        new_year: int | None = None,
+        recursive: bool = True,
+    ) -> Result:
+        """Update the copyright year in all Python files in this package.
+
+        Updates patterns like:
+        - "Copyright 2023" -> "Copyright 2023-2024"
+        - "Copyright 2023-2024" -> "Copyright 2023-2025"
+
+        Parameters
+        ----------
+        new_year : int | None
+            Target year. Defaults to current year.
+        recursive : bool
+            Whether to include files in subpackages. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> pkg = rj.package("mypackage/")
+        >>> pkg.update_copyright_year()
+        """
+        from rejig.modules.headers import HeaderManager
+
+        if not self.exists():
+            return self._operation_failed(
+                "update_copyright_year", f"Package not found: {self.path}"
+            )
+
+        manager = HeaderManager(self._rejig)
+        files_changed: list[Path] = []
+
+        # Get all Python files
+        pattern = "**/*.py" if recursive else "*.py"
+        for file_path in self.path.glob(pattern):
+            if "__pycache__" in str(file_path):
+                continue
+
+            result = manager.update_copyright_year(file_path, new_year)
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        if not files_changed:
+            return Result(
+                success=True,
+                message=f"No files needed copyright year update in {self.path}",
+            )
+
+        prefix = "[DRY RUN] Would update" if self.dry_run else "Updated"
+        return Result(
+            success=True,
+            message=f"{prefix} copyright year in {len(files_changed)} files",
+            files_changed=files_changed,
+        )

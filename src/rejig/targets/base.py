@@ -745,3 +745,121 @@ class TargetList(Generic[T]):
                     )
                 )
         return BatchResult(results)
+
+    # ===== Header batch operations =====
+
+    def add_copyright_header(
+        self,
+        copyright_text: str,
+        year: int | None = None,
+    ) -> BatchResult:
+        """Add a copyright header to all file targets.
+
+        Parameters
+        ----------
+        copyright_text : str
+            Copyright holder text (e.g., "MyCompany Inc.").
+        year : int | None
+            Copyright year. Defaults to current year.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.add_copyright_header("MyCompany Inc.")
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "add_copyright_header"):
+                results.append(t.add_copyright_header(copyright_text, year))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'add_copyright_header' not supported for {t.__class__.__name__}",
+                        operation="add_copyright_header",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def add_license_header(
+        self,
+        license_name: str,
+        copyright_holder: str | None = None,
+        year: int | None = None,
+    ) -> BatchResult:
+        """Add a license header to all file targets.
+
+        Parameters
+        ----------
+        license_name : str
+            License identifier: "MIT", "Apache-2.0", "GPL-3.0",
+            "BSD-3-Clause", or "Proprietary".
+        copyright_holder : str | None
+            Copyright holder name. If None, uses a placeholder.
+        year : int | None
+            Copyright year. Defaults to current year.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.add_license_header("MIT")
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "add_license_header"):
+                results.append(t.add_license_header(license_name, copyright_holder, year))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'add_license_header' not supported for {t.__class__.__name__}",
+                        operation="add_license_header",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def update_copyright_year(self, new_year: int | None = None) -> BatchResult:
+        """Update the copyright year in all file targets.
+
+        Updates patterns like:
+        - "Copyright 2023" -> "Copyright 2023-2024"
+        - "Copyright 2023-2024" -> "Copyright 2023-2025"
+
+        Parameters
+        ----------
+        new_year : int | None
+            Target year. Defaults to current year.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.update_copyright_year()
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "update_copyright_year"):
+                results.append(t.update_copyright_year(new_year))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'update_copyright_year' not supported for {t.__class__.__name__}",
+                        operation="update_copyright_year",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)

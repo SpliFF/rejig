@@ -335,3 +335,63 @@ class ModuleTarget(Target):
                 "delete", f"Module '{self.module_path}' not found"
             )
         return file_target.delete()
+
+    def rename(self, new_name: str, update_imports: bool = True) -> Result:
+        """Rename this module and update imports across the project.
+
+        Parameters
+        ----------
+        new_name : str
+            New module path (e.g., "myapp.new_utils").
+        update_imports : bool
+            Whether to update imports across the project. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> module = rj.module("myapp.old_utils")
+        >>> module.rename("myapp.new_utils")  # Updates imports across project
+        """
+        from rejig.modules.rename import ModuleRenamer
+
+        if not self.exists():
+            return self._operation_failed(
+                "rename", f"Module '{self.module_path}' not found"
+            )
+
+        renamer = ModuleRenamer(self._rejig)
+        return renamer.rename(self.module_path, new_name, update_imports)
+
+    def move_to(self, new_location: str, update_imports: bool = True) -> Result:
+        """Move this module to a new location with import updates.
+
+        Parameters
+        ----------
+        new_location : str
+            New module path (e.g., "myapp.core.utils").
+        update_imports : bool
+            Whether to update imports across the project. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> module = rj.module("myapp.utils")
+        >>> module.move_to("myapp.core.utils")  # Moves and updates imports
+        """
+        from rejig.modules.rename import ModuleRenamer
+
+        if not self.exists():
+            return self._operation_failed(
+                "move_to", f"Module '{self.module_path}' not found"
+            )
+
+        renamer = ModuleRenamer(self._rejig)
+        return renamer.move_to(self.module_path, new_location, update_imports)

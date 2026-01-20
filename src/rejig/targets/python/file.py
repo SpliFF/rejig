@@ -1838,3 +1838,301 @@ class FileTarget(Target):
             message=f"Removed {count} directives from {self.path}",
             files_changed=[self.path] if count > 0 else [],
         )
+
+    # ===== Module operations =====
+
+    def split(
+        self,
+        by: str = "class",
+        output_dir: Path | None = None,
+        create_init: bool = True,
+    ) -> Result:
+        """Split this file into multiple files.
+
+        Parameters
+        ----------
+        by : str
+            What to split by: "class" or "function".
+        output_dir : Path | None
+            Output directory. Defaults to a package named after the file.
+        create_init : bool
+            Whether to create an __init__.py with imports.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("big_module.py")
+        >>> file.split(by="class")  # One file per class
+        >>> file.split(by="function")  # One file per function
+        """
+        from rejig.modules.split import ModuleSplitter
+
+        splitter = ModuleSplitter(self._rejig)
+
+        if by == "class":
+            return splitter.split_by_class(self.path, output_dir, create_init)
+        elif by == "function":
+            return splitter.split_by_function(self.path, output_dir, create_init)
+        else:
+            return self._operation_failed(
+                "split",
+                f"Invalid split mode: {by}. Use 'class' or 'function'.",
+            )
+
+    def convert_to_package(self, keep_original: bool = False) -> Result:
+        """Convert this file to a package directory.
+
+        Transforms utils.py into utils/__init__.py.
+
+        Parameters
+        ----------
+        keep_original : bool
+            Whether to keep the original file. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("utils.py")
+        >>> file.convert_to_package()  # Creates utils/__init__.py
+        """
+        from rejig.modules.split import ModuleSplitter
+
+        splitter = ModuleSplitter(self._rejig)
+        return splitter.convert_to_package(self.path, keep_original)
+
+    # ===== __all__ management operations =====
+
+    def get_all_exports(self) -> list[str]:
+        """Get the current __all__ exports from this file.
+
+        Returns
+        -------
+        list[str]
+            List of exported names, or empty list if no __all__.
+
+        Examples
+        --------
+        >>> file = rj.file("mypackage/__init__.py")
+        >>> exports = file.get_all_exports()
+        >>> print(exports)  # ['Class1', 'function1', ...]
+        """
+        from rejig.modules.exports import ExportsManager
+
+        manager = ExportsManager(self._rejig)
+        return manager.get_exports(self.path)
+
+    def generate_all_exports(self, include_private: bool = False) -> Result:
+        """Generate __all__ from all public definitions in this file.
+
+        Creates an __all__ list containing all public classes, functions,
+        and module-level variables.
+
+        Parameters
+        ----------
+        include_private : bool
+            Whether to include private names (starting with _).
+
+        Returns
+        -------
+        Result
+            Result with generated __all__ in data field.
+
+        Examples
+        --------
+        >>> init_file = rj.file("mypackage/__init__.py")
+        >>> init_file.generate_all_exports()
+        """
+        from rejig.modules.exports import ExportsManager
+
+        manager = ExportsManager(self._rejig)
+        return manager.generate_exports(self.path, include_private)
+
+    def update_all_exports(self, include_private: bool = False) -> Result:
+        """Update __all__ to sync with actual definitions.
+
+        Adds missing exports and removes stale ones.
+
+        Parameters
+        ----------
+        include_private : bool
+            Whether to include private names (starting with _).
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> init_file = rj.file("mypackage/__init__.py")
+        >>> init_file.update_all_exports()
+        """
+        from rejig.modules.exports import ExportsManager
+
+        manager = ExportsManager(self._rejig)
+        return manager.update_exports(self.path, include_private)
+
+    def add_to_all(self, name: str) -> Result:
+        """Add a name to __all__.
+
+        Parameters
+        ----------
+        name : str
+            Name to add to __all__.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> init_file = rj.file("mypackage/__init__.py")
+        >>> init_file.add_to_all("new_function")
+        """
+        from rejig.modules.exports import ExportsManager
+
+        manager = ExportsManager(self._rejig)
+        return manager.add_export(self.path, name)
+
+    def remove_from_all(self, name: str) -> Result:
+        """Remove a name from __all__.
+
+        Parameters
+        ----------
+        name : str
+            Name to remove from __all__.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> init_file = rj.file("mypackage/__init__.py")
+        >>> init_file.remove_from_all("old_function")
+        """
+        from rejig.modules.exports import ExportsManager
+
+        manager = ExportsManager(self._rejig)
+        return manager.remove_export(self.path, name)
+
+    # ===== Header management operations =====
+
+    def add_copyright_header(
+        self,
+        copyright_text: str,
+        year: int | None = None,
+    ) -> Result:
+        """Add a copyright header to this file.
+
+        Parameters
+        ----------
+        copyright_text : str
+            Copyright holder text (e.g., "MyCompany Inc.").
+        year : int | None
+            Copyright year. Defaults to current year.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.add_copyright_header("Copyright 2024 MyCompany")
+        """
+        from rejig.modules.headers import HeaderManager
+
+        manager = HeaderManager(self._rejig)
+        return manager.add_copyright_header(self.path, copyright_text, year)
+
+    def add_license_header(
+        self,
+        license_name: str,
+        copyright_holder: str | None = None,
+        year: int | None = None,
+    ) -> Result:
+        """Add a license header to this file.
+
+        Parameters
+        ----------
+        license_name : str
+            License identifier: "MIT", "Apache-2.0", "GPL-3.0",
+            "BSD-3-Clause", or "Proprietary".
+        copyright_holder : str | None
+            Copyright holder name. If None, uses a placeholder.
+        year : int | None
+            Copyright year. Defaults to current year.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.add_license_header("MIT")
+        >>> file.add_license_header("Apache-2.0", "MyCompany Inc.")
+        """
+        from rejig.modules.headers import HeaderManager
+
+        manager = HeaderManager(self._rejig)
+        return manager.add_license_header(self.path, license_name, copyright_holder, year)
+
+    def update_copyright_year(self, new_year: int | None = None) -> Result:
+        """Update the copyright year in this file's header.
+
+        Updates patterns like:
+        - "Copyright 2023" -> "Copyright 2023-2024"
+        - "Copyright 2023-2024" -> "Copyright 2023-2025"
+
+        Parameters
+        ----------
+        new_year : int | None
+            Target year. Defaults to current year.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.update_copyright_year()
+        """
+        from rejig.modules.headers import HeaderManager
+
+        manager = HeaderManager(self._rejig)
+        return manager.update_copyright_year(self.path, new_year)
+
+    def has_header(self) -> bool:
+        """Check if this file has a copyright/license header.
+
+        Returns
+        -------
+        bool
+            True if the file has a header.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> if not file.has_header():
+        ...     file.add_license_header("MIT")
+        """
+        from rejig.modules.headers import HeaderManager
+
+        manager = HeaderManager(self._rejig)
+        return manager.has_header(self.path)
