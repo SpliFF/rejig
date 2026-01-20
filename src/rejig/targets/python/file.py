@@ -829,3 +829,95 @@ class FileTarget(Target):
             return None
         except Exception:
             return None
+
+    # ===== Type hint operations =====
+
+    def convert_type_comments_to_annotations(self) -> Result:
+        """Convert type comments to inline annotations.
+
+        Converts:
+            x = 1  # type: int
+        To:
+            x: int = 1
+
+        And:
+            def f(x):  # type: (int) -> str
+        To:
+            def f(x: int) -> str:
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("legacy_module.py")
+        >>> file.convert_type_comments_to_annotations()
+        """
+        from rejig.typehints.modernizer import TypeCommentConverter
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            converter = TypeCommentConverter()
+            new_tree = tree.visit(converter)
+            new_content = new_tree.code
+
+            if not converter.changed:
+                return Result(success=True, message=f"No type comments to convert in {self.path}")
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "convert_type_comments_to_annotations",
+                f"Failed to convert type comments: {e}",
+                e,
+            )
+
+    def modernize_type_hints(self) -> Result:
+        """Modernize type hints to Python 3.10+ syntax.
+
+        Converts:
+        - List[str] → list[str]
+        - Dict[str, int] → dict[str, int]
+        - Optional[str] → str | None
+        - Union[str, int] → str | int
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.modernize_type_hints()
+        """
+        from rejig.typehints.modernizer import TypeHintModernizer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            modernizer = TypeHintModernizer()
+            new_tree = tree.visit(modernizer)
+            new_content = new_tree.code
+
+            if not modernizer.changed:
+                return Result(success=True, message=f"No type hints to modernize in {self.path}")
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "modernize_type_hints",
+                f"Failed to modernize type hints: {e}",
+                e,
+            )

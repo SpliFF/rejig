@@ -367,3 +367,38 @@ class PackageTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete package: {e}", e)
+
+    # ===== Type hint operations =====
+
+    def generate_stubs(self, output: str | Path | None = None) -> Result:
+        """Generate type stub files (.pyi) for all modules in this package.
+
+        Creates stub files that contain only function signatures, class
+        definitions, and type annotations. This is useful for providing
+        type hints for libraries or for use with type checkers.
+
+        Parameters
+        ----------
+        output : str | Path | None
+            Output directory for stub files. If None, creates a 'stubs/'
+            directory next to the package.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> pkg = rj.package("src/mypackage")
+        >>> pkg.generate_stubs()  # Creates stubs/ alongside package
+        >>> pkg.generate_stubs("custom_stubs/")  # Use custom directory
+        """
+        from rejig.typehints.stubs import StubGenerator
+
+        if not self.exists():
+            return self._operation_failed("generate_stubs", f"Package not found: {self.path}")
+
+        output_dir = Path(output) if output else None
+        generator = StubGenerator(self._rejig)
+        return generator.generate_for_package(self.path, output_dir)

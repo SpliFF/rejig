@@ -444,3 +444,135 @@ class TargetList(Generic[T]):
                     )
                 )
         return BatchResult(results)
+
+    # ===== Type hint batch operations =====
+
+    def modernize_type_hints(self) -> BatchResult:
+        """Modernize type hints in all targets (FileTarget).
+
+        Converts old-style type hints to Python 3.10+ syntax:
+        - List[str] → list[str]
+        - Dict[str, int] → dict[str, int]
+        - Optional[str] → str | None
+        - Union[str, int] → str | int
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.modernize_type_hints()
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "modernize_type_hints"):
+                results.append(t.modernize_type_hints())
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'modernize_type_hints' not supported for {t.__class__.__name__}",
+                        operation="modernize_type_hints",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def convert_type_comments(self) -> BatchResult:
+        """Convert type comments to inline annotations in all targets.
+
+        Converts:
+            x = 1  # type: int
+        To:
+            x: int = 1
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.convert_type_comments()
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "convert_type_comments_to_annotations"):
+                results.append(t.convert_type_comments_to_annotations())
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'convert_type_comments' not supported for {t.__class__.__name__}",
+                        operation="convert_type_comments",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def infer_type_hints(self, overwrite: bool = False) -> BatchResult:
+        """Infer and add type hints to all targets (FunctionTarget/MethodTarget).
+
+        Uses heuristics to infer types from:
+        - Default parameter values (e.g., = 0 → int)
+        - Parameter names (e.g., count → int, is_valid → bool)
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, overwrite existing type hints. Default False.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> funcs = rj.find_functions()
+        >>> funcs.infer_type_hints()
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "infer_type_hints"):
+                results.append(t.infer_type_hints(overwrite))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'infer_type_hints' not supported for {t.__class__.__name__}",
+                        operation="infer_type_hints",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def remove_type_hints(self) -> BatchResult:
+        """Remove type hints from all targets (FunctionTarget/MethodTarget).
+
+        Removes return type annotations and parameter type annotations.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> funcs = rj.find_functions("^test_")
+        >>> funcs.remove_type_hints()
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "remove_type_hints"):
+                results.append(t.remove_type_hints())
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'remove_type_hints' not supported for {t.__class__.__name__}",
+                        operation="remove_type_hints",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)

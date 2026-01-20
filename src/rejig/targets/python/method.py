@@ -13,12 +13,16 @@ from rejig.transformers import (
     AddFirstParameter,
     AddMethodDecorator,
     AddParameter,
+    InferTypeHints,
     InsertAtMatch,
     InsertAtMethodEnd,
     InsertAtMethodStart,
     RemoveMethodDecorator,
+    RemoveTypeHints,
     RenameMethod,
     ReplaceIdentifier,
+    SetParameterType,
+    SetReturnType,
     StaticToClassMethod,
 )
 
@@ -699,3 +703,123 @@ class MethodTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete method: {e}", e)
+
+    # ===== Type hint operations =====
+
+    def set_return_type(self, return_type: str) -> Result:
+        """Set the return type annotation for this method.
+
+        Parameters
+        ----------
+        return_type : str
+            The return type annotation (e.g., "list[str]", "None").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.set_return_type("list[str]")
+        >>> method.set_return_type("Result")
+        """
+        transformer = SetReturnType(self.class_name, self.name, return_type)
+        result = self._transform(transformer)
+
+        if result.success and transformer.changed:
+            return Result(
+                success=True,
+                message=f"Set return type of {self.class_name}.{self.name} to {return_type}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def set_parameter_type(self, param_name: str, param_type: str) -> Result:
+        """Set the type annotation for a parameter.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the parameter to annotate.
+        param_type : str
+            The type annotation (e.g., "dict[str, Any]").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.set_parameter_type("data", "dict[str, Any]")
+        >>> method.set_parameter_type("timeout", "int")
+        """
+        transformer = SetParameterType(self.class_name, self.name, param_name, param_type)
+        result = self._transform(transformer)
+
+        if result.success and transformer.changed:
+            return Result(
+                success=True,
+                message=f"Set type of {param_name} to {param_type} in {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def remove_type_hints(self) -> Result:
+        """Remove all type hints from this method.
+
+        Removes return type annotations and parameter type annotations.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.remove_type_hints()
+        """
+        transformer = RemoveTypeHints(self.class_name, self.name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.changed:
+            return Result(
+                success=True,
+                message=f"Removed type hints from {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def infer_type_hints(self, overwrite: bool = False) -> Result:
+        """Infer and add type hints based on defaults and name heuristics.
+
+        Uses heuristics to infer types from:
+        - Default parameter values (e.g., = 0 → int)
+        - Parameter names (e.g., count → int, is_valid → bool)
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, overwrite existing type hints. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.infer_type_hints()
+        >>> method.infer_type_hints(overwrite=True)
+        """
+        transformer = InferTypeHints(self.class_name, self.name, overwrite)
+        result = self._transform(transformer)
+
+        if result.success and transformer.changed:
+            return Result(
+                success=True,
+                message=f"Inferred type hints for {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        return result

@@ -12,6 +12,7 @@ from rejig.targets.base import ErrorResult, ErrorTarget, Result, Target, TargetL
 from rejig.transformers import (
     AddClassAttribute,
     AddClassDecorator,
+    InferTypeHints,
     RemoveClassAttribute,
     RemoveDecorator,
     RenameClass,
@@ -686,3 +687,64 @@ class ClassTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete class: {e}", e)
+
+    # ===== Type hint operations =====
+
+    def add_type_hints_from_defaults(self, overwrite: bool = False) -> Result:
+        """Add type hints to methods based on parameter defaults.
+
+        Infers type hints from:
+        - Default parameter values (e.g., = 0 → int)
+        - Parameter names (e.g., count → int, is_valid → bool)
+
+        This primarily targets the __init__ method to infer instance
+        attribute types from default values.
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, overwrite existing type hints. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.add_type_hints_from_defaults()
+        >>> cls.add_type_hints_from_defaults(overwrite=True)
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed(
+                "add_type_hints_from_defaults", f"Class '{self.name}' not found"
+            )
+
+        # Get all methods in this class
+        methods = self.find_methods()
+        if not methods:
+            return Result(
+                success=True,
+                message=f"No methods found in {self.name}",
+            )
+
+        # Apply type inference to each method
+        changed_count = 0
+        for method in methods:
+            transformer = InferTypeHints(self.name, method.name, overwrite)
+            result = self._transform(transformer)
+            if result.success and transformer.changed:
+                changed_count += 1
+
+        if changed_count == 0:
+            return Result(
+                success=True,
+                message=f"No type hints inferred for {self.name}",
+            )
+
+        return Result(
+            success=True,
+            message=f"Inferred type hints for {changed_count} methods in {self.name}",
+            files_changed=[file_path],
+        )

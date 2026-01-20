@@ -1667,3 +1667,159 @@ class Rejig:
             message=f"Removed {total_removed} unused imports from {len(files_changed)} files",
             files_changed=files_changed,
         )
+
+    # -------------------------------------------------------------------------
+    # Type Hint Operations
+    # -------------------------------------------------------------------------
+
+    def find_functions_without_type_hints(self) -> TargetList[FunctionTarget]:
+        """
+        Find all functions that lack return type annotations.
+
+        Returns functions where the return type is not annotated.
+        This helps identify code that needs type hints added.
+
+        Returns
+        -------
+        TargetList[FunctionTarget]
+            List of FunctionTarget objects for functions without return types.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> untyped = rj.find_functions_without_type_hints()
+        >>> print(f"Found {len(untyped)} functions without type hints")
+        >>> for func in untyped:
+        ...     print(f"  {func.name} in {func.file_path}")
+        """
+        from rejig.targets.base import TargetList
+        from rejig.targets.python.function import FunctionTarget
+
+        targets: list[FunctionTarget] = []
+
+        for file_path in self.files:
+            try:
+                content = file_path.read_text()
+                tree = cst.parse_module(content)
+
+                for node in tree.body:
+                    if isinstance(node, cst.FunctionDef):
+                        # Check if return type is missing
+                        if node.returns is None:
+                            targets.append(
+                                FunctionTarget(self, node.name.value, file_path=file_path)
+                            )
+            except Exception:
+                continue
+
+        return TargetList(self, targets)
+
+    def find_parameters_without_type_hints(
+        self,
+    ) -> list[tuple[FunctionTarget | ClassTarget, str]]:
+        """
+        Find all function/method parameters that lack type annotations.
+
+        Returns a list of tuples containing the target (FunctionTarget or
+        ClassTarget with method info) and the parameter name that needs
+        type hints.
+
+        Returns
+        -------
+        list[tuple[FunctionTarget | ClassTarget, str]]
+            List of (target, param_name) tuples for parameters without types.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> untyped_params = rj.find_parameters_without_type_hints()
+        >>> print(f"Found {len(untyped_params)} parameters without type hints")
+        >>> for target, param_name in untyped_params:
+        ...     print(f"  {param_name} in {target}")
+        """
+        from rejig.targets.python.function import FunctionTarget
+
+        results: list[tuple[FunctionTarget | ClassTarget, str]] = []
+
+        for file_path in self.files:
+            try:
+                content = file_path.read_text()
+                tree = cst.parse_module(content)
+
+                class ParamFinder(cst.CSTVisitor):
+                    def __init__(self):
+                        self.current_class: str | None = None
+                        self.untyped_params: list[tuple[str | None, str, str]] = []
+
+                    def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                        self.current_class = node.name.value
+                        return True
+
+                    def leave_ClassDef(self, node: cst.ClassDef) -> None:
+                        self.current_class = None
+
+                    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+                        func_name = node.name.value
+                        for param in node.params.params:
+                            # Skip self/cls
+                            if param.name.value in ("self", "cls"):
+                                continue
+                            if param.annotation is None:
+                                self.untyped_params.append(
+                                    (self.current_class, func_name, param.name.value)
+                                )
+                        return False
+
+                finder = ParamFinder()
+                tree.walk(finder)
+
+                for class_name, func_name, param_name in finder.untyped_params:
+                    if class_name:
+                        # It's a method - use ClassTarget with method info
+                        from rejig.targets.python.class_ import ClassTarget
+                        target = ClassTarget(self, class_name, file_path=file_path)
+                        method = target.find_method(func_name)
+                        results.append((method, param_name))
+                    else:
+                        # It's a module-level function
+                        target = FunctionTarget(self, func_name, file_path=file_path)
+                        results.append((target, param_name))
+
+            except Exception:
+                continue
+
+        return results
+
+    def modernize_all_type_hints(self) -> Result:
+        """
+        Modernize type hints in all Python files.
+
+        Converts old-style type hints to Python 3.10+ syntax:
+        - List[str] → list[str]
+        - Dict[str, int] → dict[str, int]
+        - Optional[str] → str | None
+        - Union[str, int] → str | int
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.modernize_all_type_hints()
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.modernize_type_hints()
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Modernized type hints in {len(files_changed)} files",
+            files_changed=files_changed,
+        )
