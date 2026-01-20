@@ -81,6 +81,91 @@ class Target(ABC):
             exception=exception,
         )
 
+    def _get_file_content(self, path: Path) -> str | None:
+        """Get file content, transaction-aware.
+
+        If in a transaction, returns pending content if available.
+        Otherwise reads from disk.
+
+        Parameters
+        ----------
+        path : Path
+            Path to the file.
+
+        Returns
+        -------
+        str | None
+            File content, or None if file doesn't exist.
+        """
+        tx = self._rejig.current_transaction
+        if tx is not None:
+            return tx.get_current_content(path)
+        if path.exists():
+            return path.read_text()
+        return None
+
+    def _write_with_diff(
+        self,
+        path: Path,
+        original: str,
+        new_content: str,
+        operation: str,
+    ) -> Result:
+        """Write content with diff generation, transaction-aware.
+
+        If in a transaction, the change is recorded but not applied.
+        Otherwise writes immediately.
+
+        Parameters
+        ----------
+        path : Path
+            Path to the file.
+        original : str
+            Original file content.
+        new_content : str
+            New file content.
+        operation : str
+            Description of the operation (for messages).
+
+        Returns
+        -------
+        Result
+            Result of the operation with diff included.
+        """
+        if new_content == original:
+            return Result(success=True, message=f"No changes needed for {operation}")
+
+        from rejig.core.diff import generate_diff
+
+        # Check if we're in a transaction
+        tx = self._rejig.current_transaction
+        if tx is not None:
+            return tx.add_change(path, original, new_content, operation)
+
+        # Not in transaction - write immediately
+        diff = generate_diff(original, new_content, path)
+
+        if self.dry_run:
+            return Result(
+                success=True,
+                message=f"[DRY RUN] Would {operation}",
+                files_changed=[path],
+                diff=diff,
+                diffs={path: diff},
+            )
+
+        try:
+            path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Completed {operation}",
+                files_changed=[path],
+                diff=diff,
+                diffs={path: diff},
+            )
+        except Exception as e:
+            return self._operation_failed(operation, f"Write failed: {e}", e)
+
     # ===== Common operations - subclasses override to implement =====
 
     def add_function(self, name: str, body: str = "pass", **kwargs: Any) -> Result:

@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import re
 import shutil
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 import libcst as cst
 
 from rejig.core.results import Result
 
 if TYPE_CHECKING:
+    from rejig.core.transaction import Transaction
     from rejig.packaging.models import PackageConfig
     from rejig.targets import (
         ClassTarget,
@@ -27,6 +29,7 @@ if TYPE_CHECKING:
     )
     from rejig.targets.base import TargetList
     from rejig.targets.python.todo import TodoTargetList
+    from rejig.targets.text.text_block import TextBlock
 
 
 class Rejig:
@@ -74,6 +77,7 @@ class Rejig:
         self._files: list[Path] | None = None
         self._rope_project = None
         self._root_path: Path | None = None
+        self._transaction: Transaction | None = None
 
     @property
     def root(self) -> Path:
@@ -181,6 +185,74 @@ class Rejig:
             return []
 
     # =========================================================================
+    # Transaction Support
+    # =========================================================================
+
+    @property
+    def in_transaction(self) -> bool:
+        """Check if currently in a transaction.
+
+        Returns
+        -------
+        bool
+            True if a transaction is active.
+        """
+        return self._transaction is not None
+
+    @property
+    def current_transaction(self) -> Transaction | None:
+        """Get the current active transaction.
+
+        Returns
+        -------
+        Transaction | None
+            The current transaction, or None if not in a transaction.
+        """
+        return self._transaction
+
+    @contextmanager
+    def transaction(self) -> Generator[Transaction, None, None]:
+        """Start a transaction for atomic batch operations.
+
+        All file writes within the transaction are collected and applied
+        atomically on commit(). If any write fails, all changes are
+        rolled back.
+
+        Yields
+        ------
+        Transaction
+            The transaction object for commit/rollback control.
+
+        Raises
+        ------
+        RuntimeError
+            If called when already in a transaction (nested transactions
+            are not supported).
+
+        Examples
+        --------
+        >>> with rj.transaction() as tx:
+        ...     rj.find_class("Foo").rename("Bar")
+        ...     rj.find_function("baz").delete()
+        ...     print(tx.preview())  # See combined diff
+        ...     result = tx.commit()  # Apply all atomically
+        ...     # or tx.rollback()   # Discard all
+        """
+        from rejig.core.transaction import Transaction
+
+        if self._transaction is not None:
+            raise RuntimeError("Nested transactions are not supported")
+
+        self._transaction = Transaction(self)
+        try:
+            yield self._transaction
+        finally:
+            # Auto-rollback if not committed
+            if not self._transaction._committed and not self._transaction._rolled_back:
+                self._transaction.rollback()
+            self._transaction = None
+
+    # =========================================================================
     # Target Factory Methods
     # =========================================================================
     # These methods create Target objects from the new unified target system.
@@ -284,6 +356,40 @@ class Rejig:
 
         resolved = self._resolve_path(path)
         return TextFileTarget(self, resolved)
+
+    def text_block(self, path: str | Path) -> TextBlock:
+        """
+        Get a TextBlock for raw text pattern-based manipulation.
+
+        TextBlock provides pattern-based operations (find, replace) for any
+        text file without language-specific parsing. Use this when you need
+        regex-based text manipulation.
+
+        Parameters
+        ----------
+        path : str | Path
+            Path to the text file (relative to root or absolute).
+
+        Returns
+        -------
+        TextBlock
+            A target for pattern-based text manipulation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> block = rj.text_block("README.md")
+        >>> block.replace_pattern(r"v\\d+\\.\\d+", "v2.0")
+        >>>
+        >>> # Find and operate on matches
+        >>> matches = block.find_pattern(r"TODO:.*")
+        >>> for match in matches:
+        ...     print(f"Line {match.line_number}: {match.text}")
+        """
+        from rejig.targets.text.text_block import TextBlock
+
+        resolved = self._resolve_path(path)
+        return TextBlock(self, resolved)
 
     def toml(self, path: str | Path) -> TomlTarget:
         """

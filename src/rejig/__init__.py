@@ -102,6 +102,15 @@ IniTarget
 TextFileTarget
     Target for generic text files.
 
+TextBlock
+    Target for raw text pattern-based manipulation.
+
+TextMatch
+    Target for individual pattern matches.
+
+Transaction
+    Atomic batch operations with commit/rollback.
+
 Packaging
 ---------
 Dependency
@@ -131,6 +140,7 @@ PackageConfigConverter
 from __future__ import annotations
 
 from .core import BatchResult, ErrorResult, Rejig, Result
+from .core.transaction import Transaction
 from .packaging import (
     Dependency,
     FormatDetector,
@@ -159,7 +169,9 @@ from .targets import (
     StringLiteralTarget,
     Target,
     TargetList,
+    TextBlock,
     TextFileTarget,
+    TextMatch,
     TomlTarget,
     YamlTarget,
 )
@@ -172,6 +184,8 @@ __all__ = [
     "Result",
     "ErrorResult",
     "BatchResult",
+    # Transaction support
+    "Transaction",
     # Target base classes
     "Target",
     "ErrorTarget",
@@ -195,6 +209,8 @@ __all__ = [
     "IniTarget",
     # Text targets
     "TextFileTarget",
+    "TextBlock",
+    "TextMatch",
     # Packaging
     "Dependency",
     "PackageMetadata",

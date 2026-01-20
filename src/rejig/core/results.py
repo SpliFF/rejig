@@ -24,12 +24,16 @@ class Result:
         message: Human-readable description of what happened
         files_changed: List of files that were modified
         data: Optional payload for operations that return data
+        diff: Combined unified diff of all changes (if any)
+        diffs: Per-file diffs mapping path to diff string
     """
 
     success: bool
     message: str
     files_changed: list[Path] = field(default_factory=list)
     data: Any = None
+    diff: str | None = None
+    diffs: dict[Path, str] = field(default_factory=dict)
 
     def __bool__(self) -> bool:
         return self.success
@@ -37,6 +41,24 @@ class Result:
     def is_error(self) -> bool:
         """Check if this result represents an error."""
         return not self.success
+
+    def get_diff(self, path: Path | None = None) -> str | None:
+        """Get diff for a specific file or combined diff.
+
+        Parameters
+        ----------
+        path : Path | None
+            If provided, returns diff for that specific file.
+            If None, returns the combined diff.
+
+        Returns
+        -------
+        str | None
+            The diff string, or None if no diff available.
+        """
+        if path is not None:
+            return self.diffs.get(path)
+        return self.diff
 
 
 @dataclass
@@ -102,6 +124,42 @@ class BatchResult:
         for r in self.results:
             files.extend(r.files_changed)
         return list(set(files))
+
+    @property
+    def diff(self) -> str | None:
+        """Combined diff from all results."""
+        from rejig.core.diff import combine_diffs
+
+        all_diffs = self.diffs
+        if not all_diffs:
+            return None
+        return combine_diffs(all_diffs)
+
+    @property
+    def diffs(self) -> dict[Path, str]:
+        """Merged diffs from all results."""
+        merged: dict[Path, str] = {}
+        for r in self.results:
+            merged.update(r.diffs)
+        return merged
+
+    def get_diff(self, path: Path | None = None) -> str | None:
+        """Get diff for a specific file or combined diff.
+
+        Parameters
+        ----------
+        path : Path | None
+            If provided, returns diff for that specific file.
+            If None, returns the combined diff.
+
+        Returns
+        -------
+        str | None
+            The diff string, or None if no diff available.
+        """
+        if path is not None:
+            return self.diffs.get(path)
+        return self.diff
 
     def __bool__(self) -> bool:
         return self.success

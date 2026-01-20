@@ -18,10 +18,12 @@ from __future__ import annotations
 
 from .rejig import Rejig
 from .results import BatchResult, ErrorResult, Result
+from .transaction import Transaction
 
 __all__ = [
     "Rejig",
     "Result",
     "ErrorResult",
     "BatchResult",
+    "Transaction",
 ]

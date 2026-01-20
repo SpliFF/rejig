@@ -26,9 +26,13 @@ Python Targets:
 Config Targets:
     TomlTarget: TOML files
     JsonTarget: JSON files
+    YamlTarget: YAML files
+    IniTarget: INI/CFG files
 
 Text Targets:
     TextFileTarget: Any text file
+    TextBlock: Raw text pattern-based manipulation
+    TextMatch: Individual pattern match within a file
 """
 
 from rejig.targets.base import (
@@ -53,7 +57,7 @@ from rejig.targets.python import (
     PackageTarget,
     StringLiteralTarget,
 )
-from rejig.targets.text import TextFileTarget
+from rejig.targets.text import TextBlock, TextFileTarget, TextMatch
 
 __all__ = [
     # Base classes
@@ -82,4 +86,6 @@ __all__ = [
     "IniTarget",
     # Text targets
     "TextFileTarget",
+    "TextBlock",
+    "TextMatch",
 ]
