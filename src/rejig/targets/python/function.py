@@ -11,13 +11,20 @@ from rejig.core.position import find_function_line, find_function_lines
 from rejig.targets.base import ErrorResult, Result, Target
 from rejig.transformers import (
     AddFunctionDecorator,
+    AddLogging,
     AddParameter,
+    ConvertToAsync,
+    ConvertToSync,
     InferTypeHints,
     InsertAtMethodEnd,
     InsertAtMethodStart,
+    RemoveParameter,
     RemoveTypeHints,
+    RenameParameter,
+    ReorderParameters,
     SetParameterType,
     SetReturnType,
+    WrapWithTryExcept,
 )
 
 if TYPE_CHECKING:
@@ -260,6 +267,105 @@ class FunctionTarget(Target):
             position,
         )
         return self._transform(transformer)
+
+    def remove_parameter(self, param_name: str) -> Result:
+        """Remove a parameter from the function signature.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the parameter to remove.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.remove_parameter("deprecated_arg")
+        """
+        transformer = RemoveParameter(None, self.name, param_name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.removed:
+            return Result(
+                success=True,
+                message=f"Removed parameter {param_name} from {self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "remove_parameter", f"Parameter '{param_name}' not found in {self.name}"
+            )
+        return result
+
+    def rename_parameter(self, old_name: str, new_name: str) -> Result:
+        """Rename a parameter in the function signature.
+
+        Also updates all references to the parameter within the function body.
+
+        Parameters
+        ----------
+        old_name : str
+            Current name of the parameter.
+        new_name : str
+            New name for the parameter.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.rename_parameter("old_arg", "new_arg")
+        """
+        transformer = RenameParameter(None, self.name, old_name, new_name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.renamed:
+            return Result(
+                success=True,
+                message=f"Renamed parameter {old_name} to {new_name} in {self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "rename_parameter", f"Parameter '{old_name}' not found in {self.name}"
+            )
+        return result
+
+    def reorder_parameters(self, param_order: list[str]) -> Result:
+        """Reorder parameters in the function signature.
+
+        Parameters not in the order list are appended at the end in their
+        original relative order.
+
+        Parameters
+        ----------
+        param_order : list[str]
+            Ordered list of parameter names defining the new order.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.reorder_parameters(["required", "optional", "extra"])
+        """
+        transformer = ReorderParameters(None, self.name, param_order)
+        result = self._transform(transformer)
+
+        if result.success and transformer.reordered:
+            return Result(
+                success=True,
+                message=f"Reordered parameters in {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
 
     def add_decorator(self, decorator: str) -> Result:
         """Add a decorator to this function.
@@ -851,5 +957,221 @@ class FunctionTarget(Target):
             return self._operation_failed(
                 "add_docstring_returns",
                 f"Function '{self.name}' has no docstring to update",
+            )
+        return result
+
+    # ===== Async/sync conversion =====
+
+    def convert_to_async(self) -> Result:
+        """Convert this function to async.
+
+        Adds the `async` keyword to the function definition.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.convert_to_async()
+        """
+        transformer = ConvertToAsync(None, self.name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} to async",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "convert_to_async", f"Function '{self.name}' is already async"
+            )
+        return result
+
+    def convert_to_sync(self) -> Result:
+        """Convert this function from async to sync.
+
+        Removes the `async` keyword and all `await` expressions.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.convert_to_sync()
+        """
+        transformer = ConvertToSync(None, self.name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} to sync",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "convert_to_sync", f"Function '{self.name}' is not async"
+            )
+        return result
+
+    # ===== Decorator convenience methods =====
+
+    def add_retry_decorator(
+        self,
+        max_attempts: int = 3,
+        exceptions: list[str] | None = None,
+    ) -> Result:
+        """Add a retry decorator to this function.
+
+        Parameters
+        ----------
+        max_attempts : int
+            Maximum number of retry attempts. Defaults to 3.
+        exceptions : list[str] | None
+            List of exception types to catch for retry.
+            Defaults to ["Exception"].
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_retry_decorator(max_attempts=3, exceptions=["ConnectionError"])
+        """
+        exc_list = exceptions or ["Exception"]
+        exc_str = ", ".join(exc_list)
+        decorator = f"retry(max_attempts={max_attempts}, exceptions=({exc_str},))"
+        return self.add_decorator(decorator)
+
+    def add_caching_decorator(self, ttl: int | None = None) -> Result:
+        """Add a caching decorator to this function.
+
+        Parameters
+        ----------
+        ttl : int | None
+            Time-to-live in seconds. If None, uses lru_cache without maxsize.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_caching_decorator()
+        >>> func.add_caching_decorator(ttl=300)
+        """
+        if ttl is not None:
+            decorator = f"cache(ttl={ttl})"
+        else:
+            decorator = "lru_cache(maxsize=None)"
+        return self.add_decorator(decorator)
+
+    def add_timing_decorator(self) -> Result:
+        """Add a timing decorator to this function.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_timing_decorator()
+        """
+        return self.add_decorator("timing")
+
+    # ===== Error handling =====
+
+    def wrap_with_try_except(
+        self,
+        exceptions: list[str],
+        handler: str,
+    ) -> Result:
+        """Wrap the function body with a try/except block.
+
+        Parameters
+        ----------
+        exceptions : list[str]
+            List of exception types to catch.
+        handler : str
+            Handler code to execute in the except block.
+            Use 'e' to reference the caught exception.
+            Separate multiple statements with semicolons.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.wrap_with_try_except(
+        ...     ["ValueError", "TypeError"],
+        ...     "logger.error(f'Error: {e}'); raise"
+        ... )
+        """
+        transformer = WrapWithTryExcept(None, self.name, exceptions, handler)
+        result = self._transform(transformer)
+
+        if result.success and transformer.wrapped:
+            return Result(
+                success=True,
+                message=f"Wrapped {self.name} with try/except",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "wrap_with_try_except",
+                f"Function '{self.name}' is already wrapped or has no body",
+            )
+        return result
+
+    # ===== Logging =====
+
+    def add_logging(
+        self,
+        level: str = "debug",
+        include_args: bool = False,
+        logger_name: str = "logger",
+    ) -> Result:
+        """Add logging statement at the start of this function.
+
+        Parameters
+        ----------
+        level : str
+            Logging level: "debug", "info", "warning", "error", "critical".
+            Defaults to "debug".
+        include_args : bool
+            If True, include argument values in the log message.
+            Defaults to False.
+        logger_name : str
+            Name of the logger variable. Defaults to "logger".
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_logging(level="debug", include_args=True)
+        """
+        transformer = AddLogging(None, self.name, level, include_args, logger_name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Added logging to {self.name}",
+                files_changed=result.files_changed,
             )
         return result

@@ -11,19 +11,26 @@ from rejig.core.position import find_method_line, find_method_lines
 from rejig.targets.base import Result, Target
 from rejig.transformers import (
     AddFirstParameter,
+    AddLogging,
     AddMethodDecorator,
     AddParameter,
+    ConvertToAsync,
+    ConvertToSync,
     InferTypeHints,
     InsertAtMatch,
     InsertAtMethodEnd,
     InsertAtMethodStart,
     RemoveMethodDecorator,
+    RemoveParameter,
     RemoveTypeHints,
     RenameMethod,
+    RenameParameter,
+    ReorderParameters,
     ReplaceIdentifier,
     SetParameterType,
     SetReturnType,
     StaticToClassMethod,
+    WrapWithTryExcept,
 )
 
 if TYPE_CHECKING:
@@ -452,6 +459,107 @@ class MethodTarget(Target):
             position,
         )
         return self._transform(transformer)
+
+    def remove_parameter(self, param_name: str) -> Result:
+        """Remove a parameter from the method signature.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the parameter to remove.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.remove_parameter("deprecated_arg")
+        """
+        transformer = RemoveParameter(self.class_name, self.name, param_name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.removed:
+            return Result(
+                success=True,
+                message=f"Removed parameter {param_name} from {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "remove_parameter",
+                f"Parameter '{param_name}' not found in {self.class_name}.{self.name}",
+            )
+        return result
+
+    def rename_parameter(self, old_name: str, new_name: str) -> Result:
+        """Rename a parameter in the method signature.
+
+        Also updates all references to the parameter within the method body.
+
+        Parameters
+        ----------
+        old_name : str
+            Current name of the parameter.
+        new_name : str
+            New name for the parameter.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.rename_parameter("old_arg", "new_arg")
+        """
+        transformer = RenameParameter(self.class_name, self.name, old_name, new_name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.renamed:
+            return Result(
+                success=True,
+                message=f"Renamed parameter {old_name} to {new_name} in {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "rename_parameter",
+                f"Parameter '{old_name}' not found in {self.class_name}.{self.name}",
+            )
+        return result
+
+    def reorder_parameters(self, param_order: list[str]) -> Result:
+        """Reorder parameters in the method signature.
+
+        Parameters not in the order list are appended at the end in their
+        original relative order.
+
+        Parameters
+        ----------
+        param_order : list[str]
+            Ordered list of parameter names defining the new order.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.reorder_parameters(["self", "required", "optional"])
+        """
+        transformer = ReorderParameters(self.class_name, self.name, param_order)
+        result = self._transform(transformer)
+
+        if result.success and transformer.reordered:
+            return Result(
+                success=True,
+                message=f"Reordered parameters in {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
 
     def replace_identifier(self, old_name: str, new_name: str) -> Result:
         """Replace identifier references within the method.
@@ -1142,5 +1250,225 @@ class MethodTarget(Target):
             return self._operation_failed(
                 "add_docstring_returns",
                 f"Method '{self.class_name}.{self.name}' has no docstring to update",
+            )
+        return result
+
+    # ===== Async/sync conversion =====
+
+    def convert_to_async(self) -> Result:
+        """Convert this method to async.
+
+        Adds the `async` keyword to the method definition.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.convert_to_async()
+        """
+        transformer = ConvertToAsync(self.class_name, self.name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.class_name}.{self.name} to async",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "convert_to_async",
+                f"Method '{self.class_name}.{self.name}' is already async",
+            )
+        return result
+
+    def convert_to_sync(self) -> Result:
+        """Convert this method from async to sync.
+
+        Removes the `async` keyword and all `await` expressions.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.convert_to_sync()
+        """
+        transformer = ConvertToSync(self.class_name, self.name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.class_name}.{self.name} to sync",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "convert_to_sync",
+                f"Method '{self.class_name}.{self.name}' is not async",
+            )
+        return result
+
+    # ===== Decorator convenience methods =====
+
+    def add_retry_decorator(
+        self,
+        max_attempts: int = 3,
+        exceptions: list[str] | None = None,
+    ) -> Result:
+        """Add a retry decorator to this method.
+
+        Parameters
+        ----------
+        max_attempts : int
+            Maximum number of retry attempts. Defaults to 3.
+        exceptions : list[str] | None
+            List of exception types to catch for retry.
+            Defaults to ["Exception"].
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_retry_decorator(max_attempts=3, exceptions=["ConnectionError"])
+        """
+        exc_list = exceptions or ["Exception"]
+        exc_str = ", ".join(exc_list)
+        decorator = f"retry(max_attempts={max_attempts}, exceptions=({exc_str},))"
+        return self.add_decorator(decorator)
+
+    def add_caching_decorator(self, ttl: int | None = None) -> Result:
+        """Add a caching decorator to this method.
+
+        Parameters
+        ----------
+        ttl : int | None
+            Time-to-live in seconds. If None, uses lru_cache without maxsize.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_caching_decorator()
+        >>> method.add_caching_decorator(ttl=300)
+        """
+        if ttl is not None:
+            decorator = f"cache(ttl={ttl})"
+        else:
+            decorator = "lru_cache(maxsize=None)"
+        return self.add_decorator(decorator)
+
+    def add_timing_decorator(self) -> Result:
+        """Add a timing decorator to this method.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_timing_decorator()
+        """
+        return self.add_decorator("timing")
+
+    # ===== Error handling =====
+
+    def wrap_with_try_except(
+        self,
+        exceptions: list[str],
+        handler: str,
+    ) -> Result:
+        """Wrap the method body with a try/except block.
+
+        Parameters
+        ----------
+        exceptions : list[str]
+            List of exception types to catch.
+        handler : str
+            Handler code to execute in the except block.
+            Use 'e' to reference the caught exception.
+            Separate multiple statements with semicolons.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.wrap_with_try_except(
+        ...     ["ValueError", "TypeError"],
+        ...     "logger.error(f'Error: {e}'); raise"
+        ... )
+        """
+        transformer = WrapWithTryExcept(self.class_name, self.name, exceptions, handler)
+        result = self._transform(transformer)
+
+        if result.success and transformer.wrapped:
+            return Result(
+                success=True,
+                message=f"Wrapped {self.class_name}.{self.name} with try/except",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "wrap_with_try_except",
+                f"Method '{self.class_name}.{self.name}' is already wrapped or has no body",
+            )
+        return result
+
+    # ===== Logging =====
+
+    def add_logging(
+        self,
+        level: str = "debug",
+        include_args: bool = False,
+        logger_name: str = "logger",
+    ) -> Result:
+        """Add logging statement at the start of this method.
+
+        Parameters
+        ----------
+        level : str
+            Logging level: "debug", "info", "warning", "error", "critical".
+            Defaults to "debug".
+        include_args : bool
+            If True, include argument values in the log message.
+            Defaults to False.
+        logger_name : str
+            Name of the logger variable. Defaults to "logger".
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_logging(level="debug", include_args=True)
+        """
+        transformer = AddLogging(
+            self.class_name, self.name, level, include_args, logger_name
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Added logging to {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
             )
         return result
