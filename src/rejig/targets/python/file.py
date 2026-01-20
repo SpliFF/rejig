@@ -1226,3 +1226,341 @@ class FileTarget(Target):
                 f"Failed to generate docstrings: {e}",
                 e,
             )
+
+    # ===== Code modernization operations =====
+
+    def convert_format_strings_to_fstrings(self) -> Result:
+        """Convert .format() string formatting to f-strings.
+
+        Converts:
+            "Hello {}".format(name) → f"Hello {name}"
+            "Hello {0}".format(name) → f"Hello {name}"
+            "Hello {name}".format(name=value) → f"Hello {value}"
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("legacy_module.py")
+        >>> file.convert_format_strings_to_fstrings()
+        """
+        from rejig.modernize.fstrings import FormatToFstringTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = FormatToFstringTransformer()
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if not transformer.changed:
+                return Result(
+                    success=True,
+                    message=f"No .format() calls to convert in {self.path}",
+                )
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "convert_format_strings_to_fstrings",
+                f"Failed to convert format strings: {e}",
+                e,
+            )
+
+    def convert_percent_format_to_fstrings(self) -> Result:
+        """Convert % string formatting to f-strings.
+
+        Converts:
+            "Hello %s" % name → f"Hello {name}"
+            "Hello %s %s" % (a, b) → f"Hello {a} {b}"
+            "%(name)s" % {"name": value} → f"{value}"
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("legacy_module.py")
+        >>> file.convert_percent_format_to_fstrings()
+        """
+        from rejig.modernize.fstrings import PercentToFstringTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = PercentToFstringTransformer()
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if not transformer.changed:
+                return Result(
+                    success=True,
+                    message=f"No % formatting to convert in {self.path}",
+                )
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "convert_percent_format_to_fstrings",
+                f"Failed to convert percent formatting: {e}",
+                e,
+            )
+
+    def add_future_annotations(self) -> Result:
+        """Add `from __future__ import annotations` to this file.
+
+        This enables PEP 563 postponed evaluation of annotations, allowing
+        forward references and reducing runtime overhead.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.add_future_annotations()
+        """
+        from rejig.modernize.python2 import AddFutureAnnotationsTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = AddFutureAnnotationsTransformer()
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if not transformer.added:
+                return Result(
+                    success=True,
+                    message=f"Future annotations already present in {self.path}",
+                )
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "add_future_annotations",
+                f"Failed to add future annotations: {e}",
+                e,
+            )
+
+    def remove_python2_compatibility(self) -> Result:
+        """Remove Python 2 compatibility code from this file.
+
+        Removes:
+        - __future__ imports (except annotations)
+        - super(ClassName, self) → super()
+        - u"string" prefixes
+        - Unnecessary (object) base class
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("legacy_module.py")
+        >>> file.remove_python2_compatibility()
+        """
+        from rejig.modernize.python2 import RemovePython2CompatTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = RemovePython2CompatTransformer()
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if not transformer.changed:
+                return Result(
+                    success=True,
+                    message=f"No Python 2 compatibility code in {self.path}",
+                )
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "remove_python2_compatibility",
+                f"Failed to remove Python 2 compatibility: {e}",
+                e,
+            )
+
+    def remove_six_usage(self) -> Result:
+        """Remove `six` library compatibility usage.
+
+        Converts:
+        - six.text_type → str
+        - six.binary_type → bytes
+        - six.PY2 → False, six.PY3 → True
+        - six.moves.range → range
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("legacy_module.py")
+        >>> file.remove_six_usage()
+        """
+        from rejig.modernize.python2 import RemoveSixUsageTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = RemoveSixUsageTransformer()
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if not transformer.changed:
+                return Result(
+                    success=True,
+                    message=f"No six library usage in {self.path}",
+                )
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "remove_six_usage",
+                f"Failed to remove six usage: {e}",
+                e,
+            )
+
+    def replace_deprecated_code(
+        self, replacements: dict[str, str] | None = None
+    ) -> Result:
+        """Replace deprecated API usage with modern equivalents.
+
+        Replaces common deprecated patterns like:
+        - collections.MutableMapping → collections.abc.MutableMapping
+        - assertEquals → assertEqual
+        - logger.warn → logger.warning
+
+        Parameters
+        ----------
+        replacements : dict[str, str] | None
+            Custom replacement mapping. If None, uses built-in defaults.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("tests.py")
+        >>> file.replace_deprecated_code()
+        >>> file.replace_deprecated_code({"oldFunc": "newFunc"})
+        """
+        from rejig.modernize.deprecated import ReplaceDeprecatedTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = ReplaceDeprecatedTransformer(replacements)
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if not transformer.changed:
+                return Result(
+                    success=True,
+                    message=f"No deprecated code to replace in {self.path}",
+                )
+
+            return self._write_content(new_content)
+        except Exception as e:
+            return self._operation_failed(
+                "replace_deprecated_code",
+                f"Failed to replace deprecated code: {e}",
+                e,
+            )
+
+    def modernize_all(self) -> Result:
+        """Apply all modernization transformations to this file.
+
+        This is a convenience method that applies:
+        1. F-string conversion (format and percent)
+        2. Type hint modernization
+        3. Python 2 compatibility removal
+        4. Deprecated code replacement
+
+        Returns
+        -------
+        Result
+            Result of the operation with summary of changes.
+
+        Examples
+        --------
+        >>> file = rj.file("legacy_module.py")
+        >>> file.modernize_all()
+        """
+        changes_made = []
+
+        # Convert format strings to f-strings
+        result = self.convert_format_strings_to_fstrings()
+        if result.success and result.files_changed:
+            changes_made.append("format strings")
+
+        # Convert percent formatting to f-strings
+        result = self.convert_percent_format_to_fstrings()
+        if result.success and result.files_changed:
+            changes_made.append("percent formatting")
+
+        # Modernize type hints
+        result = self.modernize_type_hints()
+        if result.success and result.files_changed:
+            changes_made.append("type hints")
+
+        # Remove Python 2 compatibility
+        result = self.remove_python2_compatibility()
+        if result.success and result.files_changed:
+            changes_made.append("Python 2 compatibility")
+
+        # Replace deprecated code
+        result = self.replace_deprecated_code()
+        if result.success and result.files_changed:
+            changes_made.append("deprecated code")
+
+        if not changes_made:
+            return Result(
+                success=True,
+                message=f"No modernization needed in {self.path}",
+            )
+
+        return Result(
+            success=True,
+            message=f"Modernized {self.path}: {', '.join(changes_made)}",
+            files_changed=[self.path],
+        )

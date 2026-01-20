@@ -1513,3 +1513,87 @@ class ClassTarget(Target):
                 files_changed=result.files_changed,
             )
         return result
+
+    # ===== Code modernization operations =====
+
+    def convert_to_context_manager(
+        self,
+        enter_body: str | None = None,
+        exit_body: str | None = None,
+    ) -> Result:
+        """Convert this class to a context manager by adding __enter__/__exit__.
+
+        If the class has open/connect methods, uses them in __enter__.
+        If the class has close/disconnect methods, uses them in __exit__.
+        Otherwise, returns self in __enter__ and passes in __exit__.
+
+        Parameters
+        ----------
+        enter_body : str | None
+            Custom body for __enter__ method. If None, auto-generates.
+        exit_body : str | None
+            Custom body for __exit__ method. If None, auto-generates.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.convert_to_context_manager()
+        >>> cls.convert_to_context_manager(
+        ...     enter_body="self._conn = self.connect()\\nreturn self._conn",
+        ...     exit_body="self._conn.close()"
+        ... )
+        """
+        from rejig.modernize import ConvertToContextManagerTransformer
+
+        transformer = ConvertToContextManagerTransformer(
+            self.name, enter_body=enter_body, exit_body=exit_body
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} to context manager",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return Result(
+                success=True,
+                message=f"{self.name} is already a context manager",
+            )
+        return result
+
+    def remove_object_base(self) -> Result:
+        """Remove unnecessary (object) base class from this class.
+
+        In Python 3, all classes implicitly inherit from object, so
+        explicitly inheriting from object is unnecessary.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.remove_object_base()  # class Foo(object): → class Foo:
+        """
+        from rejig.generation import RemoveBaseClassTransformer
+
+        transformer = RemoveBaseClassTransformer(self.name, "object")
+        result = self._transform(transformer)
+
+        if result.success and transformer.removed:
+            return Result(
+                success=True,
+                message=f"Removed 'object' base class from {self.name}",
+                files_changed=result.files_changed,
+            )
+        return Result(
+            success=True,
+            message=f"{self.name} does not inherit from object",
+        )

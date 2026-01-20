@@ -2023,3 +2023,265 @@ class Rejig:
             message=f"Converted {total_converted} docstrings in {len(files_changed)} files",
             files_changed=files_changed,
         )
+
+    # -------------------------------------------------------------------------
+    # Code Modernization Operations
+    # -------------------------------------------------------------------------
+
+    def convert_all_format_strings_to_fstrings(self) -> Result:
+        """
+        Convert .format() string formatting to f-strings in all files.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.convert_all_format_strings_to_fstrings()
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.convert_format_strings_to_fstrings()
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Converted format strings to f-strings in {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def convert_all_percent_format_to_fstrings(self) -> Result:
+        """
+        Convert % string formatting to f-strings in all files.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.convert_all_percent_format_to_fstrings()
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.convert_percent_format_to_fstrings()
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Converted percent formatting to f-strings in {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def add_future_annotations_to_all(self) -> Result:
+        """
+        Add `from __future__ import annotations` to all files.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.add_future_annotations_to_all()
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.add_future_annotations()
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Added future annotations to {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def remove_all_python2_compatibility(self) -> Result:
+        """
+        Remove Python 2 compatibility code from all files.
+
+        Removes:
+        - __future__ imports (except annotations)
+        - super(ClassName, self) → super()
+        - u"string" prefixes
+        - Unnecessary (object) base classes
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.remove_all_python2_compatibility()
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.remove_python2_compatibility()
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Removed Python 2 compatibility from {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def replace_all_deprecated_code(
+        self, replacements: dict[str, str] | None = None
+    ) -> Result:
+        """
+        Replace deprecated API usage in all files.
+
+        Parameters
+        ----------
+        replacements : dict[str, str] | None
+            Custom replacement mapping. If None, uses built-in defaults.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.replace_all_deprecated_code()
+        >>> rj.replace_all_deprecated_code({"oldFunc": "newFunc"})
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.replace_deprecated_code(replacements)
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Replaced deprecated code in {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def find_deprecated_usage(self) -> list:
+        """
+        Find all deprecated API usage across the project.
+
+        Returns
+        -------
+        list[DeprecatedUsage]
+            List of deprecated usage instances found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> deprecated = rj.find_deprecated_usage()
+        >>> for d in deprecated:
+        ...     print(f"{d.file_path}: {d.old_pattern} → {d.suggested_replacement}")
+        """
+        from rejig.modernize.deprecated import find_deprecated_usage
+
+        return find_deprecated_usage(self)
+
+    def find_old_style_classes(self) -> list[tuple]:
+        """
+        Find all old-style class definitions in the project.
+
+        Old-style classes are those that explicitly inherit only from object,
+        which is unnecessary in Python 3.
+
+        Returns
+        -------
+        list[tuple[Path, str]]
+            List of (file_path, class_name) tuples.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> old_classes = rj.find_old_style_classes()
+        >>> for file_path, class_name in old_classes:
+        ...     print(f"{file_path}: class {class_name}(object)")
+        """
+        from rejig.modernize.deprecated import find_old_style_classes
+
+        return find_old_style_classes(self)
+
+    def modernize_all_files(self) -> Result:
+        """
+        Apply all modernization transformations to all files.
+
+        This is a convenience method that applies:
+        1. F-string conversion (format and percent)
+        2. Type hint modernization
+        3. Python 2 compatibility removal
+        4. Deprecated code replacement
+
+        Returns
+        -------
+        Result
+            Result of the operation with summary of changes.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.modernize_all_files()
+        """
+        files_changed = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.modernize_all()
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+
+        return Result(
+            success=True,
+            message=f"Modernized {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def replace_deprecated(self, old_pattern: str, new_pattern: str) -> Result:
+        """
+        Replace a specific deprecated pattern across the project.
+
+        This is a convenience method for simple string replacements
+        of deprecated API usage.
+
+        Parameters
+        ----------
+        old_pattern : str
+            The deprecated pattern to find (e.g., "assertEquals").
+        new_pattern : str
+            The replacement pattern (e.g., "assertEqual").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.replace_deprecated("assertEquals", "assertEqual")
+        >>> rj.replace_deprecated("collections.MutableMapping", "collections.abc.MutableMapping")
+        """
+        return self.replace_all_deprecated_code({old_pattern: new_pattern})
