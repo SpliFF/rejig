@@ -823,3 +823,324 @@ class MethodTarget(Target):
                 files_changed=result.files_changed,
             )
         return result
+
+    # ===== Docstring operations =====
+
+    @property
+    def has_docstring(self) -> bool:
+        """Check if this method has a docstring.
+
+        Returns
+        -------
+        bool
+            True if the method has a docstring.
+
+        Examples
+        --------
+        >>> if not method.has_docstring:
+        ...     method.generate_docstring()
+        """
+        file_path = self._find_method()
+        if not file_path:
+            return False
+
+        try:
+            from rejig.docstrings.parser import has_docstring as check_docstring
+
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            class DocstringChecker(cst.CSTVisitor):
+                def __init__(self, target_class: str, target_method: str):
+                    self.target_class = target_class
+                    self.target_method = target_method
+                    self.in_target_class = False
+                    self.result = False
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = True
+                    return True
+
+                def leave_ClassDef(self, node: cst.ClassDef) -> None:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = False
+
+                def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+                    if self.in_target_class and node.name.value == self.target_method:
+                        self.result = check_docstring(node)
+                    return False
+
+            checker = DocstringChecker(self.class_name, self.name)
+            tree.walk(checker)
+            return checker.result
+        except Exception:
+            return False
+
+    def get_docstring(self) -> Result:
+        """Get the docstring of this method.
+
+        Returns
+        -------
+        Result
+            Result with docstring text in `data` field if successful.
+            Returns empty string if no docstring exists.
+
+        Examples
+        --------
+        >>> result = method.get_docstring()
+        >>> if result.success and result.data:
+        ...     print(result.data)
+        """
+        file_path = self._find_method()
+        if not file_path:
+            return self._operation_failed(
+                "get_docstring", f"Method '{self.class_name}.{self.name}' not found"
+            )
+
+        try:
+            from rejig.docstrings.parser import extract_docstring
+
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            class DocstringExtractor(cst.CSTVisitor):
+                def __init__(self, target_class: str, target_method: str):
+                    self.target_class = target_class
+                    self.target_method = target_method
+                    self.in_target_class = False
+                    self.docstring: str | None = None
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = True
+                    return True
+
+                def leave_ClassDef(self, node: cst.ClassDef) -> None:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = False
+
+                def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+                    if self.in_target_class and node.name.value == self.target_method:
+                        self.docstring = extract_docstring(node)
+                    return False
+
+            extractor = DocstringExtractor(self.class_name, self.name)
+            tree.walk(extractor)
+
+            if extractor.docstring is not None:
+                return Result(success=True, message="OK", data=extractor.docstring)
+            return Result(success=True, message="OK", data="")
+        except Exception as e:
+            return self._operation_failed("get_docstring", f"Failed to get docstring: {e}", e)
+
+    def generate_docstring(
+        self,
+        style: str = "google",
+        summary: str = "",
+        overwrite: bool = False,
+    ) -> Result:
+        """Generate a docstring for this method.
+
+        Creates a docstring from the method signature including
+        parameters, return type, and raised exceptions.
+
+        Parameters
+        ----------
+        style : str
+            Docstring style: "google", "numpy", or "sphinx".
+            Defaults to "google".
+        summary : str
+            Custom summary line. If empty, auto-generates from method name.
+        overwrite : bool
+            Whether to overwrite existing docstring. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.generate_docstring()
+        >>> method.generate_docstring(style="numpy")
+        >>> method.generate_docstring(summary="Save the model to disk.")
+        """
+        from rejig.docstrings.updater import AddDocstringTransformer
+
+        transformer = AddDocstringTransformer(
+            target_class=self.class_name,
+            target_func=self.name,
+            style=style,
+            summary=summary,
+            overwrite=overwrite,
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Generated docstring for {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def update_docstring_param(self, param_name: str, description: str) -> Result:
+        """Update or add a parameter description in the docstring.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the parameter to document.
+        description : str
+            Description of the parameter.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.update_docstring_param("timeout", "Maximum wait time in seconds")
+        """
+        from rejig.docstrings.updater import UpdateDocstringTransformer
+
+        transformer = UpdateDocstringTransformer(
+            target_class=self.class_name,
+            target_func=self.name,
+            updates={"param": (param_name, description)},
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.updated:
+            return Result(
+                success=True,
+                message=f"Updated docstring param {param_name} in {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "update_docstring_param",
+                f"Method '{self.class_name}.{self.name}' has no docstring to update",
+            )
+        return result
+
+    def add_docstring_raises(self, exception: str, description: str) -> Result:
+        """Add a raises entry to the docstring.
+
+        Parameters
+        ----------
+        exception : str
+            Name of the exception (e.g., "ValueError").
+        description : str
+            Description of when the exception is raised.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_docstring_raises("ValueError", "If input is negative")
+        """
+        from rejig.docstrings.updater import UpdateDocstringTransformer
+
+        transformer = UpdateDocstringTransformer(
+            target_class=self.class_name,
+            target_func=self.name,
+            updates={"raises": (exception, description)},
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.updated:
+            return Result(
+                success=True,
+                message=f"Added raises {exception} to {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "add_docstring_raises",
+                f"Method '{self.class_name}.{self.name}' has no docstring to update",
+            )
+        return result
+
+    def add_docstring_example(self, example: str) -> Result:
+        """Add an example to the docstring.
+
+        Parameters
+        ----------
+        example : str
+            Example code (can include >>> and output).
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_docstring_example(">>> obj.save()\\n'saved'")
+        """
+        from rejig.docstrings.updater import UpdateDocstringTransformer
+
+        transformer = UpdateDocstringTransformer(
+            target_class=self.class_name,
+            target_func=self.name,
+            updates={"example": example},
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.updated:
+            return Result(
+                success=True,
+                message=f"Added example to {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "add_docstring_example",
+                f"Method '{self.class_name}.{self.name}' has no docstring to update",
+            )
+        return result
+
+    def add_docstring_returns(self, description: str) -> Result:
+        """Add or update the returns section in the docstring.
+
+        Parameters
+        ----------
+        description : str
+            Description of the return value.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> method.add_docstring_returns("The saved instance")
+        """
+        from rejig.docstrings.updater import UpdateDocstringTransformer
+
+        transformer = UpdateDocstringTransformer(
+            target_class=self.class_name,
+            target_func=self.name,
+            updates={"returns": description},
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.updated:
+            return Result(
+                success=True,
+                message=f"Updated returns in {self.class_name}.{self.name}",
+                files_changed=result.files_changed,
+            )
+        elif result.success:
+            return self._operation_failed(
+                "add_docstring_returns",
+                f"Method '{self.class_name}.{self.name}' has no docstring to update",
+            )
+        return result

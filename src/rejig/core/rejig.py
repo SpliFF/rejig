@@ -1823,3 +1823,167 @@ class Rejig:
             message=f"Modernized type hints in {len(files_changed)} files",
             files_changed=files_changed,
         )
+
+    # -------------------------------------------------------------------------
+    # Docstring Operations
+    # -------------------------------------------------------------------------
+
+    def find_missing_docstrings(self) -> TargetList:
+        """
+        Find all functions, methods, and classes without docstrings.
+
+        Returns
+        -------
+        TargetList
+            List of FunctionTarget, MethodTarget, and ClassTarget objects
+            that don't have docstrings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> missing = rj.find_missing_docstrings()
+        >>> print(f"Found {len(missing)} items without docstrings")
+        >>> missing.generate_docstrings()  # Add docstrings to all
+        """
+        from rejig.targets.base import TargetList
+
+        all_targets = []
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            targets = file_target.find_missing_docstrings()
+            all_targets.extend(targets.to_list())
+
+        return TargetList(self, all_targets)
+
+    def find_outdated_docstrings(self) -> list[dict]:
+        """
+        Find all functions/methods with outdated docstrings across the project.
+
+        A docstring is considered outdated if:
+        - It documents parameters that no longer exist in the signature
+        - It's missing documentation for parameters in the signature
+
+        Returns
+        -------
+        list[dict]
+            List of dicts with:
+            - file_path: Path to the file
+            - name: function/method name
+            - class_name: class name (or None for functions)
+            - stale_params: params documented but not in signature
+            - missing_params: params in signature but not documented
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> outdated = rj.find_outdated_docstrings()
+        >>> for item in outdated:
+        ...     print(f"{item['file_path']}:{item['name']}")
+        ...     print(f"  Stale: {item['stale_params']}")
+        ...     print(f"  Missing: {item['missing_params']}")
+        """
+        results = []
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.find_outdated_docstrings()
+            if result.success and result.data:
+                for item in result.data:
+                    item["file_path"] = file_path
+                    results.append(item)
+
+        return results
+
+    def generate_all_docstrings(
+        self,
+        style: str = "google",
+        overwrite: bool = False,
+    ) -> Result:
+        """
+        Generate docstrings for all functions and methods in the project.
+
+        Parameters
+        ----------
+        style : str
+            Docstring style: "google", "numpy", or "sphinx".
+            Defaults to "google".
+        overwrite : bool
+            Whether to overwrite existing docstrings. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_all_docstrings()
+        >>> rj.generate_all_docstrings(style="numpy", overwrite=True)
+        """
+        files_changed = []
+        total_generated = 0
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.generate_all_docstrings(style=style, overwrite=overwrite)
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+                # Extract count from message if available
+                import re
+                match = re.search(r"(\d+) docstrings", result.message)
+                if match:
+                    total_generated += int(match.group(1))
+
+        return Result(
+            success=True,
+            message=f"Generated {total_generated} docstrings in {len(files_changed)} files",
+            files_changed=files_changed,
+        )
+
+    def convert_all_docstring_styles(
+        self,
+        from_style: str | None,
+        to_style: str,
+    ) -> Result:
+        """
+        Convert all docstrings from one style to another across the project.
+
+        Parameters
+        ----------
+        from_style : str | None
+            Source docstring style ("google", "numpy", "sphinx"),
+            or None to auto-detect.
+        to_style : str
+            Target docstring style ("google", "numpy", "sphinx").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.convert_all_docstring_styles("sphinx", "google")
+        >>> rj.convert_all_docstring_styles(None, "numpy")  # auto-detect
+        """
+        files_changed = []
+        total_converted = 0
+
+        for file_path in self.files:
+            file_target = self.file(file_path)
+            result = file_target.convert_docstring_style(from_style, to_style)
+            if result.success and result.files_changed:
+                files_changed.extend(result.files_changed)
+                # Extract count from message if available
+                import re
+                match = re.search(r"(\d+) docstrings", result.message)
+                if match:
+                    total_converted += int(match.group(1))
+
+        return Result(
+            success=True,
+            message=f"Converted {total_converted} docstrings in {len(files_changed)} files",
+            files_changed=files_changed,
+        )

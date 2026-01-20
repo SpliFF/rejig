@@ -748,3 +748,191 @@ class ClassTarget(Target):
             message=f"Inferred type hints for {changed_count} methods in {self.name}",
             files_changed=[file_path],
         )
+
+    # ===== Docstring operations =====
+
+    @property
+    def has_docstring(self) -> bool:
+        """Check if this class has a docstring.
+
+        Returns
+        -------
+        bool
+            True if the class has a docstring.
+
+        Examples
+        --------
+        >>> if not cls.has_docstring:
+        ...     cls.generate_docstring()
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return False
+
+        try:
+            from rejig.docstrings.parser import has_docstring as check_docstring
+
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            for node in tree.body:
+                if isinstance(node, cst.ClassDef) and node.name.value == self.name:
+                    return check_docstring(node)
+            return False
+        except Exception:
+            return False
+
+    def get_docstring(self) -> Result:
+        """Get the docstring of this class.
+
+        Returns
+        -------
+        Result
+            Result with docstring text in `data` field if successful.
+            Returns empty string if no docstring exists.
+
+        Examples
+        --------
+        >>> result = cls.get_docstring()
+        >>> if result.success and result.data:
+        ...     print(result.data)
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("get_docstring", f"Class '{self.name}' not found")
+
+        try:
+            from rejig.docstrings.parser import extract_docstring
+
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            for node in tree.body:
+                if isinstance(node, cst.ClassDef) and node.name.value == self.name:
+                    docstring = extract_docstring(node)
+                    return Result(success=True, message="OK", data=docstring or "")
+
+            return self._operation_failed(
+                "get_docstring", f"Class '{self.name}' not found in AST"
+            )
+        except Exception as e:
+            return self._operation_failed("get_docstring", f"Failed to get docstring: {e}", e)
+
+    def generate_docstrings(
+        self,
+        style: str = "google",
+        overwrite: bool = False,
+    ) -> Result:
+        """Generate docstrings for all methods in this class.
+
+        Parameters
+        ----------
+        style : str
+            Docstring style: "google", "numpy", or "sphinx".
+            Defaults to "google".
+        overwrite : bool
+            Whether to overwrite existing docstrings. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.generate_docstrings()
+        >>> cls.generate_docstrings(style="numpy")
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("generate_docstrings", f"Class '{self.name}' not found")
+
+        from rejig.docstrings.updater import AddDocstringTransformer
+
+        methods = self.find_methods()
+        if not methods:
+            return Result(
+                success=True,
+                message=f"No methods found in {self.name}",
+            )
+
+        added_count = 0
+        for method in methods:
+            transformer = AddDocstringTransformer(
+                target_class=self.name,
+                target_func=method.name,
+                style=style,
+                overwrite=overwrite,
+            )
+            result = self._transform(transformer)
+            if result.success and transformer.added:
+                added_count += 1
+
+        if added_count == 0:
+            return Result(
+                success=True,
+                message=f"No docstrings added for {self.name} (all methods already have docstrings)",
+            )
+
+        return Result(
+            success=True,
+            message=f"Generated docstrings for {added_count} methods in {self.name}",
+            files_changed=[file_path],
+        )
+
+    def find_methods_without_docstrings(self) -> TargetList[Target]:
+        """Find all methods in this class that don't have docstrings.
+
+        Returns
+        -------
+        TargetList[MethodTarget]
+            List of methods without docstrings.
+
+        Examples
+        --------
+        >>> missing = cls.find_methods_without_docstrings()
+        >>> for method in missing:
+        ...     method.generate_docstring()
+        """
+        from rejig.targets.python.method import MethodTarget
+
+        file_path = self._find_class()
+        if not file_path:
+            return TargetList(self._rejig, [])
+
+        try:
+            from rejig.docstrings.parser import has_docstring as check_docstring
+
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+            targets: list[Target] = []
+
+            class MethodFinder(cst.CSTVisitor):
+                def __init__(self, target_class: str):
+                    self.target_class = target_class
+                    self.in_target_class = False
+                    self.methods_without_docs: list[str] = []
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = True
+                    return True
+
+                def leave_ClassDef(self, node: cst.ClassDef) -> None:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = False
+
+                def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+                    if self.in_target_class and not check_docstring(node):
+                        self.methods_without_docs.append(node.name.value)
+                    return False
+
+            finder = MethodFinder(self.name)
+            tree.walk(finder)
+
+            for method_name in finder.methods_without_docs:
+                targets.append(MethodTarget(self._rejig, self.name, method_name, file_path=file_path))
+
+            return TargetList(self._rejig, targets)
+        except Exception:
+            return TargetList(self._rejig, [])

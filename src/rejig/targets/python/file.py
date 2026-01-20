@@ -921,3 +921,308 @@ class FileTarget(Target):
                 f"Failed to modernize type hints: {e}",
                 e,
             )
+
+    # ===== Docstring operations =====
+
+    def convert_docstring_style(
+        self,
+        from_style: str | None,
+        to_style: str,
+    ) -> Result:
+        """Convert all docstrings from one style to another.
+
+        Parameters
+        ----------
+        from_style : str | None
+            Source docstring style ("google", "numpy", "sphinx"),
+            or None to auto-detect.
+        to_style : str
+            Target docstring style ("google", "numpy", "sphinx").
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.convert_docstring_style("sphinx", "google")
+        >>> file.convert_docstring_style(None, "numpy")  # auto-detect source
+        """
+        from rejig.docstrings.updater import ConvertDocstringStyleTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        try:
+            tree = cst.parse_module(content)
+            transformer = ConvertDocstringStyleTransformer(from_style, to_style)
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if transformer.converted_count == 0:
+                return Result(
+                    success=True,
+                    message=f"No docstrings to convert in {self.path}",
+                )
+
+            if new_content == content:
+                return Result(
+                    success=True,
+                    message=f"No changes needed in {self.path}",
+                )
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would convert {transformer.converted_count} docstrings in {self.path}",
+                    files_changed=[self.path],
+                )
+
+            self.path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Converted {transformer.converted_count} docstrings to {to_style} style in {self.path}",
+                files_changed=[self.path],
+            )
+        except Exception as e:
+            return self._operation_failed(
+                "convert_docstring_style",
+                f"Failed to convert docstrings: {e}",
+                e,
+            )
+
+    def find_missing_docstrings(self) -> TargetList[Target]:
+        """Find all functions, methods, and classes without docstrings.
+
+        Returns
+        -------
+        TargetList[Target]
+            List of FunctionTarget, MethodTarget, and ClassTarget objects
+            that don't have docstrings.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> missing = file.find_missing_docstrings()
+        >>> print(f"Found {len(missing)} items without docstrings")
+        """
+        from rejig.docstrings.updater import find_missing_docstrings
+        from rejig.targets.python.class_ import ClassTarget
+        from rejig.targets.python.function import FunctionTarget
+        from rejig.targets.python.method import MethodTarget
+
+        result = self.get_content()
+        if result.is_error():
+            return TargetList(self._rejig, [])
+
+        targets: list[Target] = []
+
+        try:
+            missing = find_missing_docstrings(result.data)
+
+            for func_name, class_name in missing:
+                if class_name is None:
+                    # Could be a class or function
+                    # Try class first
+                    cls = ClassTarget(self._rejig, func_name, file_path=self.path)
+                    if cls.exists():
+                        targets.append(cls)
+                    else:
+                        # Must be a function
+                        targets.append(FunctionTarget(self._rejig, func_name, file_path=self.path))
+                else:
+                    # It's a method
+                    targets.append(MethodTarget(self._rejig, class_name, func_name, file_path=self.path))
+        except Exception:
+            pass
+
+        return TargetList(self._rejig, targets)
+
+    def find_outdated_docstrings(self) -> Result:
+        """Find functions/methods with outdated docstrings.
+
+        A docstring is considered outdated if:
+        - It documents parameters that no longer exist in the signature
+        - It's missing documentation for parameters in the signature
+
+        Returns
+        -------
+        Result
+            Result with list of outdated docstrings in `data` field.
+            Each entry is a dict with:
+            - name: function/method name
+            - class_name: class name (or None for functions)
+            - stale_params: params documented but not in signature
+            - missing_params: params in signature but not documented
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> result = file.find_outdated_docstrings()
+        >>> for item in result.data:
+        ...     print(f"{item['name']}: stale={item['stale_params']}, missing={item['missing_params']}")
+        """
+        from rejig.docstrings.updater import find_outdated_docstrings
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        try:
+            outdated = find_outdated_docstrings(result.data)
+
+            data = []
+            for func_name, class_name, stale, missing in outdated:
+                data.append({
+                    "name": func_name,
+                    "class_name": class_name,
+                    "stale_params": stale,
+                    "missing_params": missing,
+                })
+
+            return Result(
+                success=True,
+                message=f"Found {len(data)} outdated docstrings in {self.path}",
+                data=data,
+            )
+        except Exception as e:
+            return self._operation_failed(
+                "find_outdated_docstrings",
+                f"Failed to find outdated docstrings: {e}",
+                e,
+            )
+
+    def generate_all_docstrings(
+        self,
+        style: str = "google",
+        overwrite: bool = False,
+    ) -> Result:
+        """Generate docstrings for all functions and methods without them.
+
+        Parameters
+        ----------
+        style : str
+            Docstring style: "google", "numpy", or "sphinx".
+            Defaults to "google".
+        overwrite : bool
+            Whether to overwrite existing docstrings. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> file = rj.file("mymodule.py")
+        >>> file.generate_all_docstrings()
+        >>> file.generate_all_docstrings(style="numpy", overwrite=True)
+        """
+        from rejig.docstrings.updater import AddDocstringTransformer
+
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+
+        try:
+            tree = cst.parse_module(content)
+            added_count = 0
+
+            # Find all functions and methods that need docstrings
+            class AllDocstringAdder(cst.CSTTransformer):
+                def __init__(self, docstring_style: str, should_overwrite: bool):
+                    self.style = docstring_style
+                    self.overwrite = should_overwrite
+                    self.current_class: str | None = None
+                    self.added = 0
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    self.current_class = node.name.value
+                    return True
+
+                def leave_ClassDef(
+                    self, original_node: cst.ClassDef, updated_node: cst.ClassDef
+                ) -> cst.ClassDef:
+                    self.current_class = None
+                    return updated_node
+
+                def leave_FunctionDef(
+                    self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
+                ) -> cst.FunctionDef:
+                    from rejig.docstrings.generator import DocstringGenerator
+                    from rejig.docstrings.parser import has_docstring
+
+                    # Skip if already has docstring and not overwriting
+                    if has_docstring(original_node) and not self.overwrite:
+                        return updated_node
+
+                    # Generate docstring
+                    generator = DocstringGenerator(self.style)
+                    docstring_text = generator.generate(original_node)
+
+                    # Create docstring node
+                    docstring_node = cst.SimpleStatementLine(
+                        body=[cst.Expr(cst.SimpleString(docstring_text))]
+                    )
+
+                    # Update function body
+                    body = updated_node.body
+                    if isinstance(body, cst.IndentedBlock):
+                        new_body_stmts = list(body.body)
+
+                        # Check if first statement is docstring
+                        if new_body_stmts and self._is_docstring_stmt(new_body_stmts[0]):
+                            if self.overwrite:
+                                new_body_stmts[0] = docstring_node
+                                self.added += 1
+                        else:
+                            new_body_stmts.insert(0, docstring_node)
+                            self.added += 1
+
+                        new_body = body.with_changes(body=new_body_stmts)
+                        return updated_node.with_changes(body=new_body)
+
+                    return updated_node
+
+                def _is_docstring_stmt(self, stmt: cst.BaseStatement) -> bool:
+                    if isinstance(stmt, cst.SimpleStatementLine):
+                        if stmt.body and isinstance(stmt.body[0], cst.Expr):
+                            expr = stmt.body[0].value
+                            return isinstance(expr, (cst.SimpleString, cst.ConcatenatedString))
+                    return False
+
+            transformer = AllDocstringAdder(style, overwrite)
+            new_tree = tree.visit(transformer)
+            new_content = new_tree.code
+
+            if transformer.added == 0:
+                return Result(
+                    success=True,
+                    message=f"No docstrings to generate in {self.path}",
+                )
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would generate {transformer.added} docstrings in {self.path}",
+                    files_changed=[self.path],
+                )
+
+            self.path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Generated {transformer.added} docstrings in {self.path}",
+                files_changed=[self.path],
+            )
+        except Exception as e:
+            return self._operation_failed(
+                "generate_all_docstrings",
+                f"Failed to generate docstrings: {e}",
+                e,
+            )

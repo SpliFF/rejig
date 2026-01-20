@@ -576,3 +576,172 @@ class TargetList(Generic[T]):
                     )
                 )
         return BatchResult(results)
+
+    # ===== Docstring batch operations =====
+
+    def generate_docstrings(
+        self,
+        style: str = "google",
+        overwrite: bool = False,
+    ) -> BatchResult:
+        """Generate docstrings for all targets (FunctionTarget/MethodTarget/ClassTarget).
+
+        Creates docstrings from function/method signatures including
+        parameters, return type, and raised exceptions.
+
+        Parameters
+        ----------
+        style : str
+            Docstring style: "google", "numpy", or "sphinx".
+            Defaults to "google".
+        overwrite : bool
+            Whether to overwrite existing docstrings. Default False.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> funcs = rj.find_functions()
+        >>> funcs.generate_docstrings()
+        >>> methods = cls.find_methods()
+        >>> methods.generate_docstrings(style="numpy")
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "generate_docstring"):
+                results.append(t.generate_docstring(style=style, overwrite=overwrite))
+            elif hasattr(t, "generate_docstrings"):
+                results.append(t.generate_docstrings(style=style, overwrite=overwrite))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'generate_docstrings' not supported for {t.__class__.__name__}",
+                        operation="generate_docstrings",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def without_docstrings(self) -> TargetList[T]:
+        """Filter to targets that don't have docstrings.
+
+        Returns
+        -------
+        TargetList[T]
+            List of targets without docstrings.
+
+        Examples
+        --------
+        >>> funcs = rj.find_functions()
+        >>> no_docs = funcs.without_docstrings()
+        >>> no_docs.generate_docstrings()
+        """
+        def has_no_docstring(t: T) -> bool:
+            if hasattr(t, "has_docstring"):
+                return not t.has_docstring
+            return False
+
+        return self.filter(has_no_docstring)
+
+    def with_docstrings(self) -> TargetList[T]:
+        """Filter to targets that have docstrings.
+
+        Returns
+        -------
+        TargetList[T]
+            List of targets with docstrings.
+
+        Examples
+        --------
+        >>> funcs = rj.find_functions()
+        >>> with_docs = funcs.with_docstrings()
+        """
+        def has_docstring(t: T) -> bool:
+            if hasattr(t, "has_docstring"):
+                return t.has_docstring
+            return False
+
+        return self.filter(has_docstring)
+
+    def convert_docstring_style(
+        self,
+        from_style: str | None,
+        to_style: str,
+    ) -> BatchResult:
+        """Convert docstring style for all targets (FileTarget).
+
+        Parameters
+        ----------
+        from_style : str | None
+            Source docstring style ("google", "numpy", "sphinx"),
+            or None to auto-detect.
+        to_style : str
+            Target docstring style ("google", "numpy", "sphinx").
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.convert_docstring_style("sphinx", "google")
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "convert_docstring_style"):
+                results.append(t.convert_docstring_style(from_style, to_style))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'convert_docstring_style' not supported for {t.__class__.__name__}",
+                        operation="convert_docstring_style",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
+
+    def generate_all_docstrings(
+        self,
+        style: str = "google",
+        overwrite: bool = False,
+    ) -> BatchResult:
+        """Generate all docstrings for all targets (FileTarget).
+
+        This generates docstrings for all functions and methods in the files.
+
+        Parameters
+        ----------
+        style : str
+            Docstring style: "google", "numpy", or "sphinx".
+            Defaults to "google".
+        overwrite : bool
+            Whether to overwrite existing docstrings. Default False.
+
+        Returns
+        -------
+        BatchResult
+            Results of all operations.
+
+        Examples
+        --------
+        >>> files = rj.find_files("**/*.py")
+        >>> files.generate_all_docstrings()
+        """
+        results: list[Result] = []
+        for t in self._targets:
+            if hasattr(t, "generate_all_docstrings"):
+                results.append(t.generate_all_docstrings(style=style, overwrite=overwrite))
+            else:
+                results.append(
+                    ErrorResult(
+                        message=f"Operation 'generate_all_docstrings' not supported for {t.__class__.__name__}",
+                        operation="generate_all_docstrings",
+                        target_repr=repr(t),
+                    )
+                )
+        return BatchResult(results)
