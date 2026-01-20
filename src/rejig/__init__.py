@@ -159,6 +159,11 @@ ImportGraph
 
 CircularImport
     Represents a circular import chain.
+
+Project Management
+------------------
+PythonProject
+    High-level Python project configuration manager.
 """
 from __future__ import annotations
 
@@ -183,6 +188,20 @@ from .packaging import (
     PoetryParser,
     RequirementsParser,
     UVParser,
+)
+from .project import (
+    PythonProject,
+    PyprojectTarget,
+    ProjectSectionTarget,
+    DependenciesTarget,
+    ScriptsTarget,
+    ToolConfigTarget,
+    BlackConfigTarget,
+    RuffConfigTarget,
+    MypyConfigTarget,
+    PytestConfigTarget,
+    IsortConfigTarget,
+    CoverageConfigTarget,
 )
 from .targets import (
     ClassTarget,
@@ -261,4 +280,17 @@ __all__ = [
     "ImportOrganizer",
     "ImportGraph",
     "CircularImport",
+    # Project Management
+    "PythonProject",
+    "PyprojectTarget",
+    "ProjectSectionTarget",
+    "DependenciesTarget",
+    "ScriptsTarget",
+    "ToolConfigTarget",
+    "BlackConfigTarget",
+    "RuffConfigTarget",
+    "MypyConfigTarget",
+    "PytestConfigTarget",
+    "IsortConfigTarget",
+    "CoverageConfigTarget",
 ]

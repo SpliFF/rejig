@@ -14,6 +14,7 @@ from rejig.core.results import Result
 if TYPE_CHECKING:
     from rejig.core.transaction import Transaction
     from rejig.packaging.models import PackageConfig
+    from rejig.project.targets import PyprojectTarget
     from rejig.targets import (
         ClassTarget,
         FileTarget,
@@ -415,6 +416,41 @@ class Rejig:
 
         resolved = self._resolve_path(path)
         return TomlTarget(self, resolved)
+
+    def pyproject(self, path: str | Path | None = None) -> PyprojectTarget:
+        """
+        Get a PyprojectTarget for pyproject.toml with section navigation.
+
+        Parameters
+        ----------
+        path : str | Path | None
+            Path to pyproject.toml. If None, uses "pyproject.toml" in root.
+
+        Returns
+        -------
+        PyprojectTarget
+            A target for performing operations on pyproject.toml sections.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> pyproject = rj.pyproject()
+        >>>
+        >>> # Navigate to sections
+        >>> pyproject.dependencies().add("requests", ">=2.28.0")
+        >>> pyproject.black().set(line_length=110)
+        >>> pyproject.project().bump_version("minor")
+        >>>
+        >>> # Or use TomlTarget methods
+        >>> pyproject.set("project.version", "2.0.0")
+        """
+        from rejig.project.targets import PyprojectTarget
+
+        if path is None:
+            resolved = self.root / "pyproject.toml"
+        else:
+            resolved = self._resolve_path(path)
+        return PyprojectTarget(self, resolved)
 
     def yaml(self, path: str | Path) -> YamlTarget:
         """
