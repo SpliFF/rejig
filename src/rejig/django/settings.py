@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..result import RefactorResult
+from ..core.results import Result
 
 if TYPE_CHECKING:
     from .project import DjangoProject
@@ -34,7 +34,7 @@ class SettingsManager:
         self,
         app_name: str,
         after_app: str | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add an app to INSTALLED_APPS in Django settings.
 
@@ -47,12 +47,12 @@ class SettingsManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         settings_path = self.settings_path
         if not settings_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Settings file not found: {settings_path}",
             )
@@ -60,7 +60,7 @@ class SettingsManager:
         content = settings_path.read_text()
 
         if f'"{app_name}"' in content or f"'{app_name}'" in content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"App {app_name} already in INSTALLED_APPS",
             )
@@ -75,20 +75,20 @@ class SettingsManager:
             new_content = re.sub(pattern, replacement, content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not add {app_name} to INSTALLED_APPS",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add {app_name} to INSTALLED_APPS",
                 files_changed=[settings_path],
             )
 
         settings_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added {app_name} to INSTALLED_APPS",
             files_changed=[settings_path],
@@ -98,7 +98,7 @@ class SettingsManager:
         self,
         old_path: str,
         new_path: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Update a middleware path in Django settings.
 
@@ -111,12 +111,12 @@ class SettingsManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         settings_path = self.settings_path
         if not settings_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Settings file not found: {settings_path}",
             )
@@ -124,7 +124,7 @@ class SettingsManager:
         content = settings_path.read_text()
 
         if old_path not in content:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Middleware {old_path} not found in settings",
             )
@@ -133,14 +133,14 @@ class SettingsManager:
         new_content = new_content.replace(f"'{old_path}'", f"'{new_path}'")
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would update middleware: {old_path} -> {new_path}",
                 files_changed=[settings_path],
             )
 
         settings_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Updated middleware: {old_path} -> {new_path}",
             files_changed=[settings_path],
@@ -151,7 +151,7 @@ class SettingsManager:
         middleware_path: str,
         position: str = "first",
         after: str | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add a middleware to Django settings.
 
@@ -166,12 +166,12 @@ class SettingsManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         settings_path = self.settings_path
         if not settings_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Settings file not found: {settings_path}",
             )
@@ -179,7 +179,7 @@ class SettingsManager:
         content = settings_path.read_text()
 
         if middleware_path in content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Middleware {middleware_path} already in settings",
             )
@@ -194,7 +194,7 @@ class SettingsManager:
             pattern = rf'(["\']){re.escape(after)}\1,'
             replacement = rf'\g<0>\n    "{middleware_path}",'
         else:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message="Invalid position or missing 'after' parameter",
             )
@@ -202,20 +202,20 @@ class SettingsManager:
         new_content = re.sub(pattern, replacement, content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not add middleware {middleware_path}",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add middleware: {middleware_path}",
                 files_changed=[settings_path],
             )
 
         settings_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added middleware: {middleware_path}",
             files_changed=[settings_path],
@@ -310,7 +310,7 @@ class SettingsManager:
         value: str,
         comment: str | None = None,
         settings_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add a new setting to Django settings file.
 
@@ -327,12 +327,12 @@ class SettingsManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         settings_path = settings_file or self.settings_path
         if not settings_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Settings file not found: {settings_path}",
             )
@@ -340,7 +340,7 @@ class SettingsManager:
         content = settings_path.read_text()
 
         if re.search(rf'^{setting_name}\s*=', content, re.MULTILINE):
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Setting {setting_name} already exists (use update_setting instead)",
             )
@@ -353,7 +353,7 @@ class SettingsManager:
         new_setting = "".join(lines)
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add setting: {setting_name}",
                 files_changed=[settings_path],
@@ -361,7 +361,7 @@ class SettingsManager:
 
         new_content = content.rstrip() + new_setting
         settings_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added setting: {setting_name}",
             files_changed=[settings_path],
@@ -373,7 +373,7 @@ class SettingsManager:
         new_value: str,
         comment: str | None = None,
         settings_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Update an existing setting in Django settings file.
 
@@ -390,12 +390,12 @@ class SettingsManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         settings_path = settings_file or self.settings_path
         if not settings_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Settings file not found: {settings_path}",
             )
@@ -404,7 +404,7 @@ class SettingsManager:
 
         bounds = self._find_setting_bounds(content, setting_name)
         if bounds is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Setting {setting_name} not found (use add_setting instead)",
             )
@@ -425,7 +425,7 @@ class SettingsManager:
         replacement = "".join(replacement_lines)
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would update setting: {setting_name}",
                 files_changed=[settings_path],
@@ -433,7 +433,7 @@ class SettingsManager:
 
         new_content = content[:comment_start] + replacement + content[end:]
         settings_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Updated setting: {setting_name}",
             files_changed=[settings_path],
@@ -444,7 +444,7 @@ class SettingsManager:
         setting_name: str,
         delete_comment: bool = True,
         settings_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Delete a setting from Django settings file.
 
@@ -460,12 +460,12 @@ class SettingsManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         settings_path = settings_file or self.settings_path
         if not settings_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Settings file not found: {settings_path}",
             )
@@ -474,7 +474,7 @@ class SettingsManager:
 
         bounds = self._find_setting_bounds(content, setting_name)
         if bounds is None:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Setting {setting_name} not found (already deleted?)",
             )
@@ -487,7 +487,7 @@ class SettingsManager:
                 start -= len(lines_before.pop())
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would delete setting: {setting_name}",
                 files_changed=[settings_path],
@@ -496,7 +496,7 @@ class SettingsManager:
         new_content = content[:start] + content[end:]
         new_content = re.sub(r'\n{3,}', '\n\n', new_content)
         settings_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Deleted setting: {setting_name}",
             files_changed=[settings_path],

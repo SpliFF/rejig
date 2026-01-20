@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..result import RefactorResult
+from ..core.results import Result
 
 if TYPE_CHECKING:
     from .project import DjangoProject
@@ -149,7 +149,7 @@ class DependencyManager:
         optional: bool = False,
         section: str = "tool.poetry.dependencies",
         pyproject_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add a new dependency to pyproject.toml.
 
@@ -170,12 +170,12 @@ class DependencyManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         pyproject_path = pyproject_file or self.pyproject_path
         if not pyproject_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"pyproject.toml not found: {pyproject_path}",
             )
@@ -183,14 +183,14 @@ class DependencyManager:
         content = pyproject_path.read_text()
 
         if self._find_dependency_line(content, package_name, section) is not None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Dependency {package_name} already exists (use update_dependency)",
             )
 
         section_bounds = self._find_dependencies_section(content, section)
         if section_bounds is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Section [{section}] not found in pyproject.toml",
             )
@@ -209,7 +209,7 @@ class DependencyManager:
             dep_line = f'{package_name} = "{version}"\n'
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add dependency: {package_name}",
                 files_changed=[pyproject_path],
@@ -226,7 +226,7 @@ class DependencyManager:
         )
 
         pyproject_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f'Added dependency: {package_name} = "{version}"',
             files_changed=[pyproject_path],
@@ -240,7 +240,7 @@ class DependencyManager:
         optional: bool | None = None,
         section: str = "tool.poetry.dependencies",
         pyproject_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Update an existing dependency in pyproject.toml.
 
@@ -261,12 +261,12 @@ class DependencyManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         pyproject_path = pyproject_file or self.pyproject_path
         if not pyproject_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"pyproject.toml not found: {pyproject_path}",
             )
@@ -275,7 +275,7 @@ class DependencyManager:
 
         line_bounds = self._find_dependency_line(content, package_name, section)
         if line_bounds is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Dependency {package_name} not found (use add_dependency)",
             )
@@ -304,7 +304,7 @@ class DependencyManager:
                 dep_line = f'{package_name} = "{version}"\n'
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would update dependency: {package_name}",
                 files_changed=[pyproject_path],
@@ -312,7 +312,7 @@ class DependencyManager:
 
         new_content = content[:start] + dep_line + content[end:]
         pyproject_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f'Updated dependency: {package_name} = "{version}"',
             files_changed=[pyproject_path],
@@ -323,7 +323,7 @@ class DependencyManager:
         package_name: str,
         section: str = "tool.poetry.dependencies",
         pyproject_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Remove a dependency from pyproject.toml.
 
@@ -338,12 +338,12 @@ class DependencyManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         pyproject_path = pyproject_file or self.pyproject_path
         if not pyproject_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"pyproject.toml not found: {pyproject_path}",
             )
@@ -352,7 +352,7 @@ class DependencyManager:
 
         line_bounds = self._find_dependency_line(content, package_name, section)
         if line_bounds is None:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Dependency {package_name} not found (already removed?)",
             )
@@ -360,7 +360,7 @@ class DependencyManager:
         start, end = line_bounds
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would remove dependency: {package_name}",
                 files_changed=[pyproject_path],
@@ -369,7 +369,7 @@ class DependencyManager:
         new_content = content[:start] + content[end:]
         new_content = re.sub(r'\n{3,}', '\n\n', new_content)
         pyproject_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Removed dependency: {package_name}",
             files_changed=[pyproject_path],

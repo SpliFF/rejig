@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from rejig.packaging.models import Dependency, PackageConfig, PackageMetadata
 from rejig.packaging.pep621 import PEP621Parser
-from rejig.targets.base import Result
+from rejig.core.results import Result
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig

@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
-from rejig.result import FindResult, Match, RefactorResult
+from rejig.result import FindResult, Match
+from rejig.core.results import Result
 
 if TYPE_CHECKING:
     from rejig.packaging.models import PackageConfig
-    from rejig.scope import ClassScope, FunctionScope
     from rejig.targets import (
         ClassTarget,
         FileTarget,
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
         TomlTarget,
         YamlTarget,
     )
-    from rejig.targets.base import Result, TargetList
+    from rejig.targets.base import TargetList
     from rejig.targets.python.todo import TodoTargetList
 
 
@@ -497,14 +497,14 @@ class Rejig:
         return TargetList(self, targets)
 
     # =========================================================================
-    # Scope-based Methods (original API)
+    # Find Methods (return Targets)
     # =========================================================================
 
-    def find_class(self, class_name: str) -> ClassScope:
+    def find_class(self, class_name: str) -> ClassTarget:
         """
         Find a class by name across all files in the working set.
 
-        Returns a ClassScope object that can be used to perform operations
+        Returns a ClassTarget object that can be used to perform operations
         on the found class or to further narrow the scope to methods.
 
         Parameters
@@ -514,27 +514,24 @@ class Rejig:
 
         Returns
         -------
-        ClassScope
-            A scope object for performing operations on the matched class.
+        ClassTarget
+            A target for performing operations on the matched class.
 
         Examples
         --------
         >>> rj = Rejig("src/")
-        >>> class_scope = rj.find_class("MyClass")
-        >>> class_scope.add_attribute("count", "int", "0")
+        >>> cls = rj.find_class("MyClass")
+        >>> cls.add_attribute("count", "int", "0")
         """
-        from rejig.scope import ClassScope
+        from rejig.targets.python.class_ import ClassTarget
 
-        return ClassScope(
-            Rejig=self,
-            class_name=class_name,
-        )
+        return ClassTarget(self, class_name)
 
-    def find_function(self, function_name: str) -> FunctionScope:
+    def find_function(self, function_name: str) -> FunctionTarget:
         """
         Find a module-level function by name across all files.
 
-        Returns a FunctionScope object that can be used to perform operations
+        Returns a FunctionTarget object that can be used to perform operations
         on the found function.
 
         Parameters
@@ -544,21 +541,18 @@ class Rejig:
 
         Returns
         -------
-        FunctionScope
-            A scope object for performing operations on the matched function.
+        FunctionTarget
+            A target for performing operations on the matched function.
 
         Examples
         --------
         >>> rj = Rejig("src/")
-        >>> func_scope = rj.find_function("process_data")
-        >>> func_scope.add_parameter("timeout", "int", "30")
+        >>> func = rj.find_function("process_data")
+        >>> func.add_parameter("timeout", "int", "30")
         """
-        from rejig.scope import FunctionScope
+        from rejig.targets.python.function import FunctionTarget
 
-        return FunctionScope(
-            Rejig=self,
-            function_name=function_name,
-        )
+        return FunctionTarget(self, function_name)
 
     def find_classes(self, pattern: str | None = None) -> FindResult:
         """
@@ -662,7 +656,7 @@ class Rejig:
         self,
         file_path: Path,
         transformer: cst.CSTTransformer,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Apply a LibCST transformer to a file.
 
@@ -677,11 +671,11 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the transformation.
         """
         if not file_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"File not found: {file_path}",
             )
@@ -693,27 +687,27 @@ class Rejig:
             new_content = new_tree.code
 
             if new_content == content:
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"No changes needed in {file_path}",
                 )
 
             if self.dry_run:
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"[DRY RUN] Would transform {file_path}",
                     files_changed=[file_path],
                 )
 
             file_path.write_text(new_content)
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Transformed {file_path}",
                 files_changed=[file_path],
             )
 
         except Exception as e:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Transformation failed: {e}",
             )
@@ -722,7 +716,7 @@ class Rejig:
         self,
         file_path: Path,
         import_statement: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add an import statement to a file.
 
@@ -735,11 +729,11 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the operation.
         """
         if not file_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"File not found: {file_path}",
             )
@@ -747,7 +741,7 @@ class Rejig:
         content = file_path.read_text()
 
         if import_statement in content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Import already exists in {file_path}",
             )
@@ -776,14 +770,14 @@ class Rejig:
         new_content = "".join(lines)
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add import to {file_path}",
                 files_changed=[file_path],
             )
 
         file_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added import to {file_path}",
             files_changed=[file_path],
@@ -793,7 +787,7 @@ class Rejig:
         self,
         file_path: Path,
         import_pattern: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Remove an import statement from a file.
 
@@ -806,11 +800,11 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the operation.
         """
         if not file_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"File not found: {file_path}",
             )
@@ -819,20 +813,20 @@ class Rejig:
         new_content = re.sub(rf"^{import_pattern}\n", "", content, flags=re.MULTILINE)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"No matching import found in {file_path}",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would remove import from {file_path}",
                 files_changed=[file_path],
             )
 
         file_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Removed import from {file_path}",
             files_changed=[file_path],
@@ -859,7 +853,7 @@ class Rejig:
         source_file: Path,
         class_name: str,
         dest_module: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Move a class from source file to destination module using rope.
 
@@ -876,7 +870,7 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
 
         Examples
@@ -889,7 +883,7 @@ class Rejig:
 
         offset = self._get_class_offset(source_file, class_name)
         if offset is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not find class {class_name} in {source_file}",
             )
@@ -907,21 +901,21 @@ class Rejig:
             ]
 
             if self.dry_run:
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"[DRY RUN] Would move {class_name} to {dest_module}",
                     files_changed=changed_files,
                 )
 
             self.rope_project.do(changes)
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Moved {class_name} to {dest_module}",
                 files_changed=changed_files,
             )
 
         except Exception as e:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Error moving {class_name}: {e}",
             )
@@ -931,7 +925,7 @@ class Rejig:
         source_file: Path,
         function_name: str,
         dest_module: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Move a function from source file to destination module using rope.
 
@@ -948,7 +942,7 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
 
         Examples
@@ -961,7 +955,7 @@ class Rejig:
 
         offset = self._get_function_offset(source_file, function_name)
         if offset is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not find function {function_name} in {source_file}",
             )
@@ -979,21 +973,21 @@ class Rejig:
             ]
 
             if self.dry_run:
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"[DRY RUN] Would move {function_name} to {dest_module}",
                     files_changed=changed_files,
                 )
 
             self.rope_project.do(changes)
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Moved {function_name} to {dest_module}",
                 files_changed=changed_files,
             )
 
         except Exception as e:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Error moving {function_name}: {e}",
             )
@@ -1071,7 +1065,7 @@ class Rejig:
         version: str | None = None,
         dev: bool = False,
         group: str | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add a dependency to the project's package configuration.
 
@@ -1091,7 +1085,7 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the operation.
 
         Examples
@@ -1107,7 +1101,7 @@ class Rejig:
         config_path = detector.get_config_path(self.root)
 
         if fmt is None or config_path is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message="No package configuration found in project",
             )
@@ -1138,7 +1132,7 @@ class Rejig:
             spec = dep.to_pip_spec()
 
             if self.dry_run:
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"[DRY RUN] Would add {spec} to {config_path}",
                     files_changed=[config_path],
@@ -1149,26 +1143,26 @@ class Rejig:
                 if spec not in content:
                     with open(config_path, "a") as f:
                         f.write(f"{spec}\n")
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"Added {spec} to {config_path}",
                     files_changed=[config_path],
                 )
             except Exception as e:
-                return RefactorResult(success=False, message=f"Failed to add dependency: {e}")
+                return Result(success=False, message=f"Failed to add dependency: {e}")
         else:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Unsupported package format: {fmt}",
             )
 
-        return RefactorResult(
+        return Result(
             success=result.success,
             message=result.message,
             files_changed=result.files_changed,
         )
 
-    def remove_dependency(self, name: str) -> RefactorResult:
+    def remove_dependency(self, name: str) -> Result:
         """
         Remove a dependency from the project's package configuration.
 
@@ -1179,7 +1173,7 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the operation.
 
         Examples
@@ -1194,7 +1188,7 @@ class Rejig:
         config_path = detector.get_config_path(self.root)
 
         if fmt is None or config_path is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message="No package configuration found in project",
             )
@@ -1218,7 +1212,7 @@ class Rejig:
             normalized = Dependency._normalize_name(name)
 
             if not config_path.exists():
-                return RefactorResult(success=True, message=f"Dependency {name} not found")
+                return Result(success=True, message=f"Dependency {name} not found")
 
             try:
                 content = config_path.read_text()
@@ -1234,30 +1228,30 @@ class Rejig:
                         new_lines.append(line)
 
                 if not found:
-                    return RefactorResult(success=True, message=f"Dependency {name} not found")
+                    return Result(success=True, message=f"Dependency {name} not found")
 
                 if self.dry_run:
-                    return RefactorResult(
+                    return Result(
                         success=True,
                         message=f"[DRY RUN] Would remove {name} from {config_path}",
                         files_changed=[config_path],
                     )
 
                 config_path.write_text("\n".join(new_lines) + "\n" if new_lines else "")
-                return RefactorResult(
+                return Result(
                     success=True,
                     message=f"Removed {name} from {config_path}",
                     files_changed=[config_path],
                 )
             except Exception as e:
-                return RefactorResult(success=False, message=f"Failed to remove dependency: {e}")
+                return Result(success=False, message=f"Failed to remove dependency: {e}")
         else:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Unsupported package format: {fmt}",
             )
 
-        return RefactorResult(
+        return Result(
             success=result.success,
             message=result.message,
             files_changed=result.files_changed,
@@ -1265,7 +1259,7 @@ class Rejig:
 
     def export_requirements(
         self, output: Path | None = None, include_dev: bool = False
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Export dependencies as a requirements.txt file.
 
@@ -1278,7 +1272,7 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the operation.
 
         Examples
@@ -1292,7 +1286,7 @@ class Rejig:
 
         config = get_package_config(self.root)
         if config is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message="No package configuration found in project",
             )
@@ -1305,7 +1299,7 @@ class Rejig:
             config, output, include_dev=include_dev, dry_run=self.dry_run
         )
 
-        return RefactorResult(
+        return Result(
             success=result.success,
             message=result.message,
             files_changed=result.files_changed,
@@ -1313,7 +1307,7 @@ class Rejig:
 
     def convert_package_config(
         self, target_format: str, output: Path | None = None
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Convert package configuration to a different format.
 
@@ -1326,7 +1320,7 @@ class Rejig:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result of the operation.
 
         Examples
@@ -1340,7 +1334,7 @@ class Rejig:
 
         config = get_package_config(self.root)
         if config is None:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message="No package configuration found in project",
             )
@@ -1361,12 +1355,12 @@ class Rejig:
             else:
                 result = converter.to_pep621(config, output, dry_run=self.dry_run)
         else:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Conversion to {target_format} not yet supported",
             )
 
-        return RefactorResult(
+        return Result(
             success=result.success,
             message=result.message,
             files_changed=result.files_changed,

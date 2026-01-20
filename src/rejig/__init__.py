@@ -17,7 +17,7 @@ Example
 >>> # Chain operations on methods
 >>> rj.find_class("MyClass").find_method("process").insert_statement("self.validate()")
 >>>
->>> # Use the new target API
+>>> # Use the target API
 >>> rj.file("mymodule.py").find_class("MyClass").add_method("process")
 >>> rj.toml("pyproject.toml").set("project.version", "2.0.0")
 >>>
@@ -31,9 +31,15 @@ Classes
 Rejig
     Main entry point for all refactoring operations.
 
-RefactorResult
-    Dataclass returned by all refactoring methods containing success status,
-    message, and list of changed files.
+Result
+    Result class for all operations. Contains success status, message, and
+    list of changed files. Operations never raise exceptions.
+
+ErrorResult
+    Result class for failed operations.
+
+BatchResult
+    Aggregate result for operations applied to multiple targets.
 
 FindResult
     Result of find operations containing matched locations.
@@ -41,29 +47,17 @@ FindResult
 Match
     A single match from a find operation.
 
-ClassScope
-    Scope for operations on a specific class.
-
-MethodScope
-    Scope for operations on a specific method within a class.
-
-FunctionScope
-    Scope for operations on a module-level function.
-
-Targets
--------
-Result
-    Result class for target operations.
-
-ErrorResult
-    Result class for failed operations.
-
 Target
     Base class for all targets.
+
+ErrorTarget
+    Sentinel for failed lookups - all operations return ErrorResult.
 
 TargetList
     List of targets for batch operations.
 
+Python Targets
+--------------
 FileTarget
     Target for Python files.
 
@@ -88,6 +82,17 @@ LineTarget
 LineBlockTarget
     Target for line ranges.
 
+CodeBlockTarget
+    Target for code blocks (if/for/while/try/with/class/function).
+
+CommentTarget
+    Target for Python comments.
+
+StringLiteralTarget
+    Target for string literals.
+
+Config Targets
+--------------
 TomlTarget
     Target for TOML files.
 
@@ -131,7 +136,7 @@ PackageConfigConverter
 """
 from __future__ import annotations
 
-from .core import Rejig
+from .core import BatchResult, ErrorResult, Rejig, Result
 from .packaging import (
     Dependency,
     FormatDetector,
@@ -143,14 +148,11 @@ from .packaging import (
     RequirementsParser,
     UVParser,
 )
-from .result import FindResult, Match, RefactorResult
-from .scope import ClassScope, FunctionScope, MethodScope
+from .result import FindResult, Match
 from .targets import (
-    BatchResult,
     ClassTarget,
     CodeBlockTarget,
     CommentTarget,
-    ErrorResult,
     ErrorTarget,
     FileTarget,
     FunctionTarget,
@@ -161,7 +163,6 @@ from .targets import (
     MethodTarget,
     ModuleTarget,
     PackageTarget,
-    Result,
     StringLiteralTarget,
     Target,
     TargetList,
@@ -174,18 +175,13 @@ __version__ = "0.1.0"
 __all__ = [
     # Main entry point
     "Rejig",
-    # Legacy result classes
-    "RefactorResult",
-    "FindResult",
-    "Match",
-    # Legacy scope classes
-    "ClassScope",
-    "MethodScope",
-    "FunctionScope",
-    # Target base classes
+    # Result classes
     "Result",
     "ErrorResult",
     "BatchResult",
+    "FindResult",
+    "Match",
+    # Target base classes
     "Target",
     "ErrorTarget",
     "TargetList",

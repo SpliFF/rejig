@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.packaging.models import Dependency, PackageConfig, PackageFormat, PackageMetadata
-from rejig.targets.base import Result
+from rejig.core.results import Result
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig

@@ -10,8 +10,8 @@ import re
 import shutil
 from pathlib import Path
 
-from ..core import Manipylate
-from ..result import RefactorResult
+from ..core import Rejig
+from ..core.results import Result
 from .dependencies import DependencyManager
 from .settings import SettingsManager
 from .urls import UrlManager
@@ -88,8 +88,8 @@ class DjangoProject:
         self._urls = UrlManager(self)
         self._dependencies = DependencyManager(self)
 
-        # Create internal Manipylate instance for rope operations
-        self._manipylate = Manipylate(self.django_root, dry_run=dry_run)
+        # Create internal Rejig instance for rope operations
+        self._rejig = Rejig(self.django_root, dry_run=dry_run)
 
     @property
     def settings_path(self) -> Path:
@@ -122,8 +122,8 @@ class DjangoProject:
 
     def close(self) -> None:
         """Close the rope project and clean up .ropeproject directory."""
-        # Close the internal Manipylate instance (handles rope cleanup)
-        self._manipylate.close()
+        # Close the internal Rejig instance (handles rope cleanup)
+        self._rejig.close()
 
         # Also close legacy rope project if it was used directly
         if self._rope_project is not None:
@@ -269,7 +269,7 @@ class DjangoProject:
         self,
         app_name: str,
         files: dict[str, str] | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Create a new Django app directory with specified files.
 
@@ -282,13 +282,13 @@ class DjangoProject:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         app_path = self.get_app_path(app_name)
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would create app: {app_name}",
                 files_changed=[app_path],
@@ -310,14 +310,14 @@ class DjangoProject:
                 filepath.write_text(content)
                 created_files.append(filepath)
 
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Created app: {app_name}",
             files_changed=created_files,
         )
 
     # -------------------------------------------------------------------------
-    # Rope-based Refactoring Methods (delegated to Manipylate)
+    # Rope-based Refactoring Methods (delegated to Rejig)
     # -------------------------------------------------------------------------
 
     def move_class(
@@ -325,7 +325,7 @@ class DjangoProject:
         source_file: Path,
         class_name: str,
         dest_module: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Move a class from source file to destination module using rope.
 
@@ -342,17 +342,17 @@ class DjangoProject:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
-        return self._manipylate.move_class(source_file, class_name, dest_module)
+        return self._rejig.move_class(source_file, class_name, dest_module)
 
     def move_function(
         self,
         source_file: Path,
         function_name: str,
         dest_module: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Move a function from source file to destination module using rope.
 
@@ -367,10 +367,10 @@ class DjangoProject:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
-        return self._manipylate.move_function(source_file, function_name, dest_module)
+        return self._rejig.move_function(source_file, function_name, dest_module)
 
     # -------------------------------------------------------------------------
     # Settings Management (delegated to SettingsManager)
@@ -380,7 +380,7 @@ class DjangoProject:
         self,
         app_name: str,
         after_app: str | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Add an app to INSTALLED_APPS in Django settings."""
         return self._settings.add_installed_app(app_name, after_app)
 
@@ -388,7 +388,7 @@ class DjangoProject:
         self,
         old_path: str,
         new_path: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """Update a middleware path in Django settings."""
         return self._settings.update_middleware_path(old_path, new_path)
 
@@ -397,7 +397,7 @@ class DjangoProject:
         middleware_path: str,
         position: str = "first",
         after: str | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Add a middleware to Django settings."""
         return self._settings.add_middleware(middleware_path, position, after)
 
@@ -407,7 +407,7 @@ class DjangoProject:
         value: str,
         comment: str | None = None,
         settings_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Add a new setting to Django settings file."""
         return self._settings.add_setting(setting_name, value, comment, settings_file)
 
@@ -417,7 +417,7 @@ class DjangoProject:
         new_value: str,
         comment: str | None = None,
         settings_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Update an existing setting in Django settings file."""
         return self._settings.update_setting(setting_name, new_value, comment, settings_file)
 
@@ -426,7 +426,7 @@ class DjangoProject:
         setting_name: str,
         delete_comment: bool = True,
         settings_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Delete a setting from Django settings file."""
         return self._settings.delete_setting(setting_name, delete_comment, settings_file)
 
@@ -440,7 +440,7 @@ class DjangoProject:
         path_prefix: str = "",
         urls_file: Path | None = None,
         position: str = "first",
-    ) -> RefactorResult:
+    ) -> Result:
         """Add an include() to a urls.py file."""
         return self._urls.add_url_include(urls_module, path_prefix, urls_file, position)
 
@@ -451,7 +451,7 @@ class DjangoProject:
         name: str | None = None,
         urls_file: Path | None = None,
         position: str = "last",
-    ) -> RefactorResult:
+    ) -> Result:
         """Add a URL pattern to a urls.py file."""
         return self._urls.add_url_pattern(path_str, view, name, urls_file, position)
 
@@ -459,7 +459,7 @@ class DjangoProject:
         self,
         pattern_regex: str,
         urls_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Remove a URL pattern from a urls.py file."""
         return self._urls.remove_url_pattern(pattern_regex, urls_file)
 
@@ -467,7 +467,7 @@ class DjangoProject:
         self,
         view_name: str,
         urls_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Remove a URL pattern by view name from a urls.py file."""
         return self._urls.remove_url_pattern_by_view(view_name, urls_file)
 
@@ -490,7 +490,7 @@ class DjangoProject:
         view_name: str,
         source_urls: Path,
         dest_urls: Path,
-    ) -> RefactorResult:
+    ) -> Result:
         """Move a URL pattern from one urls.py to another."""
         return self._urls.move_url_pattern(view_name, source_urls, dest_urls)
 
@@ -506,7 +506,7 @@ class DjangoProject:
         optional: bool = False,
         section: str = "tool.poetry.dependencies",
         pyproject_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Add a new dependency to pyproject.toml."""
         return self._dependencies.add_dependency(
             package_name, version, extras, optional, section, pyproject_file
@@ -520,7 +520,7 @@ class DjangoProject:
         optional: bool | None = None,
         section: str = "tool.poetry.dependencies",
         pyproject_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Update an existing dependency in pyproject.toml."""
         return self._dependencies.update_dependency(
             package_name, version, extras, optional, section, pyproject_file
@@ -531,7 +531,7 @@ class DjangoProject:
         package_name: str,
         section: str = "tool.poetry.dependencies",
         pyproject_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """Remove a dependency from pyproject.toml."""
         return self._dependencies.remove_dependency(package_name, section, pyproject_file)
 
@@ -544,7 +544,7 @@ class DjangoProject:
         file_path: Path,
         old_module: str,
         new_module: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Update import statements in a file.
 
@@ -559,11 +559,11 @@ class DjangoProject:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         if not file_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"File not found: {file_path}",
             )
@@ -580,20 +580,20 @@ class DjangoProject:
             new_content = re.sub(pattern, replacement, new_content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"No imports to update in {file_path}",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would update imports in {file_path}",
                 files_changed=[file_path],
             )
 
         file_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Updated imports in {file_path}",
             files_changed=[file_path],
@@ -603,7 +603,7 @@ class DjangoProject:
         self,
         file_path: Path,
         import_statement: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add an import statement to a file.
 
@@ -616,11 +616,11 @@ class DjangoProject:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         if not file_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"File not found: {file_path}",
             )
@@ -628,7 +628,7 @@ class DjangoProject:
         content = file_path.read_text()
 
         if import_statement in content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"Import already exists in {file_path}",
             )
@@ -648,14 +648,14 @@ class DjangoProject:
         new_content = "".join(lines)
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add import to {file_path}",
                 files_changed=[file_path],
             )
 
         file_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added import to {file_path}",
             files_changed=[file_path],
@@ -665,7 +665,7 @@ class DjangoProject:
         self,
         file_path: Path,
         import_pattern: str,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Remove an import statement from a file.
 
@@ -678,11 +678,11 @@ class DjangoProject:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         if not file_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"File not found: {file_path}",
             )
@@ -691,20 +691,20 @@ class DjangoProject:
         new_content = re.sub(rf'^{import_pattern}\n', '', content, flags=re.MULTILINE)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"No matching import found in {file_path}",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would remove import from {file_path}",
                 files_changed=[file_path],
             )
 
         file_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Removed import from {file_path}",
             files_changed=[file_path],

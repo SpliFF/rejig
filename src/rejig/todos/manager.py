@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rejig.targets.base import Result
+from rejig.core.results import Result
 from rejig.targets.python.todo import TodoTarget, TodoType
 
 if TYPE_CHECKING:

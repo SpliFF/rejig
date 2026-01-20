@@ -17,7 +17,11 @@ Example
 from __future__ import annotations
 
 from .rejig import Rejig
+from .results import BatchResult, ErrorResult, Result
 
 __all__ = [
     "Rejig",
+    "Result",
+    "ErrorResult",
+    "BatchResult",
 ]

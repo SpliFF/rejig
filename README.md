@@ -1,4 +1,4 @@
-# Manipylate
+# Rejig
 
 A Python library for programmatic code refactoring using LibCST.
 
@@ -14,56 +14,56 @@ pip install rejig[django]
 ## Quick Start
 
 ```python
-from rejig import Manipylate
+from rejig import Rejig
 
 # Initialize with a directory or glob pattern
-pym = Manipylate("src/")
+rj = Rejig("src/")
 
 # Find and modify a class
-pym.find_class("MyClass").add_attribute("count", "int", "0")
+rj.find_class("MyClass").add_attribute("count", "int", "0")
 
 # Chain operations on methods
-pym.find_class("MyClass").find_method("process").insert_statement("self.validate()")
+rj.find_class("MyClass").find_method("process").insert_statement("self.validate()")
 
 # Preview changes without modifying files
-pym = Manipylate("src/", dry_run=True)
-result = pym.find_class("MyClass").add_attribute("x", "int", "0")
+rj = Rejig("src/", dry_run=True)
+result = rj.find_class("MyClass").add_attribute("x", "int", "0")
 print(result.message)  # [DRY RUN] Would add attribute...
 ```
 
 ## Core API
 
-### Manipylate
+### Rejig
 
 The main entry point for code refactoring operations.
 
 ```python
-from rejig import Manipylate
+from rejig import Rejig
 
 # Work with all Python files in a directory
-pym = Manipylate("src/myproject/")
+rj = Rejig("src/myproject/")
 
 # Work with specific files using glob patterns
-pym = Manipylate("src/**/*_views.py")
+rj = Rejig("src/**/*_views.py")
 
 # Work with a single file
-pym = Manipylate("path/to/file.py")
+rj = Rejig("path/to/file.py")
 ```
 
 ### Finding Code Elements
 
 ```python
 # Find a class
-class_scope = pym.find_class("MyClass")
+cls = rj.find_class("MyClass")
 
 # Find a method within a class
-method_scope = pym.find_class("MyClass").find_method("my_method")
+method = rj.find_class("MyClass").find_method("my_method")
 
 # Find a module-level function
-func_scope = pym.find_function("process_data")
+func = rj.find_function("process_data")
 
 # Search for patterns
-results = pym.search(r"TODO:.*")
+results = rj.search(r"TODO:.*")
 for match in results:
     print(f"{match.file_path}:{match.line_number} - {match.name}")
 ```
@@ -71,64 +71,64 @@ for match in results:
 ### Class Operations
 
 ```python
-class_scope = pym.find_class("MyClass")
+cls = rj.find_class("MyClass")
 
 # Add a class attribute
-class_scope.add_attribute("cache", "dict[str, Any] | None", "None")
+cls.add_attribute("cache", "dict[str, Any] | None", "None")
 
 # Remove a class attribute
-class_scope.remove_attribute("old_attr")
+cls.remove_attribute("old_attr")
 
 # Rename the class
-class_scope.rename("NewClassName")
+cls.rename("NewClassName")
 
 # Add/remove decorators
-class_scope.add_decorator("dataclass")
-class_scope.remove_decorator("deprecated")
+cls.add_decorator("dataclass")
+cls.remove_decorator("deprecated")
 ```
 
 ### Method Operations
 
 ```python
-method_scope = pym.find_class("MyClass").find_method("process")
+method = rj.find_class("MyClass").find_method("process")
 
 # Insert a statement at the start of the method
-method_scope.insert_statement("self.validate()")
+method.insert_statement("self.validate()")
 
 # Add a parameter
-method_scope.add_parameter("timeout", "int", "30")
+method.add_parameter("timeout", "int", "30")
 
 # Replace identifiers within the method
-method_scope.replace_identifier("cache", "cls._cache")
+method.replace_identifier("cache", "cls._cache")
 
 # Convert staticmethod to classmethod
-method_scope.convert_to_classmethod()
+method.convert_to_classmethod()
 
 # Add/remove decorators
-method_scope.add_decorator("cached_property")
-method_scope.remove_decorator("staticmethod")
+method.add_decorator("cached_property")
+method.remove_decorator("staticmethod")
 
 # Rename the method
-method_scope.rename("new_method_name")
+method.rename("new_method_name")
 
 # Insert code before/after matching lines
-method_scope.insert_before_match(r"return\s+", "self.log_result(result)")
-method_scope.insert_after_match(r"result\s*=", "self.validate_result(result)")
+method.insert_before_match(r"return\s+", "self.log_result(result)")
+method.insert_after_match(r"result\s*=", "self.validate_result(result)")
 ```
 
 ### Function Operations
 
 ```python
-func_scope = pym.find_function("process_data")
+func = rj.find_function("process_data")
 
 # Insert a statement
-func_scope.insert_statement("validate_input(data)")
+func.insert_statement("validate_input(data)")
 
 # Add a decorator
-func_scope.add_decorator("lru_cache")
+func.add_decorator("lru_cache")
 
 # Rename the function
-func_scope.rename("handle_data")
+func.rename("handle_data")
 ```
 
 ## Move Operations (Rope-based)
@@ -136,25 +136,25 @@ func_scope.rename("handle_data")
 Move classes and functions between modules with automatic import updates:
 
 ```python
-from rejig import Manipylate
+from rejig import Rejig
 
 # Use context manager for automatic cleanup
-with Manipylate("src/") as pym:
+with Rejig("src/") as rj:
 	# Move a class to a new module
-	pym.move_class(Path("src/old.py"), "MyClass", "new_module")
+	rj.move_class(Path("src/old.py"), "MyClass", "new_module")
 
 	# Move a function
-	pym.move_function(Path("src/utils.py"), "helper", "new_utils")
+	rj.move_function(Path("src/utils.py"), "helper", "new_utils")
 
 # Or use the fluent API
-with Manipylate("src/") as pym:
-	pym.find_class("MyClass").move_to("new_module.models")
-	pym.find_function("helper").move_to("utils.common")
+with Rejig("src/") as rj:
+	rj.find_class("MyClass").move_to("new_module.models")
+	rj.find_function("helper").move_to("utils.common")
 
 # Without context manager (manual cleanup)
-pym = Manipylate("src/")
-pym.find_class("MyClass").move_to("other_module")
-pym.close()  # Always close after move operations
+rj = Rejig("src/")
+rj.find_class("MyClass").move_to("other_module")
+rj.close()  # Always close after move operations
 ```
 
 ## Django Project Support
@@ -186,21 +186,21 @@ with DjangoProject("/path/to/project") as project:
 	app_name = project.find_app_containing_class("MyView", filename="views.py")
 	file_path = project.find_file_containing_class("MyModel")
 
-	# Code movement (same as core Manipylate)
+	# Code movement (same as core Rejig)
 	project.move_class(source_file, "MyClass", "newapp.models")
 	project.move_function(source_file, "helper_func", "utils.helpers")
 ```
 
 ## Result Handling
 
-All operations return a `RefactorResult`:
+All operations return a `Result`:
 
 ```python
-result = class_scope.add_attribute("count", "int", "0")
+result = cls.add_attribute("count", "int", "0")
 
 if result.success:
     print(f"Success: {result.message}")
-    for file in result.files_changed or []:
+    for file in result.files_changed:
         print(f"  Modified: {file}")
 else:
     print(f"Failed: {result.message}")
@@ -215,8 +215,8 @@ if result:
 Preview changes without modifying files:
 
 ```python
-pym = Manipylate("src/", dry_run=True)
-result = pym.find_class("MyClass").add_attribute("x", "int", "0")
+rj = Rejig("src/", dry_run=True)
+result = rj.find_class("MyClass").add_attribute("x", "int", "0")
 print(result.message)  # [DRY RUN] Would add attribute x to MyClass
 print(result.files_changed)  # Shows files that would be modified
 ```
@@ -229,7 +229,7 @@ You can use LibCST transformers directly:
 
 ```python
 import libcst as cst
-from rejig import Manipylate
+from rejig import Rejig
 
 
 class MyTransformer(cst.CSTTransformer):
@@ -237,9 +237,9 @@ class MyTransformer(cst.CSTTransformer):
 	pass
 
 
-pym = Manipylate("src/")
-for file_path in pym.files:
-	result = pym.transform_file(file_path, MyTransformer())
+rj = Rejig("src/")
+for file_path in rj.files:
+	result = rj.transform_file(file_path, MyTransformer())
 ```
 
 ### Import Management
@@ -247,13 +247,13 @@ for file_path in pym.files:
 ```python
 from pathlib import Path
 
-pym = Manipylate("src/")
+rj = Rejig("src/")
 
 # Add an import
-pym.add_import(Path("src/module.py"), "from typing import Optional")
+rj.add_import(Path("src/module.py"), "from typing import Optional")
 
 # Remove an import
-pym.remove_import(Path("src/module.py"), r"from deprecated import.*")
+rj.remove_import(Path("src/module.py"), r"from deprecated import.*")
 ```
 
 ## Requirements

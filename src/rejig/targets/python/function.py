@@ -190,6 +190,103 @@ class FunctionTarget(Target):
         transformer = InsertAtMethodStart(None, self.name, statement)
         return self._transform(transformer)
 
+    def add_parameter(
+        self,
+        param_name: str,
+        type_annotation: str | None = None,
+        default_value: str | None = None,
+        position: str = "end",
+    ) -> Result:
+        """Add a parameter to the function signature.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the parameter to add.
+        type_annotation : str | None
+            Type annotation for the parameter.
+        default_value : str | None
+            Default value for the parameter.
+        position : str
+            Where to add: "start", "end".
+            Defaults to "end".
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.add_parameter("timeout", "int", "30")
+        >>> func.add_parameter("verbose", "bool", "False")
+        """
+        file_path = self._find_function()
+        if not file_path:
+            return self._operation_failed(
+                "add_parameter", f"Function '{self.name}' not found"
+            )
+
+        try:
+            content = file_path.read_text()
+
+            # Build the parameter string
+            param_str = param_name
+            if type_annotation:
+                param_str = f"{param_name}: {type_annotation}"
+            if default_value is not None:
+                param_str = f"{param_str} = {default_value}"
+
+            # Find and update the function signature
+            # Handle both empty and non-empty parameter lists
+            if position == "start":
+                # Insert after opening paren
+                pattern = rf"(def\s+{re.escape(self.name)}\s*\()([^)]*)\)"
+                match = re.search(pattern, content)
+                if match:
+                    existing_params = match.group(2).strip()
+                    if existing_params:
+                        new_params = f"{param_str}, {existing_params}"
+                    else:
+                        new_params = param_str
+                    new_content = (
+                        content[: match.start(2)] + new_params + content[match.end(2) :]
+                    )
+                else:
+                    return self._operation_failed(
+                        "add_parameter", f"Could not find function signature for {self.name}"
+                    )
+            else:
+                # Insert at end
+                pattern = rf"(def\s+{re.escape(self.name)}\s*\([^)]*)()\)"
+                new_content = re.sub(pattern, rf"\1, {param_str})", content)
+
+                # Handle empty parameter list
+                if new_content == content:
+                    pattern = rf"(def\s+{re.escape(self.name)}\s*\(\s*)(\))"
+                    new_content = re.sub(pattern, rf"\1{param_str})", content)
+
+            if new_content == content:
+                return self._operation_failed(
+                    "add_parameter", f"Could not add parameter to {self.name}"
+                )
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would add parameter {param_name} to {self.name}",
+                    files_changed=[file_path],
+                )
+
+            file_path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Added parameter {param_name} to {self.name}",
+                files_changed=[file_path],
+            )
+        except Exception as e:
+            return self._operation_failed("add_parameter", f"Failed to add parameter: {e}", e)
+
     def add_decorator(self, decorator: str) -> Result:
         """Add a decorator to this function.
 

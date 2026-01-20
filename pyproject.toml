@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "manipylate"
+name = "rejig"
 version = "0.1.0"
 description = "A Python library for programmatic code refactoring using LibCST"
 readme = "README.md"
@@ -47,12 +47,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/alliancesoftware/manipylate"
-Documentation = "https://github.com/alliancesoftware/manipylate#readme"
-Repository = "https://github.com/alliancesoftware/manipylate"
+Homepage = "https://github.com/alliancesoftware/rejig"
+Documentation = "https://github.com/alliancesoftware/rejig#readme"
+Repository = "https://github.com/alliancesoftware/rejig"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/manipylate"]
+packages = ["src/rejig"]
 
 [tool.black]
 line-length = 110

@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..result import RefactorResult
+from ..core.results import Result
 
 if TYPE_CHECKING:
     from .project import DjangoProject
@@ -40,7 +40,7 @@ class UrlManager:
         path_prefix: str = "",
         urls_file: Path | None = None,
         position: str = "first",
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add an include() to a urls.py file.
 
@@ -57,12 +57,12 @@ class UrlManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         urls_path = urls_file or self.root_urls_path
         if not urls_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"URLs file not found: {urls_path}",
             )
@@ -70,7 +70,7 @@ class UrlManager:
         content = urls_path.read_text()
 
         if urls_module in content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"URL include for {urls_module} already exists",
             )
@@ -87,20 +87,20 @@ class UrlManager:
         new_content = re.sub(pattern, replacement, content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not add URL include for {urls_module}",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add URL include: {urls_module}",
                 files_changed=[urls_path],
             )
 
         urls_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added URL include: {urls_module}",
             files_changed=[urls_path],
@@ -113,7 +113,7 @@ class UrlManager:
         name: str | None = None,
         urls_file: Path | None = None,
         position: str = "last",
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Add a URL pattern to a urls.py file.
 
@@ -132,12 +132,12 @@ class UrlManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         urls_path = urls_file or self.root_urls_path
         if not urls_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"URLs file not found: {urls_path}",
             )
@@ -145,7 +145,7 @@ class UrlManager:
         content = urls_path.read_text()
 
         if f'"{path_str}"' in content and view in content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"URL pattern for '{path_str}' already exists",
             )
@@ -165,20 +165,20 @@ class UrlManager:
         new_content = re.sub(pattern, replacement, content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not add URL pattern for '{path_str}'",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would add URL pattern: {path_str}",
                 files_changed=[urls_path],
             )
 
         urls_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Added URL pattern: {path_str}",
             files_changed=[urls_path],
@@ -188,7 +188,7 @@ class UrlManager:
         self,
         pattern_regex: str,
         urls_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Remove a URL pattern from a urls.py file.
 
@@ -201,12 +201,12 @@ class UrlManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         urls_path = urls_file or self.root_urls_path
         if not urls_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"URLs file not found: {urls_path}",
             )
@@ -216,20 +216,20 @@ class UrlManager:
         new_content = re.sub(r'\n{3,}', '\n\n', new_content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message="No matching URL pattern found to remove",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would remove URL pattern from {urls_path}",
                 files_changed=[urls_path],
             )
 
         urls_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Removed URL pattern from {urls_path}",
             files_changed=[urls_path],
@@ -239,7 +239,7 @@ class UrlManager:
         self,
         view_name: str,
         urls_file: Path | None = None,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Remove a URL pattern by view name from a urls.py file.
 
@@ -252,12 +252,12 @@ class UrlManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         urls_path = urls_file or self.root_urls_path
         if not urls_path.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"URLs file not found: {urls_path}",
             )
@@ -269,20 +269,20 @@ class UrlManager:
         new_content = re.sub(r'\n{3,}', '\n\n', new_content)
 
         if new_content == content:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"No URL pattern found for view: {view_name}",
             )
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would remove URL pattern for view: {view_name}",
                 files_changed=[urls_path],
             )
 
         urls_path.write_text(new_content)
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Removed URL pattern for view: {view_name}",
             files_changed=[urls_path],
@@ -393,7 +393,7 @@ class UrlManager:
         view_name: str,
         source_urls: Path,
         dest_urls: Path,
-    ) -> RefactorResult:
+    ) -> Result:
         """
         Move a URL pattern from one urls.py to another.
 
@@ -415,17 +415,17 @@ class UrlManager:
 
         Returns
         -------
-        RefactorResult
+        Result
             Result with success status.
         """
         if not source_urls.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Source URLs file not found: {source_urls}",
             )
 
         if not dest_urls.exists():
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Destination URLs file not found: {dest_urls}",
             )
@@ -439,7 +439,7 @@ class UrlManager:
                 break
 
         if not pattern_match:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"URL pattern for {view_name} not found in {source_urls}",
             )
@@ -455,7 +455,7 @@ class UrlManager:
         name_match = re.search(r'name="([^"]*)"', pattern_match)
 
         if not path_match:
-            return RefactorResult(
+            return Result(
                 success=False,
                 message=f"Could not parse URL pattern: {pattern_match}",
             )
@@ -467,7 +467,7 @@ class UrlManager:
         view_call = view_match.group(1).strip() if view_match else view_name
 
         if self.dry_run:
-            return RefactorResult(
+            return Result(
                 success=True,
                 message=f"[DRY RUN] Would move URL pattern '{path_str}' from {source_urls.name} to {dest_urls.name}",
                 files_changed=[source_urls, dest_urls],
@@ -495,7 +495,7 @@ class UrlManager:
                 rf".*{re.escape(view_name)}.*"
             )
 
-        return RefactorResult(
+        return Result(
             success=True,
             message=f"Moved URL pattern '{path_str}' from {source_urls.name} to {dest_urls.name}",
             files_changed=[source_urls, dest_urls],
