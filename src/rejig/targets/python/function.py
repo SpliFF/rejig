@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
-from rejig.core.position import find_function_line
+from rejig.core.position import find_function_line, find_function_lines
 from rejig.targets.base import ErrorResult, Result, Target
 from rejig.transformers import (
     AddFunctionDecorator,
@@ -63,10 +63,28 @@ class FunctionTarget(Target):
 
     @property
     def line_number(self) -> int | None:
-        """Line number where the function is defined."""
+        """Line number where the function is defined (alias for start_line)."""
+        return self.start_line
+
+    @property
+    def start_line(self) -> int | None:
+        """Starting line number of this function definition (1-indexed)."""
         if self._line_number is None:
             self._find_function()
         return self._line_number
+
+    @property
+    def end_line(self) -> int | None:
+        """Ending line number of this function definition (1-indexed)."""
+        file_path = self._find_function()
+        if not file_path:
+            return None
+        try:
+            content = file_path.read_text()
+            lines = find_function_lines(content, self.name)
+            return lines[1] if lines else None
+        except Exception:
+            return None
 
     def __repr__(self) -> str:
         if self._file_path:

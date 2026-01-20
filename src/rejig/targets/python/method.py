@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
-from rejig.core.position import find_method_line
+from rejig.core.position import find_method_line, find_method_lines
 from rejig.targets.base import Result, Target
 from rejig.transformers import (
     AddFirstParameter,
@@ -72,10 +72,28 @@ class MethodTarget(Target):
 
     @property
     def line_number(self) -> int | None:
-        """Line number where the method is defined."""
+        """Line number where the method is defined (alias for start_line)."""
+        return self.start_line
+
+    @property
+    def start_line(self) -> int | None:
+        """Starting line number of this method definition (1-indexed)."""
         if self._line_number is None:
             self._find_method()
         return self._line_number
+
+    @property
+    def end_line(self) -> int | None:
+        """Ending line number of this method definition (1-indexed)."""
+        file_path = self._find_method()
+        if not file_path:
+            return None
+        try:
+            content = file_path.read_text()
+            lines = find_method_lines(content, self.class_name, self.name)
+            return lines[1] if lines else None
+        except Exception:
+            return None
 
     def __repr__(self) -> str:
         if self._file_path:
@@ -170,6 +188,166 @@ class MethodTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("get_content", f"Failed to get method content: {e}", e)
+
+    def extract_to_function(self, name: str) -> Result:
+        """Extract this method to a module-level function.
+
+        The method is converted to a standalone function, and the method
+        is replaced with a call to that function. The first parameter
+        (self/cls) is preserved.
+
+        Parameters
+        ----------
+        name : str
+            Name for the extracted function.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> result = method.extract_to_function("process_user_data")
+        >>> if result.success:
+        ...     func = rj.find_function("process_user_data")
+        """
+        file_path = self._find_method()
+        if not file_path:
+            return self._operation_failed(
+                "extract_to_function", f"Method '{self.class_name}.{self.name}' not found"
+            )
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            class MethodExtractor(cst.CSTTransformer):
+                def __init__(self, target_class: str, target_method: str, func_name: str):
+                    self.target_class = target_class
+                    self.target_method = target_method
+                    self.func_name = func_name
+                    self.in_target_class = False
+                    self.extracted_func: cst.FunctionDef | None = None
+                    self.extracted = False
+
+                def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+                    if node.name.value == self.target_class:
+                        self.in_target_class = True
+                    return True
+
+                def leave_ClassDef(
+                    self, original_node: cst.ClassDef, updated_node: cst.ClassDef
+                ) -> cst.ClassDef:
+                    if original_node.name.value == self.target_class:
+                        self.in_target_class = False
+                    return updated_node
+
+                def leave_FunctionDef(
+                    self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
+                ) -> cst.FunctionDef:
+                    if (
+                        self.in_target_class
+                        and original_node.name.value == self.target_method
+                    ):
+                        # Save the method as a function with the new name
+                        # Remove class-specific decorators
+                        decorators = [
+                            d
+                            for d in original_node.decorators
+                            if not self._is_class_decorator(d)
+                        ]
+
+                        # Create the extracted function (keep body unchanged, dedented later)
+                        self.extracted_func = original_node.with_changes(
+                            name=cst.Name(self.func_name),
+                            decorators=decorators,
+                        )
+                        self.extracted = True
+
+                        # Replace method body with call to extracted function
+                        # Get first param name (self/cls)
+                        first_param = "self"
+                        if original_node.params.params:
+                            first_param = original_node.params.params[0].name.value
+
+                        # Build args list for the call
+                        param_names = self._get_param_names(original_node.params)
+
+                        call_args = ", ".join(param_names)
+                        call_stmt = cst.parse_statement(
+                            f"return {self.func_name}({call_args})"
+                        )
+
+                        return updated_node.with_changes(
+                            body=cst.IndentedBlock(body=[call_stmt])
+                        )
+
+                    return updated_node
+
+                def _is_class_decorator(self, decorator: cst.Decorator) -> bool:
+                    """Check if a decorator is class-specific (staticmethod, classmethod)."""
+                    if isinstance(decorator.decorator, cst.Name):
+                        return decorator.decorator.value in ("staticmethod", "classmethod")
+                    return False
+
+                def _get_param_names(self, params: cst.Parameters) -> list[str]:
+                    """Get all parameter names from a Parameters node."""
+                    names: list[str] = []
+                    for param in params.params:
+                        names.append(param.name.value)
+                    for param in params.kwonly_params:
+                        names.append(f"{param.name.value}={param.name.value}")
+                    if params.star_arg and isinstance(params.star_arg, cst.Param):
+                        names.append(f"*{params.star_arg.name.value}")
+                    if params.star_kwarg:
+                        names.append(f"**{params.star_kwarg.name.value}")
+                    return names
+
+                def leave_Module(
+                    self, original_node: cst.Module, updated_node: cst.Module
+                ) -> cst.Module:
+                    if self.extracted_func is None:
+                        return updated_node
+
+                    # Insert the extracted function before the class
+                    new_body: list[cst.BaseStatement] = []
+                    for stmt in updated_node.body:
+                        if isinstance(stmt, cst.ClassDef) and stmt.name.value == self.target_class:
+                            # Insert extracted function before the class
+                            new_body.append(self.extracted_func)
+                            new_body.append(cst.EmptyLine(whitespace=cst.SimpleWhitespace("")))
+                        new_body.append(stmt)
+                    return updated_node.with_changes(body=new_body)
+
+            extractor = MethodExtractor(self.class_name, self.name, name)
+            new_tree = tree.visit(extractor)
+
+            if not extractor.extracted:
+                return self._operation_failed(
+                    "extract_to_function",
+                    f"Could not extract method {self.class_name}.{self.name}",
+                )
+
+            new_content = new_tree.code
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would extract {self.class_name}.{self.name} to function {name}",
+                    files_changed=[file_path],
+                )
+
+            file_path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Extracted {self.class_name}.{self.name} to function {name}",
+                files_changed=[file_path],
+            )
+        except Exception as e:
+            return self._operation_failed(
+                "extract_to_function", f"Failed to extract method: {e}", e
+            )
 
     def _transform(self, transformer: cst.CSTTransformer) -> Result:
         """Apply a LibCST transformer to the file containing this method."""

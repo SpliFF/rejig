@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import libcst as cst
 
-from rejig.core.position import find_class_line
+from rejig.core.position import find_class_line, find_class_lines
 from rejig.targets.base import ErrorResult, ErrorTarget, Result, Target, TargetList
 from rejig.transformers import (
     AddClassAttribute,
@@ -65,10 +65,28 @@ class ClassTarget(Target):
 
     @property
     def line_number(self) -> int | None:
-        """Line number where the class is defined."""
+        """Line number where the class is defined (alias for start_line)."""
+        return self.start_line
+
+    @property
+    def start_line(self) -> int | None:
+        """Starting line number of this class definition (1-indexed)."""
         if self._line_number is None:
             self._find_class()
         return self._line_number
+
+    @property
+    def end_line(self) -> int | None:
+        """Ending line number of this class definition (1-indexed)."""
+        file_path = self._find_class()
+        if not file_path:
+            return None
+        try:
+            content = file_path.read_text()
+            lines = find_class_lines(content, self.name)
+            return lines[1] if lines else None
+        except Exception:
+            return None
 
     def __repr__(self) -> str:
         if self._file_path:
@@ -136,6 +154,133 @@ class ClassTarget(Target):
             return self._operation_failed("get_content", f"Class '{self.name}' not found in AST")
         except Exception as e:
             return self._operation_failed("get_content", f"Failed to get class content: {e}", e)
+
+    def get_source(self) -> Result:
+        """Get just the class signature (without body).
+
+        Returns
+        -------
+        Result
+            Result with class signature in `data` field if successful.
+            The signature includes decorators, class name, and base classes.
+
+        Examples
+        --------
+        >>> sig = cls.get_source()
+        >>> if sig.success:
+        ...     print(sig.data)  # "class MyClass(BaseClass):"
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("get_source", f"Class '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            for node in tree.body:
+                if isinstance(node, cst.ClassDef) and node.name.value == self.name:
+                    # Build signature from decorators and class header
+                    signature_parts: list[str] = []
+
+                    # Add decorators
+                    for decorator in node.decorators:
+                        dec_code = tree.code_for_node(decorator)
+                        signature_parts.append(dec_code.strip())
+
+                    # Build class header: "class Name(bases):"
+                    bases_code = ""
+                    if node.bases:
+                        # Extract just the value from each Arg, not including trailing commas
+                        bases_list = [tree.code_for_node(base.value).strip() for base in node.bases]
+                        bases_code = f"({', '.join(bases_list)})"
+                    elif isinstance(node.lpar, cst.LeftParen):
+                        # Has empty parens: class Foo():
+                        bases_code = "()"
+
+                    class_header = f"class {self.name}{bases_code}:"
+                    signature_parts.append(class_header)
+
+                    signature = "\n".join(signature_parts)
+                    return Result(success=True, message="OK", data=signature)
+
+            return self._operation_failed("get_source", f"Class '{self.name}' not found in AST")
+        except Exception as e:
+            return self._operation_failed("get_source", f"Failed to get class signature: {e}", e)
+
+    def duplicate(self, new_name: str) -> Result:
+        """Duplicate this class with a new name.
+
+        Creates a copy of the class definition with the specified new name.
+        The duplicate is inserted immediately after the original class.
+
+        Parameters
+        ----------
+        new_name : str
+            Name for the duplicated class.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> result = cls.duplicate("UserV2")
+        >>> if result.success:
+        ...     new_cls = rj.find_class("UserV2")
+        """
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("duplicate", f"Class '{self.name}' not found")
+
+        try:
+            content = file_path.read_text()
+            tree = cst.parse_module(content)
+
+            class ClassDuplicator(cst.CSTTransformer):
+                def __init__(self, original_name: str, new_name: str):
+                    self.original_name = original_name
+                    self.new_name = new_name
+                    self.duplicated = False
+
+                def leave_Module(
+                    self, original_node: cst.Module, updated_node: cst.Module
+                ) -> cst.Module:
+                    new_body: list[cst.BaseStatement] = []
+                    for stmt in updated_node.body:
+                        new_body.append(stmt)
+                        if isinstance(stmt, cst.ClassDef) and stmt.name.value == self.original_name:
+                            # Create a duplicate with new name
+                            new_class = stmt.with_changes(name=cst.Name(self.new_name))
+                            new_body.append(cst.EmptyLine(whitespace=cst.SimpleWhitespace("")))
+                            new_body.append(new_class)
+                            self.duplicated = True
+                    return updated_node.with_changes(body=new_body)
+
+            duplicator = ClassDuplicator(self.name, new_name)
+            new_tree = tree.visit(duplicator)
+
+            if not duplicator.duplicated:
+                return self._operation_failed("duplicate", f"Could not duplicate class {self.name}")
+
+            new_content = new_tree.code
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would duplicate class {self.name} as {new_name}",
+                    files_changed=[file_path],
+                )
+
+            file_path.write_text(new_content)
+            return Result(
+                success=True,
+                message=f"Duplicated class {self.name} as {new_name}",
+                files_changed=[file_path],
+            )
+        except Exception as e:
+            return self._operation_failed("duplicate", f"Failed to duplicate class: {e}", e)
 
     def _transform(self, transformer: cst.CSTTransformer) -> Result:
         """Apply a LibCST transformer to the file containing this class."""

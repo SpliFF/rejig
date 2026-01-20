@@ -206,3 +206,72 @@ def find_all_functions(source: str) -> Sequence[NodePosition]:
     """
     finder = get_node_positions(source)
     return finder.functions
+
+
+def find_class_lines(source: str, class_name: str) -> tuple[int, int] | None:
+    """Find the start and end line numbers where a class is defined.
+
+    Parameters
+    ----------
+    source : str
+        Python source code.
+    class_name : str
+        Name of the class to find.
+
+    Returns
+    -------
+    tuple[int, int] | None
+        (start_line, end_line) as 1-indexed line numbers, or None if not found.
+    """
+    finder = get_node_positions(source)
+    for cls in finder.classes:
+        if cls.name == class_name:
+            return (cls.start_line, cls.end_line)
+    return None
+
+
+def find_function_lines(source: str, function_name: str) -> tuple[int, int] | None:
+    """Find the start and end line numbers where a module-level function is defined.
+
+    Parameters
+    ----------
+    source : str
+        Python source code.
+    function_name : str
+        Name of the function to find.
+
+    Returns
+    -------
+    tuple[int, int] | None
+        (start_line, end_line) as 1-indexed line numbers, or None if not found.
+    """
+    finder = get_node_positions(source)
+    for func in finder.functions:
+        if func.name == function_name:
+            return (func.start_line, func.end_line)
+    return None
+
+
+def find_method_lines(source: str, class_name: str, method_name: str) -> tuple[int, int] | None:
+    """Find the start and end line numbers where a method is defined.
+
+    Parameters
+    ----------
+    source : str
+        Python source code.
+    class_name : str
+        Name of the class containing the method.
+    method_name : str
+        Name of the method to find.
+
+    Returns
+    -------
+    tuple[int, int] | None
+        (start_line, end_line) as 1-indexed line numbers, or None if not found.
+    """
+    finder = get_node_positions(source)
+    if class_name in finder.methods:
+        for method in finder.methods[class_name]:
+            if method.name == method_name:
+                return (method.start_line, method.end_line)
+    return None
