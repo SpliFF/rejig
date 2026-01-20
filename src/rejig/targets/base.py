@@ -241,7 +241,7 @@ class TargetList(Generic[T]):
     """A list of targets that can be operated on uniformly.
 
     Operations are applied to all targets, returning a BatchResult.
-    This class also serves as the result type for find operations (replacing FindResult).
+    This class is also returned by find operations (e.g., find_classes(), find_functions()).
 
     Example:
         all_classes = rj.find_classes(pattern="^Test")

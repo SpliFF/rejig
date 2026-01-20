@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import libcst as cst
 
-from rejig.result import FindResult, Match
 from rejig.core.results import Result
 
 if TYPE_CHECKING:
@@ -19,6 +18,7 @@ if TYPE_CHECKING:
         FunctionTarget,
         IniTarget,
         JsonTarget,
+        LineTarget,
         ModuleTarget,
         PackageTarget,
         TextFileTarget,
@@ -386,13 +386,12 @@ class Rejig:
         return IniTarget(self, resolved)
 
     # =========================================================================
-    # Target-based Find Methods
+    # Batch Find Methods (return TargetList)
     # =========================================================================
-    # These methods return TargetList objects for batch operations.
 
-    def find_files_as_targets(self, glob: str = "**/*.py") -> TargetList[FileTarget]:
+    def find_files(self, glob: str = "**/*.py") -> TargetList[FileTarget]:
         """
-        Find files matching a glob pattern, returning as TargetList.
+        Find files matching a glob pattern.
 
         Parameters
         ----------
@@ -407,7 +406,8 @@ class Rejig:
         Examples
         --------
         >>> rj = Rejig("src/")
-        >>> files = rj.find_files_as_targets("**/*_test.py")
+        >>> files = rj.find_files("**/*_test.py")
+        >>> test_files = rj.find_files("**/test_*.py")
         """
         from rejig.targets.base import TargetList
         from rejig.targets.python.file import FileTarget
@@ -415,9 +415,9 @@ class Rejig:
         targets = [FileTarget(self, p) for p in self.root.glob(glob) if p.is_file()]
         return TargetList(self, targets)
 
-    def find_classes_as_targets(self, pattern: str | None = None) -> TargetList[ClassTarget]:
+    def find_classes(self, pattern: str | None = None) -> TargetList[ClassTarget]:
         """
-        Find all classes, returning as TargetList of ClassTarget.
+        Find all classes in the working set, optionally filtered by pattern.
 
         Parameters
         ----------
@@ -432,7 +432,8 @@ class Rejig:
         Examples
         --------
         >>> rj = Rejig("src/")
-        >>> test_classes = rj.find_classes_as_targets(pattern="^Test")
+        >>> all_classes = rj.find_classes()
+        >>> test_classes = rj.find_classes(pattern="^Test")
         >>> test_classes.add_decorator("pytest.mark.slow")
         """
         from rejig.targets.base import TargetList
@@ -456,9 +457,9 @@ class Rejig:
 
         return TargetList(self, targets)
 
-    def find_functions_as_targets(self, pattern: str | None = None) -> TargetList[FunctionTarget]:
+    def find_functions(self, pattern: str | None = None) -> TargetList[FunctionTarget]:
         """
-        Find all module-level functions, returning as TargetList of FunctionTarget.
+        Find all module-level functions in the working set.
 
         Parameters
         ----------
@@ -473,7 +474,8 @@ class Rejig:
         Examples
         --------
         >>> rj = Rejig("src/")
-        >>> functions = rj.find_functions_as_targets(pattern="^test_")
+        >>> all_funcs = rj.find_functions()
+        >>> process_funcs = rj.find_functions(pattern="^process_")
         """
         from rejig.targets.base import TargetList
         from rejig.targets.python.function import FunctionTarget
@@ -491,6 +493,48 @@ class Rejig:
                         name = node.name.value
                         if regex is None or regex.search(name):
                             targets.append(FunctionTarget(self, name, file_path=file_path))
+            except Exception:
+                continue
+
+        return TargetList(self, targets)
+
+    def search(self, pattern: str) -> TargetList[LineTarget]:
+        """
+        Search for a regex pattern across all files.
+
+        Returns a TargetList of LineTarget objects for each matching line,
+        allowing batch operations on search results.
+
+        Parameters
+        ----------
+        pattern : str
+            Regex pattern to search for.
+
+        Returns
+        -------
+        TargetList[LineTarget]
+            List of LineTarget objects for matching lines.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> matches = rj.search(r"TODO:.*")
+        >>> for line in matches:
+        ...     content = line.get_content()
+        ...     print(f"{line.path}:{line.line_number}: {content.data}")
+        """
+        from rejig.targets.base import TargetList
+        from rejig.targets.python.line import LineTarget
+
+        targets: list[LineTarget] = []
+        regex = re.compile(pattern)
+
+        for file_path in self.files:
+            try:
+                content = file_path.read_text()
+                for i, line in enumerate(content.splitlines(), 1):
+                    if regex.search(line):
+                        targets.append(LineTarget(self, file_path, i))
             except Exception:
                 continue
 
@@ -553,104 +597,6 @@ class Rejig:
         from rejig.targets.python.function import FunctionTarget
 
         return FunctionTarget(self, function_name)
-
-    def find_classes(self, pattern: str | None = None) -> FindResult:
-        """
-        Find all classes in the working set, optionally filtered by pattern.
-
-        Parameters
-        ----------
-        pattern : str | None
-            Optional regex pattern to filter class names.
-
-        Returns
-        -------
-        FindResult
-            Result containing all matching classes.
-        """
-        matches: list[Match] = []
-        regex = re.compile(pattern) if pattern else None
-
-        for file_path in self.files:
-            try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
-
-                for node in tree.body:
-                    if isinstance(node, cst.ClassDef):
-                        name = node.name.value
-                        if regex is None or regex.search(name):
-                            # Get line number
-                            pos = tree.code_for_node(node)
-                            line_num = content[: content.find(pos)].count("\n") + 1
-                            matches.append(Match(file_path, name, line_num))
-            except Exception:
-                continue
-
-        return FindResult(matches)
-
-    def find_functions(self, pattern: str | None = None) -> FindResult:
-        """
-        Find all module-level functions in the working set.
-
-        Parameters
-        ----------
-        pattern : str | None
-            Optional regex pattern to filter function names.
-
-        Returns
-        -------
-        FindResult
-            Result containing all matching functions.
-        """
-        matches: list[Match] = []
-        regex = re.compile(pattern) if pattern else None
-
-        for file_path in self.files:
-            try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
-
-                for node in tree.body:
-                    if isinstance(node, cst.FunctionDef):
-                        name = node.name.value
-                        if regex is None or regex.search(name):
-                            pos = tree.code_for_node(node)
-                            line_num = content[: content.find(pos)].count("\n") + 1
-                            matches.append(Match(file_path, name, line_num))
-            except Exception:
-                continue
-
-        return FindResult(matches)
-
-    def search(self, pattern: str) -> FindResult:
-        """
-        Search for a regex pattern across all files.
-
-        Parameters
-        ----------
-        pattern : str
-            Regex pattern to search for.
-
-        Returns
-        -------
-        FindResult
-            Result containing all matches.
-        """
-        matches: list[Match] = []
-        regex = re.compile(pattern)
-
-        for file_path in self.files:
-            try:
-                content = file_path.read_text()
-                for i, line in enumerate(content.splitlines(), 1):
-                    match = regex.search(line)
-                    if match:
-                        matches.append(Match(file_path, match.group(0), i))
-            except Exception:
-                continue
-
-        return FindResult(matches)
 
     def transform_file(
         self,

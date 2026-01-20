@@ -41,12 +41,6 @@ ErrorResult
 BatchResult
     Aggregate result for operations applied to multiple targets.
 
-FindResult
-    Result of find operations containing matched locations.
-
-Match
-    A single match from a find operation.
-
 Target
     Base class for all targets.
 
@@ -148,7 +142,6 @@ from .packaging import (
     RequirementsParser,
     UVParser,
 )
-from .result import FindResult, Match
 from .targets import (
     ClassTarget,
     CodeBlockTarget,
@@ -179,8 +172,6 @@ __all__ = [
     "Result",
     "ErrorResult",
     "BatchResult",
-    "FindResult",
-    "Match",
     # Target base classes
     "Target",
     "ErrorTarget",
