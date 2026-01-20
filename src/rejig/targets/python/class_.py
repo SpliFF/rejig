@@ -936,3 +936,580 @@ class ClassTarget(Target):
             return TargetList(self._rejig, targets)
         except Exception:
             return TargetList(self._rejig, [])
+
+    # ===== Class transformation operations =====
+
+    def convert_to_dataclass(
+        self,
+        frozen: bool = False,
+        slots: bool = False,
+    ) -> Result:
+        """Convert this class to a dataclass.
+
+        Adds @dataclass decorator and converts instance attributes to
+        class-level annotated attributes. Removes __init__ if it only
+        does attribute assignment.
+
+        Parameters
+        ----------
+        frozen : bool
+            If True, add frozen=True to decorator. Default False.
+        slots : bool
+            If True, add slots=True (Python 3.10+). Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.convert_to_dataclass()
+        >>> cls.convert_to_dataclass(frozen=True, slots=True)
+        """
+        from rejig.generation import ConvertToDataclassTransformer
+
+        transformer = ConvertToDataclassTransformer(
+            self.name, frozen=frozen, slots=slots
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} to dataclass",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def convert_from_dataclass(
+        self,
+        generate_repr: bool = True,
+        generate_eq: bool = True,
+        generate_hash: bool = False,
+    ) -> Result:
+        """Convert this dataclass back to a regular class.
+
+        Removes @dataclass decorator and generates explicit dunder methods.
+
+        Parameters
+        ----------
+        generate_repr : bool
+            If True, generate __repr__ method. Default True.
+        generate_eq : bool
+            If True, generate __eq__ method. Default True.
+        generate_hash : bool
+            If True, generate __hash__ method. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        from rejig.generation import ConvertFromDataclassTransformer
+
+        transformer = ConvertFromDataclassTransformer(
+            self.name,
+            generate_repr=generate_repr,
+            generate_eq=generate_eq,
+            generate_hash=generate_hash,
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} from dataclass to regular class",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def convert_to_typed_dict(self, total: bool = True) -> Result:
+        """Convert this class to a TypedDict.
+
+        Parameters
+        ----------
+        total : bool
+            If True, all keys are required. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.convert_to_typed_dict()
+        >>> cls.convert_to_typed_dict(total=False)
+        """
+        from rejig.generation import ConvertToTypedDictTransformer
+
+        transformer = ConvertToTypedDictTransformer(self.name, total=total)
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} to TypedDict",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def convert_to_named_tuple(self) -> Result:
+        """Convert this class to a NamedTuple.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.convert_to_named_tuple()
+        """
+        from rejig.generation import ConvertToNamedTupleTransformer
+
+        transformer = ConvertToNamedTupleTransformer(self.name)
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted {self.name} to NamedTuple",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def generate_init(self, overwrite: bool = False) -> Result:
+        """Generate __init__ method from class attributes.
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, replace existing __init__. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.generate_init()
+        >>> cls.generate_init(overwrite=True)
+        """
+        from rejig.generation import GenerateInitTransformer
+
+        transformer = GenerateInitTransformer(self.name, overwrite=overwrite)
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Generated __init__ for {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def generate_repr(self, overwrite: bool = False) -> Result:
+        """Generate __repr__ method from class attributes.
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, replace existing __repr__. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        from rejig.generation import GenerateReprTransformer
+
+        transformer = GenerateReprTransformer(self.name, overwrite=overwrite)
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Generated __repr__ for {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def generate_eq(self, overwrite: bool = False) -> Result:
+        """Generate __eq__ method from class attributes.
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, replace existing __eq__. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        from rejig.generation import GenerateEqTransformer
+
+        transformer = GenerateEqTransformer(self.name, overwrite=overwrite)
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Generated __eq__ for {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def generate_hash(self, overwrite: bool = False) -> Result:
+        """Generate __hash__ method from class attributes.
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, replace existing __hash__. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        from rejig.generation import GenerateHashTransformer
+
+        transformer = GenerateHashTransformer(self.name, overwrite=overwrite)
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Generated __hash__ for {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def generate_all_dunders(self, overwrite: bool = False) -> Result:
+        """Generate all common dunder methods (__init__, __repr__, __eq__, __hash__).
+
+        Parameters
+        ----------
+        overwrite : bool
+            If True, replace existing dunders. Default False.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.generate_all_dunders()
+        """
+        from rejig.generation import (
+            GenerateEqTransformer,
+            GenerateHashTransformer,
+            GenerateInitTransformer,
+            GenerateReprTransformer,
+        )
+
+        file_path = self._find_class()
+        if not file_path:
+            return self._operation_failed("generate_all_dunders", f"Class '{self.name}' not found")
+
+        added_methods: list[str] = []
+
+        for TransformerClass, method_name in [
+            (GenerateInitTransformer, "__init__"),
+            (GenerateReprTransformer, "__repr__"),
+            (GenerateEqTransformer, "__eq__"),
+            (GenerateHashTransformer, "__hash__"),
+        ]:
+            transformer = TransformerClass(self.name, overwrite=overwrite)
+            result = self._transform(transformer)
+            if result.success and transformer.added:
+                added_methods.append(method_name)
+
+        if not added_methods:
+            return Result(
+                success=True,
+                message=f"No dunder methods added to {self.name} (all already exist)",
+            )
+
+        return Result(
+            success=True,
+            message=f"Generated {', '.join(added_methods)} for {self.name}",
+            files_changed=[file_path],
+        )
+
+    def extract_protocol(
+        self,
+        protocol_name: str,
+        methods: list[str] | None = None,
+    ) -> Result:
+        """Extract a Protocol from this class.
+
+        Creates a new Protocol class with specified method signatures
+        and inserts it before the original class.
+
+        Parameters
+        ----------
+        protocol_name : str
+            Name for the new Protocol class.
+        methods : list[str] | None
+            Method names to include. If None, includes all public methods.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.extract_protocol("UserProtocol")
+        >>> cls.extract_protocol("ValidatorProtocol", methods=["validate", "check"])
+        """
+        from rejig.generation import ExtractProtocolTransformer
+
+        transformer = ExtractProtocolTransformer(
+            self.name, protocol_name, methods=methods
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.extracted:
+            return Result(
+                success=True,
+                message=f"Extracted Protocol '{protocol_name}' from {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def extract_abstract_base(
+        self,
+        abc_name: str | None = None,
+        methods: list[str] | None = None,
+    ) -> Result:
+        """Extract an Abstract Base Class from this class.
+
+        Creates a new ABC with abstract method signatures and makes
+        this class inherit from it.
+
+        Parameters
+        ----------
+        abc_name : str | None
+            Name for the new ABC. Defaults to "Base{ClassName}".
+        methods : list[str] | None
+            Method names to make abstract. If None, uses all public methods.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.extract_abstract_base()
+        >>> cls.extract_abstract_base("AbstractUser", methods=["save", "validate"])
+        """
+        from rejig.generation import ExtractAbstractBaseTransformer
+
+        if abc_name is None:
+            abc_name = f"Base{self.name}"
+
+        transformer = ExtractAbstractBaseTransformer(
+            self.name, abc_name, methods=methods
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.extracted:
+            return Result(
+                success=True,
+                message=f"Extracted ABC '{abc_name}' from {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def convert_attribute_to_property(
+        self,
+        attr_name: str,
+        getter: bool = True,
+        setter: bool = True,
+    ) -> Result:
+        """Convert a class attribute to a property with getter/setter.
+
+        Parameters
+        ----------
+        attr_name : str
+            Name of the attribute to convert.
+        getter : bool
+            If True, generate a getter property. Default True.
+        setter : bool
+            If True, generate a setter. Default True.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.convert_attribute_to_property("_name")
+        >>> cls.convert_attribute_to_property("value", setter=False)
+        """
+        from rejig.generation import ConvertAttributeToPropertyTransformer
+
+        transformer = ConvertAttributeToPropertyTransformer(
+            self.name, attr_name, getter=getter, setter=setter
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.converted:
+            return Result(
+                success=True,
+                message=f"Converted attribute '{attr_name}' to property in {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def add_property(
+        self,
+        prop_name: str,
+        getter: str,
+        setter: str | None = None,
+        return_type: str | None = None,
+    ) -> Result:
+        """Add a property to this class.
+
+        Parameters
+        ----------
+        prop_name : str
+            Name of the property.
+        getter : str
+            Body of the getter (return statement or expression).
+        setter : str | None
+            Body of the setter. If None, property is read-only.
+        return_type : str | None
+            Return type annotation for the getter.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.add_property("full_name", "f'{self.first} {self.last}'", return_type="str")
+        >>> cls.add_property("age", "self._age", "self._age = value", "int")
+        """
+        from rejig.generation import AddPropertyTransformer
+
+        transformer = AddPropertyTransformer(
+            self.name, prop_name, getter, setter_body=setter, return_type=return_type
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Added property '{prop_name}' to {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def add_base_class(self, base_class: str, position: str = "last") -> Result:
+        """Add a base class to this class.
+
+        Parameters
+        ----------
+        base_class : str
+            Name of the base class to add.
+        position : str
+            Where to add: "first" or "last". Default "last".
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.add_base_class("BaseModel")
+        >>> cls.add_base_class("ABC", position="first")
+        """
+        from rejig.generation import AddBaseClassTransformer
+
+        transformer = AddBaseClassTransformer(
+            self.name, base_class, position=position
+        )
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Added base class '{base_class}' to {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def remove_base_class(self, base_class: str) -> Result:
+        """Remove a base class from this class.
+
+        Parameters
+        ----------
+        base_class : str
+            Name of the base class to remove.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.remove_base_class("OldBase")
+        """
+        from rejig.generation import RemoveBaseClassTransformer
+
+        transformer = RemoveBaseClassTransformer(self.name, base_class)
+        result = self._transform(transformer)
+
+        if result.success and transformer.removed:
+            return Result(
+                success=True,
+                message=f"Removed base class '{base_class}' from {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
+
+    def add_mixin(self, mixin_class: str) -> Result:
+        """Add a mixin class to this class.
+
+        Mixins are added at the beginning of the base class list
+        following Python MRO conventions.
+
+        Parameters
+        ----------
+        mixin_class : str
+            Name of the mixin class to add.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> cls.add_mixin("LoggingMixin")
+        """
+        from rejig.generation import AddMixinTransformer
+
+        transformer = AddMixinTransformer(self.name, mixin_class)
+        result = self._transform(transformer)
+
+        if result.success and transformer.added:
+            return Result(
+                success=True,
+                message=f"Added mixin '{mixin_class}' to {self.name}",
+                files_changed=result.files_changed,
+            )
+        return result
