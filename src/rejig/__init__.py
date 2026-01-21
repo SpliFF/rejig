@@ -193,6 +193,32 @@ DeadCodeAnalyzer
 
 CodeMetrics
     Collect and analyze code metrics.
+
+Security Analysis
+-----------------
+SecurityTarget
+    Target for security analysis findings.
+
+SecurityTargetList
+    List of security targets for batch operations.
+
+SecurityType
+    Types of security findings.
+
+SecurityFinding
+    A single finding from security analysis.
+
+SecurityReport
+    Comprehensive security analysis report.
+
+SecretsScanner
+    Detect hardcoded secrets and credentials.
+
+VulnerabilityScanner
+    Detect common security vulnerabilities.
+
+SecurityReporter
+    Generate security analysis reports.
 """
 from __future__ import annotations
 
@@ -249,6 +275,16 @@ from .analysis import (
     ModuleMetrics,
 )
 from .analysis.targets import AnalysisFinding, AnalysisType
+from .security import (
+    SecurityFinding,
+    SecurityReport,
+    SecurityReporter,
+    SecretsScanner,
+    SecurityTarget,
+    SecurityTargetList,
+    SecurityType,
+    VulnerabilityScanner,
+)
 from .targets import (
     ClassTarget,
     CodeBlockTarget,
@@ -356,4 +392,13 @@ __all__ = [
     "CodeMetrics",
     "FileMetrics",
     "ModuleMetrics",
+    # Security Analysis
+    "SecurityTarget",
+    "SecurityTargetList",
+    "SecurityType",
+    "SecurityFinding",
+    "SecurityReport",
+    "SecurityReporter",
+    "SecretsScanner",
+    "VulnerabilityScanner",
 ]

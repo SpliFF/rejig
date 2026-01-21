@@ -3450,3 +3450,278 @@ class Rejig:
 
         metrics = CodeMetrics(self)
         return metrics.get_project_summary()
+
+    # =========================================================================
+    # SECURITY ANALYSIS
+    # =========================================================================
+
+    def find_hardcoded_secrets(self):
+        """
+        Find hardcoded secrets, API keys, passwords, and tokens.
+
+        Returns
+        -------
+        SecurityTargetList
+            List of potential hardcoded secrets found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> secrets = rj.find_hardcoded_secrets()
+        >>> for secret in secrets.critical():
+        ...     print(f"{secret.location}: {secret.message}")
+        """
+        from rejig.security.secrets import SecretsScanner
+
+        scanner = SecretsScanner(self)
+        return scanner.find_hardcoded_secrets()
+
+    def find_sql_injection_risks(self):
+        """
+        Find potential SQL injection vulnerabilities.
+
+        Detects unsafe SQL query construction using string formatting,
+        f-strings, or concatenation.
+
+        Returns
+        -------
+        SecurityTargetList
+            SQL injection risk findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> risks = rj.find_sql_injection_risks()
+        >>> print(f"Found {len(risks)} SQL injection risks")
+        """
+        from rejig.security.vulnerabilities import VulnerabilityScanner
+
+        scanner = VulnerabilityScanner(self)
+        return scanner.find_sql_injection_risks()
+
+    def find_shell_injection_risks(self):
+        """
+        Find potential shell/command injection vulnerabilities.
+
+        Detects dangerous usage of os.system, subprocess with shell=True,
+        and other command execution patterns.
+
+        Returns
+        -------
+        SecurityTargetList
+            Shell injection risk findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> risks = rj.find_shell_injection_risks()
+        >>> print(f"Found {len(risks)} shell injection risks")
+        """
+        from rejig.security.vulnerabilities import VulnerabilityScanner
+
+        scanner = VulnerabilityScanner(self)
+        return scanner.find_shell_injection_risks()
+
+    def find_unsafe_yaml_load(self):
+        """
+        Find unsafe YAML loading that could execute arbitrary code.
+
+        Detects yaml.load() without SafeLoader and yaml.unsafe_load().
+
+        Returns
+        -------
+        SecurityTargetList
+            Unsafe YAML load findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> unsafe = rj.find_unsafe_yaml_load()
+        >>> print(f"Found {len(unsafe)} unsafe YAML loads")
+        """
+        from rejig.security.vulnerabilities import VulnerabilityScanner
+
+        scanner = VulnerabilityScanner(self)
+        return scanner.find_unsafe_yaml_load()
+
+    def find_unsafe_pickle(self):
+        """
+        Find unsafe pickle usage that could execute arbitrary code.
+
+        Detects pickle.load() and pickle.loads() which can deserialize
+        malicious payloads.
+
+        Returns
+        -------
+        SecurityTargetList
+            Unsafe pickle findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> unsafe = rj.find_unsafe_pickle()
+        >>> print(f"Found {len(unsafe)} unsafe pickle usages")
+        """
+        from rejig.security.vulnerabilities import VulnerabilityScanner
+
+        scanner = VulnerabilityScanner(self)
+        return scanner.find_unsafe_pickle()
+
+    def find_path_traversal_risks(self):
+        """
+        Find potential path traversal vulnerabilities.
+
+        Detects file operations that construct paths dynamically
+        without proper validation.
+
+        Returns
+        -------
+        SecurityTargetList
+            Path traversal risk findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> risks = rj.find_path_traversal_risks()
+        >>> print(f"Found {len(risks)} path traversal risks")
+        """
+        from rejig.security.vulnerabilities import VulnerabilityScanner
+
+        scanner = VulnerabilityScanner(self)
+        return scanner.find_path_traversal_risks()
+
+    def find_insecure_random(self):
+        """
+        Find uses of non-cryptographic random for security purposes.
+
+        The random module is not suitable for security-sensitive
+        applications. Use the secrets module instead.
+
+        Returns
+        -------
+        SecurityTargetList
+            Insecure random usage findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> insecure = rj.find_insecure_random()
+        >>> print(f"Found {len(insecure)} insecure random usages")
+        """
+        from rejig.security.vulnerabilities import VulnerabilityScanner
+
+        scanner = VulnerabilityScanner(self)
+        return scanner.find_insecure_random()
+
+    def find_security_issues(self):
+        """
+        Find all security issues in the codebase.
+
+        Combines all security scanners to find:
+        - Hardcoded secrets
+        - SQL injection risks
+        - Shell injection risks
+        - Unsafe deserialization
+        - Path traversal risks
+        - Insecure cryptography
+
+        Returns
+        -------
+        SecurityTargetList
+            All security findings combined.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> issues = rj.find_security_issues()
+        >>> print(f"Found {len(issues)} security issues")
+        >>> print(f"Critical: {len(issues.critical())}")
+        """
+        from rejig.security.reporter import SecurityReporter
+
+        reporter = SecurityReporter(self)
+        report = reporter.generate_full_report()
+        return report.all_findings or self._empty_security_target_list()
+
+    def _empty_security_target_list(self):
+        """Create an empty SecurityTargetList."""
+        from rejig.security.targets import SecurityTargetList
+
+        return SecurityTargetList(self, [])
+
+    def generate_security_report(
+        self,
+        output_path: str | Path | None = None,
+        format: str = "json",
+    ) -> Result:
+        """
+        Generate a security analysis report.
+
+        Parameters
+        ----------
+        output_path : str | Path | None
+            Path to write the report. If None, returns data in result.
+        format : str
+            Output format: "json", "markdown", or "sarif". Default "json".
+
+        Returns
+        -------
+        Result
+            Result containing the report data or file path.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_security_report("reports/security.json")
+        >>> rj.generate_security_report("reports/security.md", format="markdown")
+        """
+        from rejig.security.reporter import SecurityReporter
+
+        reporter = SecurityReporter(self)
+        return reporter.generate_security_report(output_path, format)
+
+    def quick_security_scan(self):
+        """
+        Perform a quick security scan for critical issues only.
+
+        Returns only critical and high severity findings for
+        fast feedback during development.
+
+        Returns
+        -------
+        SecurityTargetList
+            Critical and high severity security findings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> critical = rj.quick_security_scan()
+        >>> if len(critical) > 0:
+        ...     print("Security issues found!")
+        """
+        from rejig.security.reporter import SecurityReporter
+
+        reporter = SecurityReporter(self)
+        return reporter.quick_scan()
+
+    def analyze_security(self):
+        """
+        Generate a comprehensive security analysis report object.
+
+        Returns
+        -------
+        SecurityReport
+            Full security analysis report.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> report = rj.analyze_security()
+        >>> print(report)
+        >>> print(f"Total: {report.total_findings}")
+        >>> print(f"Critical: {report.critical_count}")
+        """
+        from rejig.security.reporter import SecurityReporter
+
+        reporter = SecurityReporter(self)
+        return reporter.generate_full_report()
