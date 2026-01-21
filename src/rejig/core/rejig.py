@@ -2829,3 +2829,624 @@ class Rejig:
             files_changed=[output_path],
             data=test_content,
         )
+
+    # -------------------------------------------------------------------------
+    # Code Analysis Operations
+    # -------------------------------------------------------------------------
+
+    def find_functions_without_type_hints(self):
+        """
+        Find functions and methods without type hints.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Functions and methods lacking type annotations.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> no_hints = rj.find_functions_without_type_hints()
+        >>> print(f"Found {len(no_hints)} functions without type hints")
+        """
+        from rejig.analysis.patterns import PatternFinder
+
+        finder = PatternFinder(self)
+        return finder.find_functions_without_type_hints()
+
+    def find_classes_without_docstrings(self):
+        """
+        Find classes without docstrings.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Classes lacking docstrings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> no_docs = rj.find_classes_without_docstrings()
+        >>> print(f"Found {len(no_docs)} classes without docstrings")
+        """
+        from rejig.analysis.patterns import PatternFinder
+
+        finder = PatternFinder(self)
+        return finder.find_classes_without_docstrings()
+
+    def find_functions_without_docstrings(self):
+        """
+        Find functions and methods without docstrings.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Functions and methods lacking docstrings.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> no_docs = rj.find_functions_without_docstrings()
+        >>> print(f"Found {len(no_docs)} functions without docstrings")
+        """
+        from rejig.analysis.patterns import PatternFinder
+
+        finder = PatternFinder(self)
+        return finder.find_functions_without_docstrings()
+
+    def find_bare_excepts(self):
+        """
+        Find bare except clauses (except: without exception type).
+
+        Returns
+        -------
+        AnalysisTargetList
+            Bare except clauses found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> bare = rj.find_bare_excepts()
+        >>> print(f"Found {len(bare)} bare except clauses")
+        """
+        from rejig.analysis.patterns import PatternFinder
+
+        finder = PatternFinder(self)
+        return finder.find_bare_excepts()
+
+    def find_hardcoded_strings(self, min_length: int = 10):
+        """
+        Find hardcoded strings that might need externalization.
+
+        Parameters
+        ----------
+        min_length : int
+            Minimum string length to consider. Default 10.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Hardcoded strings found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> strings = rj.find_hardcoded_strings(min_length=20)
+        >>> print(f"Found {len(strings)} hardcoded strings")
+        """
+        from rejig.analysis.patterns import PatternFinder
+
+        finder = PatternFinder(self)
+        return finder.find_hardcoded_strings(min_length)
+
+    def find_magic_numbers(self):
+        """
+        Find magic numbers that might need to be constants.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Magic numbers found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> magic = rj.find_magic_numbers()
+        >>> print(f"Found {len(magic)} magic numbers")
+        """
+        from rejig.analysis.patterns import PatternFinder
+
+        finder = PatternFinder(self)
+        return finder.find_magic_numbers()
+
+    def find_complex_functions(self, max_complexity: int = 10):
+        """
+        Find functions exceeding cyclomatic complexity threshold.
+
+        Parameters
+        ----------
+        max_complexity : int
+            Maximum allowed cyclomatic complexity. Default 10.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Functions exceeding the threshold.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> complex_funcs = rj.find_complex_functions(max_complexity=15)
+        >>> for f in complex_funcs:
+        ...     print(f"{f.name}: complexity {f.value}")
+        """
+        from rejig.analysis.complexity import ComplexityAnalyzer
+
+        analyzer = ComplexityAnalyzer(self)
+        return analyzer.find_complex_functions(max_complexity)
+
+    def find_long_functions(self, max_lines: int = 50):
+        """
+        Find functions exceeding line count threshold.
+
+        Parameters
+        ----------
+        max_lines : int
+            Maximum allowed lines in a function. Default 50.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Functions exceeding the threshold.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> long_funcs = rj.find_long_functions(max_lines=100)
+        >>> print(f"Found {len(long_funcs)} long functions")
+        """
+        from rejig.analysis.complexity import ComplexityAnalyzer
+
+        analyzer = ComplexityAnalyzer(self)
+        return analyzer.find_long_functions(max_lines)
+
+    def find_long_classes(self, max_lines: int = 500):
+        """
+        Find classes exceeding line count threshold.
+
+        Parameters
+        ----------
+        max_lines : int
+            Maximum allowed lines in a class. Default 500.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Classes exceeding the threshold.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> long_classes = rj.find_long_classes(max_lines=300)
+        >>> print(f"Found {len(long_classes)} long classes")
+        """
+        from rejig.analysis.complexity import ComplexityAnalyzer
+
+        analyzer = ComplexityAnalyzer(self)
+        return analyzer.find_long_classes(max_lines)
+
+    def find_deeply_nested(self, max_depth: int = 4):
+        """
+        Find functions with excessive nesting depth.
+
+        Parameters
+        ----------
+        max_depth : int
+            Maximum allowed nesting depth. Default 4.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Functions exceeding the threshold.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> nested = rj.find_deeply_nested(max_depth=5)
+        >>> print(f"Found {len(nested)} deeply nested functions")
+        """
+        from rejig.analysis.complexity import ComplexityAnalyzer
+
+        analyzer = ComplexityAnalyzer(self)
+        return analyzer.find_deeply_nested(max_depth)
+
+    def find_functions_with_many_parameters(self, max_params: int = 5):
+        """
+        Find functions with too many parameters.
+
+        Parameters
+        ----------
+        max_params : int
+            Maximum allowed parameters. Default 5.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Functions exceeding the threshold.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> many_params = rj.find_functions_with_many_parameters(max_params=7)
+        >>> print(f"Found {len(many_params)} functions with many parameters")
+        """
+        from rejig.analysis.complexity import ComplexityAnalyzer
+
+        analyzer = ComplexityAnalyzer(self)
+        return analyzer.find_functions_with_many_parameters(max_params)
+
+    def find_unused_functions(self):
+        """
+        Find functions that are not called anywhere.
+
+        Note: May have false positives for callbacks, decorators, etc.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Potentially unused functions.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> unused = rj.find_unused_functions()
+        >>> print(f"Found {len(unused)} potentially unused functions")
+        """
+        from rejig.analysis.dead_code import DeadCodeAnalyzer
+
+        analyzer = DeadCodeAnalyzer(self)
+        return analyzer.find_unused_functions()
+
+    def find_unused_classes(self):
+        """
+        Find classes that are not referenced anywhere.
+
+        Note: May have false positives for dynamic instantiation.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Potentially unused classes.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> unused = rj.find_unused_classes()
+        >>> print(f"Found {len(unused)} potentially unused classes")
+        """
+        from rejig.analysis.dead_code import DeadCodeAnalyzer
+
+        analyzer = DeadCodeAnalyzer(self)
+        return analyzer.find_unused_classes()
+
+    def find_unused_variables(self):
+        """
+        Find module-level variables that are not used.
+
+        Note: Only analyzes module-level variables.
+
+        Returns
+        -------
+        AnalysisTargetList
+            Potentially unused variables.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> unused = rj.find_unused_variables()
+        >>> print(f"Found {len(unused)} potentially unused variables")
+        """
+        from rejig.analysis.dead_code import DeadCodeAnalyzer
+
+        analyzer = DeadCodeAnalyzer(self)
+        return analyzer.find_unused_variables()
+
+    def get_import_graph(self):
+        """
+        Get the import dependency graph for the project.
+
+        Returns
+        -------
+        ImportGraph
+            The import graph object.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> graph = rj.get_import_graph()
+        >>> deps = graph.get_dependencies("mymodule")
+        """
+        from rejig.imports.graph import ImportGraph
+
+        graph = ImportGraph(self)
+        graph.build()
+        return graph
+
+    def find_circular_imports(self):
+        """
+        Find circular import chains in the project.
+
+        Returns
+        -------
+        list[CircularImport]
+            List of circular import chains found.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> cycles = rj.find_circular_imports()
+        >>> for cycle in cycles:
+        ...     print(f"Circular import: {cycle}")
+        """
+        from rejig.imports.graph import ImportGraph
+
+        graph = ImportGraph(self)
+        return graph.find_circular_imports()
+
+    def find_external_dependencies(self):
+        """
+        Find imports of external (non-project) modules.
+
+        Returns
+        -------
+        set[str]
+            Set of external module names imported.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> external = rj.find_external_dependencies()
+        >>> print(f"External dependencies: {external}")
+        """
+        from rejig.imports.analyzer import ImportAnalyzer
+
+        analyzer = ImportAnalyzer(self)
+        external: set[str] = set()
+
+        for file_path in self.files:
+            imports = analyzer.get_imports(file_path)
+            for imp in imports:
+                if imp.is_future or imp.is_relative:
+                    continue
+                # Get the top-level module name
+                if imp.is_from_import and imp.module:
+                    top_module = imp.module.split(".")[0]
+                elif imp.names:
+                    top_module = imp.names[0].split(".")[0]
+                else:
+                    continue
+                external.add(top_module)
+
+        # Remove standard library and project modules
+        project_modules = {self._path_to_module(f) for f in self.files}
+        project_top = {m.split(".")[0] for m in project_modules if m}
+
+        return external - project_top
+
+    def _path_to_module(self, path: Path) -> str | None:
+        """Convert a file path to a module name."""
+        try:
+            rel_path = path.relative_to(self.root)
+            parts = list(rel_path.parts)
+            if parts[-1].endswith(".py"):
+                parts[-1] = parts[-1][:-3]
+            if parts[-1] == "__init__":
+                parts = parts[:-1]
+            return ".".join(parts) if parts else None
+        except Exception:
+            return None
+
+    def find_internal_dependencies(self, module: str):
+        """
+        Find all modules that a given module imports (within the project).
+
+        Parameters
+        ----------
+        module : str
+            The module name to check.
+
+        Returns
+        -------
+        set[str]
+            Set of internal module names imported.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> deps = rj.find_internal_dependencies("mymodule.submodule")
+        >>> print(f"Internal dependencies: {deps}")
+        """
+        from rejig.imports.graph import ImportGraph
+
+        graph = ImportGraph(self)
+        return graph.get_dependencies(module)
+
+    def generate_api_summary(self, output_path: str | Path | None = None) -> Result:
+        """
+        Generate API documentation summary.
+
+        Parameters
+        ----------
+        output_path : str | Path | None
+            Path to write the summary. If None, returns in result.data.
+
+        Returns
+        -------
+        Result
+            Result containing the generated documentation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_api_summary("docs/api.md")
+        """
+        from rejig.analysis.reporter import AnalysisReporter
+
+        reporter = AnalysisReporter(self)
+        return reporter.generate_api_summary(output_path)
+
+    def generate_module_structure(self, output_path: str | Path | None = None) -> Result:
+        """
+        Generate module structure documentation.
+
+        Parameters
+        ----------
+        output_path : str | Path | None
+            Path to write the structure. If None, returns in result.data.
+
+        Returns
+        -------
+        Result
+            Result containing the generated documentation.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_module_structure("docs/structure.md")
+        """
+        from rejig.analysis.reporter import AnalysisReporter
+
+        reporter = AnalysisReporter(self)
+        return reporter.generate_module_structure(output_path)
+
+    def generate_complexity_report(self, output_path: str | Path | None = None) -> Result:
+        """
+        Generate a complexity analysis report as JSON.
+
+        Parameters
+        ----------
+        output_path : str | Path | None
+            Path to write the report. If None, returns in result.data.
+
+        Returns
+        -------
+        Result
+            Result containing the complexity data.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_complexity_report("reports/complexity.json")
+        """
+        from rejig.analysis.reporter import AnalysisReporter
+
+        reporter = AnalysisReporter(self)
+        return reporter.generate_complexity_report(output_path)
+
+    def generate_coverage_gaps_report(self, output_path: str | Path | None = None) -> Result:
+        """
+        Generate a report of files without test coverage.
+
+        Parameters
+        ----------
+        output_path : str | Path | None
+            Path to write the report. If None, returns in result.data.
+
+        Returns
+        -------
+        Result
+            Result containing the coverage gap data.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.generate_coverage_gaps_report()
+        """
+        from rejig.analysis.reporter import AnalysisReporter
+
+        reporter = AnalysisReporter(self)
+        return reporter.generate_coverage_gaps_report(output_path)
+
+    def analyze_code(
+        self,
+        include_complexity: bool = True,
+        include_patterns: bool = True,
+        include_dead_code: bool = True,
+        include_coverage: bool = True,
+    ):
+        """
+        Generate a comprehensive code analysis report.
+
+        Parameters
+        ----------
+        include_complexity : bool
+            Include complexity analysis. Default True.
+        include_patterns : bool
+            Include pattern analysis. Default True.
+        include_dead_code : bool
+            Include dead code analysis. Default True.
+        include_coverage : bool
+            Include coverage gap analysis. Default True.
+
+        Returns
+        -------
+        AnalysisReport
+            The complete analysis report.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> report = rj.analyze_code()
+        >>> print(report)
+        >>> print(f"Total issues: {report.total_issues}")
+        """
+        from rejig.analysis.reporter import AnalysisReporter
+
+        reporter = AnalysisReporter(self)
+        return reporter.generate_full_report(
+            include_complexity=include_complexity,
+            include_patterns=include_patterns,
+            include_dead_code=include_dead_code,
+            include_coverage=include_coverage,
+        )
+
+    def get_code_metrics(self):
+        """
+        Get code metrics for the project.
+
+        Returns
+        -------
+        CodeMetrics
+            Code metrics analyzer instance.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> metrics = rj.get_code_metrics()
+        >>> summary = metrics.get_project_summary()
+        >>> print(f"Total lines: {summary['total_lines']}")
+        """
+        from rejig.analysis.metrics import CodeMetrics
+
+        return CodeMetrics(self)
+
+    def get_code_metrics_summary(self) -> dict:
+        """
+        Get a summary of project metrics.
+
+        Returns
+        -------
+        dict
+            Summary metrics for the entire project.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> summary = rj.get_code_metrics_summary()
+        >>> print(f"Total files: {summary['total_files']}")
+        >>> print(f"Total lines: {summary['total_lines']}")
+        """
+        from rejig.analysis.metrics import CodeMetrics
+
+        metrics = CodeMetrics(self)
+        return metrics.get_project_summary()

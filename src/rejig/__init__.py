@@ -164,6 +164,35 @@ Project Management
 ------------------
 PythonProject
     High-level Python project configuration manager.
+
+Code Analysis
+-------------
+AnalysisTarget
+    Target for code analysis findings.
+
+AnalysisTargetList
+    List of analysis targets for batch operations.
+
+AnalysisType
+    Types of code analysis findings.
+
+AnalysisFinding
+    A single finding from code analysis.
+
+AnalysisReport
+    Comprehensive code analysis report.
+
+ComplexityAnalyzer
+    Analyze cyclomatic complexity and code metrics.
+
+PatternFinder
+    Find code patterns needing attention.
+
+DeadCodeAnalyzer
+    Detect potentially unused code.
+
+CodeMetrics
+    Collect and analyze code metrics.
 """
 from __future__ import annotations
 
@@ -203,6 +232,23 @@ from .project import (
     IsortConfigTarget,
     CoverageConfigTarget,
 )
+from .analysis import (
+    AnalysisTarget,
+    AnalysisTargetList,
+    AnalysisReport,
+    AnalysisReporter,
+    ComplexityAnalyzer,
+    ComplexityResult,
+    NestingResult,
+    DeadCodeAnalyzer,
+    UnusedCodeResult,
+    PatternFinder,
+    PatternMatch,
+    CodeMetrics,
+    FileMetrics,
+    ModuleMetrics,
+)
+from .analysis.targets import AnalysisFinding, AnalysisType
 from .targets import (
     ClassTarget,
     CodeBlockTarget,
@@ -293,4 +339,21 @@ __all__ = [
     "PytestConfigTarget",
     "IsortConfigTarget",
     "CoverageConfigTarget",
+    # Code Analysis
+    "AnalysisTarget",
+    "AnalysisTargetList",
+    "AnalysisType",
+    "AnalysisFinding",
+    "AnalysisReport",
+    "AnalysisReporter",
+    "ComplexityAnalyzer",
+    "ComplexityResult",
+    "NestingResult",
+    "DeadCodeAnalyzer",
+    "UnusedCodeResult",
+    "PatternFinder",
+    "PatternMatch",
+    "CodeMetrics",
+    "FileMetrics",
+    "ModuleMetrics",
 ]
