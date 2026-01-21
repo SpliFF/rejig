@@ -10,9 +10,11 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rejig.targets.base import Target, TargetList
+from rejig.targets.base import FindingTarget, FindingTargetList
 
 if TYPE_CHECKING:
+    from typing import Self
+
     from rejig.core.rejig import Rejig
 
 
@@ -102,51 +104,17 @@ class SecurityFinding:
         return f"{self.file_path}:{self.line_number}"
 
 
-class SecurityTarget(Target):
+class SecurityTarget(FindingTarget[SecurityFinding]):
     """Target representing a single security finding.
 
     Allows navigation to the underlying code element and
     provides methods to address the finding.
     """
 
-    def __init__(self, rejig: Rejig, finding: SecurityFinding) -> None:
-        super().__init__(rejig)
-        self._finding = finding
-
-    @property
-    def finding(self) -> SecurityFinding:
-        """The underlying security finding."""
-        return self._finding
-
-    @property
-    def file_path(self) -> Path:
-        """Path to the file containing the finding."""
-        return self._finding.file_path
-
-    @property
-    def line_number(self) -> int:
-        """Line number of the finding."""
-        return self._finding.line_number
-
-    @property
-    def name(self) -> str | None:
-        """Name of the code element (if applicable)."""
-        return self._finding.name
-
     @property
     def type(self) -> SecurityType:
         """Type of the finding."""
         return self._finding.type
-
-    @property
-    def message(self) -> str:
-        """Description of the finding."""
-        return self._finding.message
-
-    @property
-    def severity(self) -> str:
-        """Severity level of the finding."""
-        return self._finding.severity
 
     @property
     def code_snippet(self) -> str | None:
@@ -158,28 +126,11 @@ class SecurityTarget(Target):
         """Suggested fix for this issue."""
         return self._finding.recommendation
 
-    @property
-    def location(self) -> str:
-        """Formatted location string (file:line)."""
-        return self._finding.location
-
-    def exists(self) -> bool:
-        """Check if the underlying file exists."""
-        return self._finding.file_path.exists()
-
     def __repr__(self) -> str:
         return f"SecurityTarget({self._finding.type.name}, {self.location})"
 
-    def to_file_target(self) -> Target:
-        """Navigate to the file containing this finding."""
-        return self._rejig.file(self._finding.file_path)
 
-    def to_line_target(self) -> Target:
-        """Navigate to the line containing this finding."""
-        return self._rejig.file(self._finding.file_path).line(self._finding.line_number)
-
-
-class SecurityTargetList(TargetList[SecurityTarget]):
+class SecurityTargetList(FindingTargetList[SecurityTarget, SecurityType]):
     """A list of security targets with filtering and aggregation methods.
 
     Provides domain-specific filtering for security analysis results.
@@ -193,82 +144,39 @@ class SecurityTargetList(TargetList[SecurityTarget]):
     def __repr__(self) -> str:
         return f"SecurityTargetList({len(self._targets)} findings)"
 
-    # ===== Type-based filtering =====
+    def _create_list(self, targets: list[SecurityTarget]) -> Self:
+        """Create a new SecurityTargetList instance."""
+        return SecurityTargetList(self._rejig, targets)
 
-    def by_type(self, security_type: SecurityType) -> SecurityTargetList:
-        """Filter to findings of a specific type.
+    @property
+    def _severity_order(self) -> dict[str, int]:
+        """Return severity ordering for security (critical > high > medium > low)."""
+        return {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
-        Parameters
-        ----------
-        security_type : SecurityType
-            The type of findings to include.
+    @property
+    def _summary_prefix(self) -> str:
+        """Return the prefix for summary output."""
+        return "security findings"
 
-        Returns
-        -------
-        SecurityTargetList
-            Filtered list of findings.
-        """
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type == security_type],
-        )
+    # ===== Severity shortcuts =====
 
-    def by_types(self, *types: SecurityType) -> SecurityTargetList:
-        """Filter to findings matching any of the given types.
-
-        Parameters
-        ----------
-        *types : SecurityType
-            Types of findings to include.
-
-        Returns
-        -------
-        SecurityTargetList
-            Filtered list of findings.
-        """
-        type_set = set(types)
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in type_set],
-        )
-
-    # ===== Severity filtering =====
-
-    def by_severity(self, severity: str) -> SecurityTargetList:
-        """Filter to findings with a specific severity.
-
-        Parameters
-        ----------
-        severity : str
-            Severity level: "low", "medium", "high", or "critical".
-
-        Returns
-        -------
-        SecurityTargetList
-            Filtered list of findings.
-        """
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.severity == severity],
-        )
-
-    def critical(self) -> SecurityTargetList:
+    def critical(self) -> Self:
         """Filter to critical-level findings."""
         return self.by_severity("critical")
 
-    def high(self) -> SecurityTargetList:
+    def high(self) -> Self:
         """Filter to high-level findings."""
         return self.by_severity("high")
 
-    def medium(self) -> SecurityTargetList:
+    def medium(self) -> Self:
         """Filter to medium-level findings."""
         return self.by_severity("medium")
 
-    def low(self) -> SecurityTargetList:
+    def low(self) -> Self:
         """Filter to low-level findings."""
         return self.by_severity("low")
 
-    def at_least(self, min_severity: str) -> SecurityTargetList:
+    def at_least(self, min_severity: str) -> Self:
         """Filter to findings at or above a severity level.
 
         Parameters
@@ -278,67 +186,22 @@ class SecurityTargetList(TargetList[SecurityTarget]):
 
         Returns
         -------
-        SecurityTargetList
+        Self
             Filtered list of findings at or above the given severity.
         """
         severity_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
         min_level = severity_order.get(min_severity, 0)
-        return SecurityTargetList(
-            self._rejig,
+        return self._create_list(
             [
                 t
                 for t in self._targets
                 if severity_order.get(t.severity, 0) >= min_level
-            ],
-        )
-
-    # ===== Location filtering =====
-
-    def in_file(self, path: Path | str) -> SecurityTargetList:
-        """Filter to findings in a specific file.
-
-        Parameters
-        ----------
-        path : Path | str
-            Path to the file.
-
-        Returns
-        -------
-        SecurityTargetList
-            Filtered list of findings.
-        """
-        path = Path(path) if isinstance(path, str) else path
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.file_path == path],
-        )
-
-    def in_directory(self, directory: Path | str) -> SecurityTargetList:
-        """Filter to findings in a specific directory (recursive).
-
-        Parameters
-        ----------
-        directory : Path | str
-            Path to the directory.
-
-        Returns
-        -------
-        SecurityTargetList
-            Filtered list of findings.
-        """
-        directory = Path(directory) if isinstance(directory, str) else directory
-        return SecurityTargetList(
-            self._rejig,
-            [
-                t
-                for t in self._targets
-                if t.file_path == directory or directory in t.file_path.parents
-            ],
+            ]
         )
 
     # ===== Category shortcuts =====
 
-    def secrets(self) -> SecurityTargetList:
+    def secrets(self) -> Self:
         """Filter to hardcoded secrets/credentials findings."""
         secret_types = {
             SecurityType.HARDCODED_SECRET,
@@ -347,12 +210,11 @@ class SecurityTargetList(TargetList[SecurityTarget]):
             SecurityType.HARDCODED_TOKEN,
             SecurityType.HARDCODED_CRYPTO_KEY,
         }
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in secret_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in secret_types]
         )
 
-    def injection_risks(self) -> SecurityTargetList:
+    def injection_risks(self) -> Self:
         """Filter to injection vulnerability findings."""
         injection_types = {
             SecurityType.SQL_INJECTION,
@@ -360,12 +222,11 @@ class SecurityTargetList(TargetList[SecurityTarget]):
             SecurityType.COMMAND_INJECTION,
             SecurityType.CODE_INJECTION,
         }
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in injection_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in injection_types]
         )
 
-    def unsafe_operations(self) -> SecurityTargetList:
+    def unsafe_operations(self) -> Self:
         """Filter to unsafe deserialization/eval findings."""
         unsafe_types = {
             SecurityType.UNSAFE_YAML_LOAD,
@@ -374,69 +235,29 @@ class SecurityTargetList(TargetList[SecurityTarget]):
             SecurityType.UNSAFE_EXEC,
             SecurityType.UNSAFE_DESERIALIZE,
         }
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in unsafe_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in unsafe_types]
         )
 
-    def crypto_issues(self) -> SecurityTargetList:
+    def crypto_issues(self) -> Self:
         """Filter to cryptography-related findings."""
         crypto_types = {
             SecurityType.INSECURE_RANDOM,
             SecurityType.WEAK_CRYPTO,
             SecurityType.HARDCODED_CRYPTO_KEY,
         }
-        return SecurityTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in crypto_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in crypto_types]
         )
 
-    # ===== Aggregation =====
+    # ===== Aggregation (security-specific) =====
 
-    def group_by_file(self) -> dict[Path, SecurityTargetList]:
-        """Group findings by file.
-
-        Returns
-        -------
-        dict[Path, SecurityTargetList]
-            Mapping of file paths to their findings.
-        """
-        groups: dict[Path, list[SecurityTarget]] = {}
-        for t in self._targets:
-            if t.file_path not in groups:
-                groups[t.file_path] = []
-            groups[t.file_path].append(t)
-
-        return {
-            path: SecurityTargetList(self._rejig, targets)
-            for path, targets in groups.items()
-        }
-
-    def group_by_type(self) -> dict[SecurityType, SecurityTargetList]:
-        """Group findings by type.
-
-        Returns
-        -------
-        dict[SecurityType, SecurityTargetList]
-            Mapping of types to their findings.
-        """
-        groups: dict[SecurityType, list[SecurityTarget]] = {}
-        for t in self._targets:
-            if t.type not in groups:
-                groups[t.type] = []
-            groups[t.type].append(t)
-
-        return {
-            stype: SecurityTargetList(self._rejig, targets)
-            for stype, targets in groups.items()
-        }
-
-    def group_by_severity(self) -> dict[str, SecurityTargetList]:
+    def group_by_severity(self) -> dict[str, Self]:
         """Group findings by severity.
 
         Returns
         -------
-        dict[str, SecurityTargetList]
+        dict[str, Self]
             Mapping of severity levels to their findings.
         """
         groups: dict[str, list[SecurityTarget]] = {}
@@ -446,87 +267,11 @@ class SecurityTargetList(TargetList[SecurityTarget]):
             groups[t.severity].append(t)
 
         return {
-            severity: SecurityTargetList(self._rejig, targets)
+            severity: self._create_list(targets)
             for severity, targets in groups.items()
         }
 
-    def count_by_type(self) -> dict[SecurityType, int]:
-        """Get counts by finding type.
-
-        Returns
-        -------
-        dict[SecurityType, int]
-            Mapping of types to counts.
-        """
-        counts: dict[SecurityType, int] = {}
-        for t in self._targets:
-            counts[t.type] = counts.get(t.type, 0) + 1
-        return counts
-
-    def count_by_severity(self) -> dict[str, int]:
-        """Get counts by severity level.
-
-        Returns
-        -------
-        dict[str, int]
-            Mapping of severity levels to counts.
-        """
-        counts: dict[str, int] = {}
-        for t in self._targets:
-            counts[t.severity] = counts.get(t.severity, 0) + 1
-        return counts
-
-    def count_by_file(self) -> dict[Path, int]:
-        """Get counts by file.
-
-        Returns
-        -------
-        dict[Path, int]
-            Mapping of file paths to finding counts.
-        """
-        counts: dict[Path, int] = {}
-        for t in self._targets:
-            counts[t.file_path] = counts.get(t.file_path, 0) + 1
-        return counts
-
-    # ===== Sorting =====
-
-    def sorted_by_severity(self, descending: bool = True) -> SecurityTargetList:
-        """Sort findings by severity.
-
-        Parameters
-        ----------
-        descending : bool
-            If True, critical first. If False, low first.
-
-        Returns
-        -------
-        SecurityTargetList
-            Sorted list of findings.
-        """
-        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        sorted_targets = sorted(
-            self._targets,
-            key=lambda t: severity_order.get(t.severity, 4),
-            reverse=not descending,
-        )
-        return SecurityTargetList(self._rejig, sorted_targets)
-
-    def sorted_by_location(self) -> SecurityTargetList:
-        """Sort findings by file and line number.
-
-        Returns
-        -------
-        SecurityTargetList
-            Sorted list of findings.
-        """
-        sorted_targets = sorted(
-            self._targets,
-            key=lambda t: (str(t.file_path), t.line_number),
-        )
-        return SecurityTargetList(self._rejig, sorted_targets)
-
-    # ===== Output methods =====
+    # ===== Output methods (override to include security-specific fields) =====
 
     def to_list_of_dicts(self) -> list[dict]:
         """Convert to list of dictionaries for serialization.

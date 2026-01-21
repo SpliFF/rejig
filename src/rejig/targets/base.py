@@ -4,17 +4,31 @@ This module defines the core abstractions:
 - Target - Base class for all targets (files, modules, classes, functions, etc.)
 - ErrorTarget - Sentinel for failed lookups, allows chaining
 - TargetList - Batch operations on multiple targets
+- FindingTarget - Base class for finding-based targets (analysis, security, optimize)
+- FindingTargetList - Base class for finding-based target lists
 """
 from __future__ import annotations
 
 import re
 from abc import ABC
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Iterator,
+    Protocol,
+    TypeVar,
+    runtime_checkable,
+)
 
 from rejig.core.results import BatchResult, ErrorResult, Result
 
 if TYPE_CHECKING:
+    from typing import Self
+
     from rejig.core.rejig import Rejig
 
 
@@ -22,6 +36,9 @@ __all__ = [
     "Target",
     "ErrorTarget",
     "TargetList",
+    "BaseFinding",
+    "FindingTarget",
+    "FindingTargetList",
 ]
 
 
@@ -863,3 +880,391 @@ class TargetList(Generic[T]):
                     )
                 )
         return BatchResult(results)
+
+
+# =============================================================================
+# Finding-based Target Architecture
+# =============================================================================
+# These base classes provide shared functionality for analysis, security,
+# and optimization target systems, reducing code duplication.
+
+# Type variables for finding-based targets
+F = TypeVar("F", bound="BaseFinding")  # Finding type
+E = TypeVar("E", bound=Enum)  # Enum type for finding types
+FT = TypeVar("FT", bound="FindingTarget")  # FindingTarget subclass
+
+
+@runtime_checkable
+class BaseFinding(Protocol):
+    """Protocol defining the interface for finding dataclasses.
+
+    All finding types (AnalysisFinding, SecurityFinding, OptimizeFinding)
+    must implement these attributes.
+    """
+
+    type: Enum
+    file_path: Path
+    line_number: int
+    name: str | None
+    message: str
+    severity: str
+    context: dict
+
+    @property
+    def location(self) -> str:
+        """Return a formatted location string."""
+        ...
+
+
+class FindingTarget(Target, Generic[F]):
+    """Base class for finding-based targets.
+
+    Provides common properties and methods for targets that wrap findings
+    (AnalysisTarget, SecurityTarget, OptimizeTarget).
+
+    Type Parameters
+    ---------------
+    F : BaseFinding
+        The finding type this target wraps.
+    """
+
+    def __init__(self, rejig: Rejig, finding: F) -> None:
+        super().__init__(rejig)
+        self._finding = finding
+
+    @property
+    def finding(self) -> F:
+        """The underlying finding."""
+        return self._finding
+
+    @property
+    def file_path(self) -> Path:
+        """Path to the file containing the finding."""
+        return self._finding.file_path
+
+    @property
+    def line_number(self) -> int:
+        """Line number of the finding."""
+        return self._finding.line_number
+
+    @property
+    def name(self) -> str | None:
+        """Name of the code element (if applicable)."""
+        return self._finding.name
+
+    @property
+    def type(self) -> Enum:
+        """Type of the finding."""
+        return self._finding.type
+
+    @property
+    def message(self) -> str:
+        """Description of the finding."""
+        return self._finding.message
+
+    @property
+    def severity(self) -> str:
+        """Severity level of the finding."""
+        return self._finding.severity
+
+    @property
+    def location(self) -> str:
+        """Formatted location string (file:line)."""
+        return self._finding.location
+
+    def exists(self) -> bool:
+        """Check if the underlying file exists."""
+        return self._finding.file_path.exists()
+
+    def to_file_target(self) -> Target:
+        """Navigate to the file containing this finding."""
+        return self._rejig.file(self._finding.file_path)
+
+    def to_line_target(self) -> Target:
+        """Navigate to the line containing this finding."""
+        return self._rejig.file(self._finding.file_path).line(self._finding.line_number)
+
+
+class FindingTargetList(TargetList[FT], Generic[FT, E]):
+    """Base class for finding-based target lists.
+
+    Provides common filtering, aggregation, and sorting methods for target
+    lists that contain findings (AnalysisTargetList, SecurityTargetList,
+    OptimizeTargetList).
+
+    Type Parameters
+    ---------------
+    FT : FindingTarget
+        The target type in this list.
+    E : Enum
+        The enum type for finding types.
+
+    Subclasses must implement:
+    - _create_list: Factory method to create new instances of the subclass
+    - _severity_order: Property returning severity ordering dict
+    - _summary_prefix: Property returning the summary line prefix
+    """
+
+    def _create_list(self, targets: list[FT]) -> Self:
+        """Create a new instance of this list type.
+
+        Subclasses must override to return their specific type.
+        """
+        raise NotImplementedError("Subclasses must implement _create_list")
+
+    @property
+    def _severity_order(self) -> dict[str, int]:
+        """Return severity ordering (lower = more severe).
+
+        Subclasses should override with their severity scale.
+        """
+        return {"error": 0, "warning": 1, "info": 2}
+
+    @property
+    def _summary_prefix(self) -> str:
+        """Return the prefix for summary output.
+
+        Subclasses should override with their domain name.
+        """
+        return "findings"
+
+    # ===== Type-based filtering =====
+
+    def by_type(self, finding_type: E) -> Self:
+        """Filter to findings of a specific type.
+
+        Parameters
+        ----------
+        finding_type : E
+            The type of findings to include.
+
+        Returns
+        -------
+        Self
+            Filtered list of findings.
+        """
+        return self._create_list([t for t in self._targets if t.type == finding_type])
+
+    def by_types(self, *types: E) -> Self:
+        """Filter to findings matching any of the given types.
+
+        Parameters
+        ----------
+        *types : E
+            Types of findings to include.
+
+        Returns
+        -------
+        Self
+            Filtered list of findings.
+        """
+        type_set = set(types)
+        return self._create_list([t for t in self._targets if t.type in type_set])
+
+    # ===== Severity filtering =====
+
+    def by_severity(self, severity: str) -> Self:
+        """Filter to findings with a specific severity.
+
+        Parameters
+        ----------
+        severity : str
+            Severity level to filter by.
+
+        Returns
+        -------
+        Self
+            Filtered list of findings.
+        """
+        return self._create_list([t for t in self._targets if t.severity == severity])
+
+    # ===== Location filtering =====
+
+    def in_file(self, path: Path | str) -> Self:
+        """Filter to findings in a specific file.
+
+        Parameters
+        ----------
+        path : Path | str
+            Path to the file.
+
+        Returns
+        -------
+        Self
+            Filtered list of findings.
+        """
+        path = Path(path) if isinstance(path, str) else path
+        return self._create_list([t for t in self._targets if t.file_path == path])
+
+    def in_directory(self, directory: Path | str) -> Self:
+        """Filter to findings in a specific directory (recursive).
+
+        Parameters
+        ----------
+        directory : Path | str
+            Path to the directory.
+
+        Returns
+        -------
+        Self
+            Filtered list of findings.
+        """
+        directory = Path(directory) if isinstance(directory, str) else directory
+        return self._create_list(
+            [
+                t
+                for t in self._targets
+                if t.file_path == directory or directory in t.file_path.parents
+            ]
+        )
+
+    # ===== Aggregation =====
+
+    def group_by_file(self) -> dict[Path, Self]:
+        """Group findings by file.
+
+        Returns
+        -------
+        dict[Path, Self]
+            Mapping of file paths to their findings.
+        """
+        groups: dict[Path, list[FT]] = {}
+        for t in self._targets:
+            if t.file_path not in groups:
+                groups[t.file_path] = []
+            groups[t.file_path].append(t)
+
+        return {path: self._create_list(targets) for path, targets in groups.items()}
+
+    def group_by_type(self) -> dict[E, Self]:
+        """Group findings by type.
+
+        Returns
+        -------
+        dict[E, Self]
+            Mapping of types to their findings.
+        """
+        groups: dict[E, list[FT]] = {}
+        for t in self._targets:
+            if t.type not in groups:
+                groups[t.type] = []
+            groups[t.type].append(t)
+
+        return {ftype: self._create_list(targets) for ftype, targets in groups.items()}
+
+    def count_by_type(self) -> dict[E, int]:
+        """Get counts by finding type.
+
+        Returns
+        -------
+        dict[E, int]
+            Mapping of types to counts.
+        """
+        counts: dict[E, int] = {}
+        for t in self._targets:
+            counts[t.type] = counts.get(t.type, 0) + 1
+        return counts
+
+    def count_by_severity(self) -> dict[str, int]:
+        """Get counts by severity level.
+
+        Returns
+        -------
+        dict[str, int]
+            Mapping of severity levels to counts.
+        """
+        counts: dict[str, int] = {}
+        for t in self._targets:
+            counts[t.severity] = counts.get(t.severity, 0) + 1
+        return counts
+
+    def count_by_file(self) -> dict[Path, int]:
+        """Get counts by file.
+
+        Returns
+        -------
+        dict[Path, int]
+            Mapping of file paths to finding counts.
+        """
+        counts: dict[Path, int] = {}
+        for t in self._targets:
+            counts[t.file_path] = counts.get(t.file_path, 0) + 1
+        return counts
+
+    # ===== Sorting =====
+
+    def sorted_by_severity(self, descending: bool = True) -> Self:
+        """Sort findings by severity.
+
+        Parameters
+        ----------
+        descending : bool
+            If True, most severe first. If False, least severe first.
+
+        Returns
+        -------
+        Self
+            Sorted list of findings.
+        """
+        sorted_targets = sorted(
+            self._targets,
+            key=lambda t: self._severity_order.get(t.severity, 99),
+            reverse=not descending,
+        )
+        return self._create_list(sorted_targets)
+
+    def sorted_by_location(self) -> Self:
+        """Sort findings by file and line number.
+
+        Returns
+        -------
+        Self
+            Sorted list of findings.
+        """
+        sorted_targets = sorted(
+            self._targets,
+            key=lambda t: (str(t.file_path), t.line_number),
+        )
+        return self._create_list(sorted_targets)
+
+    # ===== Output methods =====
+
+    def to_list_of_dicts(self) -> list[dict]:
+        """Convert to list of dictionaries for serialization.
+
+        Returns base fields common to all finding types.
+        Subclasses can override to add additional fields.
+
+        Returns
+        -------
+        list[dict]
+            List of finding dictionaries.
+        """
+        return [
+            {
+                "type": t.type.name,
+                "file": str(t.file_path),
+                "line": t.line_number,
+                "name": t.name,
+                "message": t.message,
+                "severity": t.severity,
+            }
+            for t in self._targets
+        ]
+
+    def summary(self) -> str:
+        """Generate a summary string of findings.
+
+        Returns
+        -------
+        str
+            Summary of findings by type.
+        """
+        counts = self.count_by_type()
+        if not counts:
+            return f"No {self._summary_prefix}"
+
+        lines = [f"Total: {len(self._targets)} {self._summary_prefix}"]
+        for ftype, count in sorted(counts.items(), key=lambda x: -x[1]):
+            lines.append(f"  {ftype.name}: {count}")
+        return "\n".join(lines)

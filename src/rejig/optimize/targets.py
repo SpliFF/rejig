@@ -5,14 +5,16 @@ in a fluent, chainable way consistent with the rest of the rejig API.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rejig.targets.base import Target, TargetList
+from rejig.targets.base import FindingTarget, FindingTargetList, Target
 
 if TYPE_CHECKING:
+    from typing import Self
+
     from rejig.core.rejig import Rejig
 
 
@@ -100,41 +102,12 @@ class OptimizeFinding:
         return f"{self.file_path}:{self.line_number}"
 
 
-class OptimizeTarget(Target):
+class OptimizeTarget(FindingTarget[OptimizeFinding]):
     """Target representing a single code optimization finding.
 
     Allows navigation to the underlying code element and
     provides methods to apply the optimization.
     """
-
-    def __init__(self, rejig: Rejig, finding: OptimizeFinding) -> None:
-        super().__init__(rejig)
-        self._finding = finding
-
-    @property
-    def finding(self) -> OptimizeFinding:
-        """The underlying optimization finding."""
-        return self._finding
-
-    @property
-    def file_path(self) -> Path:
-        """Path to the file containing the finding."""
-        return self._finding.file_path
-
-    @property
-    def line_number(self) -> int:
-        """Line number of the finding."""
-        return self._finding.line_number
-
-    @property
-    def end_line(self) -> int:
-        """End line number of the finding."""
-        return self._finding.end_line
-
-    @property
-    def name(self) -> str | None:
-        """Name of the code element (if applicable)."""
-        return self._finding.name
 
     @property
     def type(self) -> OptimizeType:
@@ -142,14 +115,9 @@ class OptimizeTarget(Target):
         return self._finding.type
 
     @property
-    def message(self) -> str:
-        """Description of the finding."""
-        return self._finding.message
-
-    @property
-    def severity(self) -> str:
-        """Severity level of the finding."""
-        return self._finding.severity
+    def end_line(self) -> int:
+        """End line number of the finding."""
+        return self._finding.end_line
 
     @property
     def original_code(self) -> str:
@@ -161,25 +129,8 @@ class OptimizeTarget(Target):
         """The suggested optimized replacement."""
         return self._finding.suggested_code
 
-    @property
-    def location(self) -> str:
-        """Formatted location string (file:line)."""
-        return self._finding.location
-
-    def exists(self) -> bool:
-        """Check if the underlying file exists."""
-        return self._finding.file_path.exists()
-
     def __repr__(self) -> str:
         return f"OptimizeTarget({self._finding.type.name}, {self.location})"
-
-    def to_file_target(self) -> Target:
-        """Navigate to the file containing this finding."""
-        return self._rejig.file(self._finding.file_path)
-
-    def to_line_target(self) -> Target:
-        """Navigate to the line containing this finding."""
-        return self._rejig.file(self._finding.file_path).line(self._finding.line_number)
 
     def to_line_block_target(self) -> Target:
         """Navigate to the line range containing this finding."""
@@ -188,7 +139,7 @@ class OptimizeTarget(Target):
         )
 
 
-class OptimizeTargetList(TargetList[OptimizeTarget]):
+class OptimizeTargetList(FindingTargetList[OptimizeTarget, OptimizeType]):
     """A list of optimization targets with filtering and aggregation methods.
 
     Provides domain-specific filtering for optimization results.
@@ -202,124 +153,37 @@ class OptimizeTargetList(TargetList[OptimizeTarget]):
     def __repr__(self) -> str:
         return f"OptimizeTargetList({len(self._targets)} findings)"
 
-    # ===== Type-based filtering =====
+    def _create_list(self, targets: list[OptimizeTarget]) -> Self:
+        """Create a new OptimizeTargetList instance."""
+        return OptimizeTargetList(self._rejig, targets)
 
-    def by_type(self, optimize_type: OptimizeType) -> OptimizeTargetList:
-        """Filter to findings of a specific type.
+    @property
+    def _severity_order(self) -> dict[str, int]:
+        """Return severity ordering for optimization (warning > suggestion > info)."""
+        return {"warning": 0, "suggestion": 1, "info": 2}
 
-        Parameters
-        ----------
-        optimize_type : OptimizeType
-            The type of findings to include.
+    @property
+    def _summary_prefix(self) -> str:
+        """Return the prefix for summary output."""
+        return "optimization opportunities"
 
-        Returns
-        -------
-        OptimizeTargetList
-            Filtered list of findings.
-        """
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type == optimize_type],
-        )
+    # ===== Severity shortcuts =====
 
-    def by_types(self, *types: OptimizeType) -> OptimizeTargetList:
-        """Filter to findings matching any of the given types.
-
-        Parameters
-        ----------
-        *types : OptimizeType
-            Types of findings to include.
-
-        Returns
-        -------
-        OptimizeTargetList
-            Filtered list of findings.
-        """
-        type_set = set(types)
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in type_set],
-        )
-
-    # ===== Severity filtering =====
-
-    def by_severity(self, severity: str) -> OptimizeTargetList:
-        """Filter to findings with a specific severity.
-
-        Parameters
-        ----------
-        severity : str
-            Severity level: "info", "warning", or "suggestion".
-
-        Returns
-        -------
-        OptimizeTargetList
-            Filtered list of findings.
-        """
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.severity == severity],
-        )
-
-    def suggestions(self) -> OptimizeTargetList:
+    def suggestions(self) -> Self:
         """Filter to suggestion-level findings."""
         return self.by_severity("suggestion")
 
-    def warnings(self) -> OptimizeTargetList:
+    def warnings(self) -> Self:
         """Filter to warning-level findings."""
         return self.by_severity("warning")
 
-    def info(self) -> OptimizeTargetList:
+    def info(self) -> Self:
         """Filter to info-level findings."""
         return self.by_severity("info")
 
-    # ===== Location filtering =====
-
-    def in_file(self, path: Path | str) -> OptimizeTargetList:
-        """Filter to findings in a specific file.
-
-        Parameters
-        ----------
-        path : Path | str
-            Path to the file.
-
-        Returns
-        -------
-        OptimizeTargetList
-            Filtered list of findings.
-        """
-        path = Path(path) if isinstance(path, str) else path
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.file_path == path],
-        )
-
-    def in_directory(self, directory: Path | str) -> OptimizeTargetList:
-        """Filter to findings in a specific directory (recursive).
-
-        Parameters
-        ----------
-        directory : Path | str
-            Path to the directory.
-
-        Returns
-        -------
-        OptimizeTargetList
-            Filtered list of findings.
-        """
-        directory = Path(directory) if isinstance(directory, str) else directory
-        return OptimizeTargetList(
-            self._rejig,
-            [
-                t
-                for t in self._targets
-                if t.file_path == directory or directory in t.file_path.parents
-            ],
-        )
-
     # ===== Category shortcuts =====
 
-    def dry_issues(self) -> OptimizeTargetList:
+    def dry_issues(self) -> Self:
         """Filter to DRY (Don't Repeat Yourself) findings."""
         dry_types = {
             OptimizeType.DUPLICATE_CODE_BLOCK,
@@ -328,12 +192,11 @@ class OptimizeTargetList(TargetList[OptimizeTarget]):
             OptimizeType.SIMILAR_FUNCTION,
             OptimizeType.REPEATED_PATTERN,
         }
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in dry_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in dry_types]
         )
 
-    def loop_issues(self) -> OptimizeTargetList:
+    def loop_issues(self) -> Self:
         """Filter to loop optimization findings."""
         loop_types = {
             OptimizeType.SLOW_LOOP_TO_COMPREHENSION,
@@ -347,140 +210,22 @@ class OptimizeTargetList(TargetList[OptimizeTarget]):
             OptimizeType.SLOW_LOOP_TO_ENUMERATE,
             OptimizeType.SLOW_LOOP_TO_ZIP,
         }
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in loop_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in loop_types]
         )
 
-    def efficiency_issues(self) -> OptimizeTargetList:
+    def efficiency_issues(self) -> Self:
         """Filter to general efficiency findings."""
         efficiency_types = {
             OptimizeType.INEFFICIENT_STRING_CONCAT,
             OptimizeType.INEFFICIENT_LIST_EXTEND,
             OptimizeType.UNNECESSARY_LIST_CONVERSION,
         }
-        return OptimizeTargetList(
-            self._rejig,
-            [t for t in self._targets if t.type in efficiency_types],
+        return self._create_list(
+            [t for t in self._targets if t.type in efficiency_types]
         )
 
-    # ===== Aggregation =====
-
-    def group_by_file(self) -> dict[Path, OptimizeTargetList]:
-        """Group findings by file.
-
-        Returns
-        -------
-        dict[Path, OptimizeTargetList]
-            Mapping of file paths to their findings.
-        """
-        groups: dict[Path, list[OptimizeTarget]] = {}
-        for t in self._targets:
-            if t.file_path not in groups:
-                groups[t.file_path] = []
-            groups[t.file_path].append(t)
-
-        return {
-            path: OptimizeTargetList(self._rejig, targets)
-            for path, targets in groups.items()
-        }
-
-    def group_by_type(self) -> dict[OptimizeType, OptimizeTargetList]:
-        """Group findings by type.
-
-        Returns
-        -------
-        dict[OptimizeType, OptimizeTargetList]
-            Mapping of types to their findings.
-        """
-        groups: dict[OptimizeType, list[OptimizeTarget]] = {}
-        for t in self._targets:
-            if t.type not in groups:
-                groups[t.type] = []
-            groups[t.type].append(t)
-
-        return {
-            otype: OptimizeTargetList(self._rejig, targets)
-            for otype, targets in groups.items()
-        }
-
-    def count_by_type(self) -> dict[OptimizeType, int]:
-        """Get counts by finding type.
-
-        Returns
-        -------
-        dict[OptimizeType, int]
-            Mapping of types to counts.
-        """
-        counts: dict[OptimizeType, int] = {}
-        for t in self._targets:
-            counts[t.type] = counts.get(t.type, 0) + 1
-        return counts
-
-    def count_by_severity(self) -> dict[str, int]:
-        """Get counts by severity level.
-
-        Returns
-        -------
-        dict[str, int]
-            Mapping of severity levels to counts.
-        """
-        counts: dict[str, int] = {}
-        for t in self._targets:
-            counts[t.severity] = counts.get(t.severity, 0) + 1
-        return counts
-
-    def count_by_file(self) -> dict[Path, int]:
-        """Get counts by file.
-
-        Returns
-        -------
-        dict[Path, int]
-            Mapping of file paths to finding counts.
-        """
-        counts: dict[Path, int] = {}
-        for t in self._targets:
-            counts[t.file_path] = counts.get(t.file_path, 0) + 1
-        return counts
-
-    # ===== Sorting =====
-
-    def sorted_by_severity(self, descending: bool = True) -> OptimizeTargetList:
-        """Sort findings by severity.
-
-        Parameters
-        ----------
-        descending : bool
-            If True, warnings first. If False, info first.
-
-        Returns
-        -------
-        OptimizeTargetList
-            Sorted list of findings.
-        """
-        severity_order = {"warning": 0, "suggestion": 1, "info": 2}
-        sorted_targets = sorted(
-            self._targets,
-            key=lambda t: severity_order.get(t.severity, 3),
-            reverse=not descending,
-        )
-        return OptimizeTargetList(self._rejig, sorted_targets)
-
-    def sorted_by_location(self) -> OptimizeTargetList:
-        """Sort findings by file and line number.
-
-        Returns
-        -------
-        OptimizeTargetList
-            Sorted list of findings.
-        """
-        sorted_targets = sorted(
-            self._targets,
-            key=lambda t: (str(t.file_path), t.line_number),
-        )
-        return OptimizeTargetList(self._rejig, sorted_targets)
-
-    # ===== Output methods =====
+    # ===== Output methods (override to include optimization-specific fields) =====
 
     def to_list_of_dicts(self) -> list[dict]:
         """Convert to list of dictionaries for serialization.
@@ -504,20 +249,3 @@ class OptimizeTargetList(TargetList[OptimizeTarget]):
             }
             for t in self._targets
         ]
-
-    def summary(self) -> str:
-        """Generate a summary string of findings.
-
-        Returns
-        -------
-        str
-            Summary of findings by type.
-        """
-        counts = self.count_by_type()
-        if not counts:
-            return "No optimization findings"
-
-        lines = [f"Total: {len(self._targets)} optimization opportunities"]
-        for otype, count in sorted(counts.items(), key=lambda x: -x[1]):
-            lines.append(f"  {otype.name}: {count}")
-        return "\n".join(lines)
