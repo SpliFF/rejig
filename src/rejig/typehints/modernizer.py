@@ -150,11 +150,13 @@ class TypeCommentConverter(cst.CSTTransformer):
         self, original_node: cst.SimpleStatementLine, updated_node: cst.SimpleStatementLine
     ) -> cst.SimpleStatementLine:
         """Convert type comments on assignment lines."""
-        # Check for trailing comment
-        if not updated_node.trailing_comment:
+        # Check for trailing comment in trailing_whitespace
+        if not updated_node.trailing_whitespace:
+            return updated_node
+        if not updated_node.trailing_whitespace.comment:
             return updated_node
 
-        comment = updated_node.trailing_comment.value
+        comment = updated_node.trailing_whitespace.comment.value
         if not comment.strip().startswith("# type:"):
             return updated_node
 
@@ -185,9 +187,11 @@ class TypeCommentConverter(cst.CSTTransformer):
                 annotation=cst.Annotation(annotation=annotation),
                 value=assign.value,
             )
+            # Remove the type comment by clearing the comment in trailing_whitespace
+            new_trailing = updated_node.trailing_whitespace.with_changes(comment=None)
             return updated_node.with_changes(
                 body=[new_stmt],
-                trailing_comment=None,
+                trailing_whitespace=new_trailing,
             )
         except Exception:
             # If we can't parse the type, leave it as is
@@ -209,10 +213,12 @@ class TypeCommentConverter(cst.CSTTransformer):
         first_stmt = body[0]
         if not isinstance(first_stmt, cst.SimpleStatementLine):
             return updated_node
-        if not first_stmt.trailing_comment:
+        if not first_stmt.trailing_whitespace:
+            return updated_node
+        if not first_stmt.trailing_whitespace.comment:
             return updated_node
 
-        comment = first_stmt.trailing_comment.value
+        comment = first_stmt.trailing_whitespace.comment.value
         if not comment.strip().startswith("# type:"):
             return updated_node
 
@@ -258,7 +264,8 @@ class TypeCommentConverter(cst.CSTTransformer):
             self.changed = True
 
             # Remove the type comment from first statement
-            new_first_stmt = first_stmt.with_changes(trailing_comment=None)
+            new_trailing = first_stmt.trailing_whitespace.with_changes(comment=None)
+            new_first_stmt = first_stmt.with_changes(trailing_whitespace=new_trailing)
             new_body = [new_first_stmt] + list(body[1:])
 
             return updated_node.with_changes(

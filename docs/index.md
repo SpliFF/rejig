@@ -55,3 +55,5 @@ pip install rejig
 - [Quickstart](getting-started/quickstart.md) — Get up and running in 5 minutes
 - [Core Concepts](getting-started/concepts.md) — Understand targets, results, and the API design
 - [Guides](guides/finding-code.md) — Learn common workflows
+- [Code Optimization](guides/code-optimization.md) — Find and fix inefficient code
+- [Optimization Recipes](examples/optimization-recipes.md) — Ready-to-use optimization scripts

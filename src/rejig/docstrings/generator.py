@@ -630,7 +630,8 @@ def generate_docstring_for_method(
                 return False
 
         finder = MethodFinder()
-        tree.walk(finder)
+        wrapper = cst.MetadataWrapper(tree)
+        wrapper.visit(finder)
         return finder.result
     except Exception:
         return None

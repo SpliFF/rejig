@@ -1807,7 +1807,8 @@ class Rejig:
                         return False
 
                 finder = ParamFinder()
-                tree.walk(finder)
+                wrapper = cst.MetadataWrapper(tree)
+                wrapper.visit(finder)
 
                 for class_name, func_name, param_name in finder.untyped_params:
                     if class_name:

@@ -336,7 +336,8 @@ class CodeBlockTarget(Target):
                     return True
 
             finder = BlockFinder()
-            tree.walk(finder)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(finder)
 
             # Find the innermost block containing the line
             containing_blocks = [

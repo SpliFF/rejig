@@ -189,7 +189,8 @@ class MethodTarget(Target):
                     return False
 
             extractor = MethodExtractor(self.class_name, self.name)
-            tree.walk(extractor)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(extractor)
 
             if extractor.method_code:
                 return Result(success=True, message="OK", data=extractor.method_code)
@@ -655,6 +656,12 @@ class MethodTarget(Target):
 
         if result.success and transformer.renamed:
             old_name = self.name
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would rename method {old_name} to {new_name}",
+                    files_changed=result.files_changed,
+                )
             self.name = new_name
             return Result(
                 success=True,
@@ -980,7 +987,8 @@ class MethodTarget(Target):
                     return False
 
             checker = DocstringChecker(self.class_name, self.name)
-            tree.walk(checker)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(checker)
             return checker.result
         except Exception:
             return False
@@ -1034,7 +1042,8 @@ class MethodTarget(Target):
                     return False
 
             extractor = DocstringExtractor(self.class_name, self.name)
-            tree.walk(extractor)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(extractor)
 
             if extractor.docstring is not None:
                 return Result(success=True, message="OK", data=extractor.docstring)
@@ -1655,7 +1664,8 @@ class MethodTarget(Target):
                     return False
 
             finder = MethodLineFinder(self.class_name, self.name)
-            tree.walk(finder)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(finder)
 
             if finder.method_code:
                 line_num = content[:content.find(finder.method_code)].count("\n") + 1 if finder.method_code in content else None
@@ -1719,7 +1729,8 @@ class MethodTarget(Target):
                     return False
 
             finder = MethodLineFinder(self.class_name, self.name)
-            tree.walk(finder)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(finder)
 
             if finder.method_code:
                 line_num = content[:content.find(finder.method_code)].count("\n") + 1 if finder.method_code in content else None

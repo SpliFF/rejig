@@ -115,27 +115,79 @@ class DefinitionCollector(cst.CSTVisitor):
 
 
 class UsageCollector(cst.CSTVisitor):
-    """Collect all name usages in a module."""
+    """Collect all name usages in a module.
+
+    This collector tracks all names that are actually used (called, referenced)
+    while excluding names that are merely defined.
+    """
 
     def __init__(self) -> None:
         self._used_names: set[str] = set()
-        self._in_definition = False
+        # Track names being defined so we don't count them as usages
+        self._definition_names: set[str] = set()
+        # Track when we're visiting assignment targets
+        self._in_assignment_target = False
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
         # Don't count the function name itself as a usage
+        self._definition_names.add(node.name.value)
         return True
+
+    def leave_FunctionDef(self, node: cst.FunctionDef) -> None:
+        # Remove from definition names after traversing the function
+        self._definition_names.discard(node.name.value)
 
     def visit_ClassDef(self, node: cst.ClassDef) -> bool:
         # Don't count the class name itself as a usage
         # But do count base classes
+        self._definition_names.add(node.name.value)
         return True
+
+    def leave_ClassDef(self, node: cst.ClassDef) -> None:
+        # Remove from definition names after traversing the class
+        self._definition_names.discard(node.name.value)
+
+    def visit_Assign(self, node: cst.Assign) -> bool:
+        # Mark that we're entering assignment targets
+        # Visit targets manually to mark them as definitions
+        for target in node.targets:
+            self._visit_assignment_target(target.target)
+        # Visit the value (RHS) normally to capture usages
+        return True
+
+    def _visit_assignment_target(self, target: cst.BaseExpression) -> None:
+        """Mark names in assignment targets as definitions."""
+        if isinstance(target, cst.Name):
+            self._definition_names.add(target.value)
+        elif isinstance(target, cst.Tuple):
+            for elem in target.elements:
+                if isinstance(elem.value, cst.Name):
+                    self._definition_names.add(elem.value.value)
+                elif isinstance(elem.value, cst.Tuple):
+                    self._visit_assignment_target(elem.value)
+
+    def visit_AnnAssign(self, node: cst.AnnAssign) -> bool:
+        # Mark annotated assignment targets as definitions
+        if isinstance(node.target, cst.Name):
+            self._definition_names.add(node.target.value)
+        return True
+
+    def visit_AssignTarget(self, node: cst.AssignTarget) -> bool:
+        # Skip visiting names in assignment targets
+        self._in_assignment_target = True
+        return True
+
+    def leave_AssignTarget(self, node: cst.AssignTarget) -> None:
+        self._in_assignment_target = False
 
     def visit_Arg(self, node: cst.Arg) -> bool:
         # Track arguments to base classes
         return True
 
     def visit_Name(self, node: cst.Name) -> bool:
-        self._used_names.add(node.value)
+        # Only count as usage if not the name being defined and not in assignment target
+        if node.value not in self._definition_names and not self._in_assignment_target:
+            self._used_names.add(node.value)
         return False
 
     def visit_Attribute(self, node: cst.Attribute) -> bool:
@@ -144,7 +196,9 @@ class UsageCollector(cst.CSTVisitor):
         while isinstance(root.value, cst.Attribute):
             root = root.value
         if isinstance(root.value, cst.Name):
-            self._used_names.add(root.value.value)
+            name = root.value.value
+            if name not in self._definition_names and not self._in_assignment_target:
+                self._used_names.add(name)
         return True
 
     @property

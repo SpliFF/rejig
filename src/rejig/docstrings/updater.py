@@ -433,7 +433,8 @@ def find_outdated_docstrings(source: str) -> list[tuple[str, str | None, list[st
                 return False
 
         finder = OutdatedFinder()
-        tree.walk(finder)
+        wrapper = cst.MetadataWrapper(tree)
+        wrapper.visit(finder)
 
     except Exception:
         pass
@@ -479,7 +480,8 @@ def find_missing_docstrings(source: str) -> list[tuple[str, str | None]]:
                 return False
 
         finder = MissingFinder()
-        tree.walk(finder)
+        wrapper = cst.MetadataWrapper(tree)
+        wrapper.visit(finder)
 
     except Exception:
         pass

@@ -314,7 +314,8 @@ class ImportAnalyzer:
             content = path.read_text()
             tree = cst.parse_module(content)
             collector = NameUsageCollector()
-            tree.walk(collector)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(collector)
             return collector.used_names
         except Exception:
             return set()
@@ -381,15 +382,16 @@ class ImportAnalyzer:
         try:
             content = path.read_text()
             tree = cst.parse_module(content)
+            wrapper = cst.MetadataWrapper(tree)
 
             # Get all used names
             usage_collector = NameUsageCollector()
-            tree.walk(usage_collector)
+            wrapper.visit(usage_collector)
             used_names = usage_collector.used_names
 
             # Get all imported names
             import_collector = ImportCollector()
-            tree.walk(import_collector)
+            wrapper.visit(import_collector)
 
             imported_names: set[str] = set()
             for imp in import_collector.imports:
@@ -505,5 +507,6 @@ class DefinitionCollector(cst.CSTVisitor):
 def _get_defined_names(tree: cst.Module) -> set[str]:
     """Get all names defined in a module."""
     collector = DefinitionCollector()
-    tree.walk(collector)
+    wrapper = cst.MetadataWrapper(tree)
+    wrapper.visit(collector)
     return collector.defined_names

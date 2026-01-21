@@ -329,7 +329,8 @@ def find_strings_in_file(
                 return False
 
         finder = StringFinder()
-        tree.walk(finder)
+        wrapper = cst.MetadataWrapper(tree)
+        wrapper.visit(finder)
 
         return strings
 

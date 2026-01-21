@@ -227,7 +227,8 @@ class _StubExtractor:
         # Class header
         bases = ""
         if node.bases:
-            bases_list = [self._module.code_for_node(base).strip() for base in node.bases]
+            # Extract base class names from Arg nodes
+            bases_list = [self._module.code_for_node(base.value).strip() for base in node.bases]
             bases = f"({', '.join(bases_list)})"
 
         self._lines.append(f"{self._indent_str()}class {node.name.value}{bases}:")
@@ -294,7 +295,8 @@ class _StubExtractor:
                 ann = self._module.code_for_node(params.star_arg.annotation.annotation).strip()
                 p = f"{p}: {ann}"
             parts.append(p)
-        elif params.star_arg == cst.ParamStar():
+        elif isinstance(params.star_arg, cst.ParamStar):
+            # Bare * separator for keyword-only args
             parts.append("*")
 
         for param in params.kwonly_params:

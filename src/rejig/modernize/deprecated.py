@@ -285,9 +285,10 @@ def find_deprecated_usage(rejig: Rejig) -> list[DeprecatedUsage]:
         try:
             content = file_path.read_text()
             tree = cst.parse_module(content)
+            wrapper = cst.MetadataWrapper(tree)
 
             finder = DeprecatedUsageFinder(file_path)
-            tree.walk(finder)
+            wrapper.visit(finder)
             all_usages.extend(finder.usages)
         except Exception:
             continue
@@ -314,9 +315,10 @@ def find_old_style_classes(rejig: Rejig) -> list[tuple[Path, str]]:
         try:
             content = file_path.read_text()
             tree = cst.parse_module(content)
+            wrapper = cst.MetadataWrapper(tree)
 
             finder = OldStyleClassFinder(file_path)
-            tree.walk(finder)
+            wrapper.visit(finder)
 
             for class_name, _ in finder.old_style_classes:
                 results.append((file_path, class_name))

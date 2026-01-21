@@ -220,6 +220,26 @@ VulnerabilityScanner
 SecurityReporter
     Generate security analysis reports.
 
+Code Optimization
+-----------------
+OptimizeTarget
+    Target for code optimization findings.
+
+OptimizeTargetList
+    List of optimization targets for batch operations.
+
+OptimizeType
+    Types of optimization findings.
+
+OptimizeFinding
+    A single finding from code optimization analysis.
+
+DRYAnalyzer
+    Detect duplicate code, expressions, and literals.
+
+LoopOptimizer
+    Find loops that can be replaced with comprehensions or builtins.
+
 Framework Extensions
 --------------------
 FlaskProject
@@ -300,6 +320,14 @@ from .frameworks import (
     FlaskProject,
     FastAPIProject,
     SQLAlchemyProject,
+)
+from .optimize import (
+    DRYAnalyzer,
+    LoopOptimizer,
+    OptimizeFinding,
+    OptimizeTarget,
+    OptimizeTargetList,
+    OptimizeType,
 )
 from .targets import (
     ClassTarget,
@@ -417,6 +445,13 @@ __all__ = [
     "SecurityReporter",
     "SecretsScanner",
     "VulnerabilityScanner",
+    # Code Optimization
+    "OptimizeTarget",
+    "OptimizeTargetList",
+    "OptimizeType",
+    "OptimizeFinding",
+    "DRYAnalyzer",
+    "LoopOptimizer",
     # Framework Extensions
     "FlaskProject",
     "FastAPIProject",

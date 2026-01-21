@@ -387,7 +387,8 @@ class ClassTarget(Target):
                     return False
 
             finder = MethodFinder(self.name)
-            tree.walk(finder)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(finder)
 
             for method_name in finder.methods:
                 if regex is None or regex.search(method_name):
@@ -928,7 +929,8 @@ class ClassTarget(Target):
                     return False
 
             finder = MethodFinder(self.name)
-            tree.walk(finder)
+            wrapper = cst.MetadataWrapper(tree)
+            wrapper.visit(finder)
 
             for method_name in finder.methods_without_docs:
                 targets.append(MethodTarget(self._rejig, self.name, method_name, file_path=file_path))
