@@ -219,6 +219,17 @@ VulnerabilityScanner
 
 SecurityReporter
     Generate security analysis reports.
+
+Framework Extensions
+--------------------
+FlaskProject
+    Flask-specific refactoring operations (routes, blueprints, error handlers).
+
+FastAPIProject
+    FastAPI-specific refactoring operations (endpoints, dependencies, middleware).
+
+SQLAlchemyProject
+    SQLAlchemy-specific refactoring operations (models, relationships, columns).
 """
 from __future__ import annotations
 
@@ -284,6 +295,11 @@ from .security import (
     SecurityTargetList,
     SecurityType,
     VulnerabilityScanner,
+)
+from .frameworks import (
+    FlaskProject,
+    FastAPIProject,
+    SQLAlchemyProject,
 )
 from .targets import (
     ClassTarget,
@@ -401,4 +417,8 @@ __all__ = [
     "SecurityReporter",
     "SecretsScanner",
     "VulnerabilityScanner",
+    # Framework Extensions
+    "FlaskProject",
+    "FastAPIProject",
+    "SQLAlchemyProject",
 ]
