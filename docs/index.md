@@ -143,7 +143,6 @@ pip install rejig[all]
 - [Patching](reference/patching.md) — Patch parsing, generation, and targets
 - [Analysis](reference/analysis.md) — Analysis types and findings
 - [Security](reference/security.md) — Security types and findings
-- [Transformers](reference/transformers.md) — LibCST transformers
 
 ### Sample Projects
 - [Sample Projects](sample-projects/README.md) — Test projects for trying recipes

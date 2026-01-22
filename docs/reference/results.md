@@ -232,7 +232,7 @@ if errors:
 
 ---
 
-::: rejig.result
+::: rejig.core.results
     options:
       show_source: false
       members:
