@@ -12,6 +12,8 @@ import libcst as cst
 from rejig.core.results import BatchResult, Result
 
 if TYPE_CHECKING:
+    from rope.base.project import Project as RopeProject
+
     from rejig.core.transaction import Transaction
     from rejig.packaging.models import PackageConfig
     from rejig.patching.targets import PatchTarget
@@ -73,11 +75,20 @@ class Rejig:
     >>> print(result.message)  # [DRY RUN] Would add attribute...
     """
 
-    def __init__(self, path: str | Path, dry_run: bool = False):
+    def __init__(self, path: str | Path, dry_run: bool = False) -> None:
+        """Initialize a Rejig instance for code refactoring.
+
+        Parameters
+        ----------
+        path : str | Path
+            Path to the file, directory, or glob pattern to work with.
+        dry_run : bool
+            If True, operations don't modify files, only preview changes.
+        """
         self.path = Path(path) if isinstance(path, str) else path
         self.dry_run = dry_run
         self._files: list[Path] | None = None
-        self._rope_project = None
+        self._rope_project: RopeProject | None = None
         self._root_path: Path | None = None
         self._transaction: Transaction | None = None
 

@@ -294,6 +294,9 @@ class PythonProject:
     def remove_dependency(self, name: str) -> Result:
         """Remove a dependency from all sections.
 
+        Attempts to remove the dependency from both main and dev dependencies.
+        Returns success if removed from at least one location.
+
         Parameters
         ----------
         name : str
@@ -302,15 +305,33 @@ class PythonProject:
         Returns
         -------
         Result
-            Result of the operation.
+            Result of the operation. Success if removed from any section.
         """
-        # Try removing from main dependencies
-        result = self.dependencies().remove(name)
+        from rejig.core.results import BatchResult
 
-        # Also try dev dependencies
-        self.dev_dependencies().remove(name)
+        # Try removing from both main and dev dependencies
+        main_result = self.dependencies().remove(name)
+        dev_result = self.dev_dependencies().remove(name)
 
-        return result
+        # Return a combined result
+        batch = BatchResult([main_result, dev_result])
+
+        if batch.all_succeeded:
+            return Result(
+                success=True,
+                message=f"Removed {name} from dependencies",
+                files_changed=main_result.files_changed + dev_result.files_changed,
+            )
+        elif batch.partial_success:
+            # At least one succeeded
+            return Result(
+                success=True,
+                message=f"Removed {name} from dependencies",
+                files_changed=(main_result.files_changed or []) + (dev_result.files_changed or []),
+            )
+        else:
+            # Both failed (likely not found in either)
+            return main_result
 
     def update_dependency(
         self,
@@ -566,20 +587,36 @@ class PythonProject:
         Result
             Result of the operation.
         """
+        from rejig.core.results import BatchResult
+
         ruff = self.ruff()
+        results: list[Result] = []
+
         if line_length is not None:
-            ruff.set_line_length(line_length)
+            results.append(ruff.set_line_length(line_length))
         if target_version is not None:
-            ruff.set_target_version(target_version)
+            results.append(ruff.set_target_version(target_version))
         if select is not None:
-            ruff.select(select)
+            results.append(ruff.select(select))
         if ignore is not None:
-            ruff.ignore(ignore)
+            results.append(ruff.ignore(ignore))
         if extend_exclude is not None:
-            ruff.set_extend_exclude(extend_exclude)
+            results.append(ruff.set_extend_exclude(extend_exclude))
         if kwargs:
-            return ruff.set(**kwargs)
-        return Result(success=True, message="Configured Ruff")
+            results.append(ruff.set(**kwargs))
+
+        if not results:
+            return Result(success=True, message="No Ruff configuration changes specified")
+
+        batch = BatchResult(results)
+        if batch.all_failed:
+            return batch.results[0] if batch.results else Result(success=False, message="Configuration failed")
+
+        return Result(
+            success=True,
+            message="Configured Ruff",
+            files_changed=[self.pyproject_path],
+        )
 
     def configure_mypy(
         self,
@@ -658,20 +695,36 @@ class PythonProject:
         Result
             Result of the operation.
         """
+        from rejig.core.results import BatchResult
+
         pt = self.pytest()
+        results: list[Result] = []
+
         if testpaths is not None:
-            pt.set_testpaths(testpaths)
+            results.append(pt.set_testpaths(testpaths))
         if addopts is not None:
-            pt.set_addopts(addopts)
+            results.append(pt.set_addopts(addopts))
         if python_files is not None:
-            pt.set_python_files(python_files)
+            results.append(pt.set_python_files(python_files))
         if python_classes is not None:
-            pt.set_python_classes(python_classes)
+            results.append(pt.set_python_classes(python_classes))
         if python_functions is not None:
-            pt.set_python_functions(python_functions)
+            results.append(pt.set_python_functions(python_functions))
         if kwargs:
-            return pt.set(**kwargs)
-        return Result(success=True, message="Configured pytest")
+            results.append(pt.set(**kwargs))
+
+        if not results:
+            return Result(success=True, message="No pytest configuration changes specified")
+
+        batch = BatchResult(results)
+        if batch.all_failed:
+            return batch.results[0] if batch.results else Result(success=False, message="Configuration failed")
+
+        return Result(
+            success=True,
+            message="Configured pytest",
+            files_changed=[self.pyproject_path],
+        )
 
     def configure_isort(
         self,
@@ -704,20 +757,36 @@ class PythonProject:
         Result
             Result of the operation.
         """
+        from rejig.core.results import BatchResult
+
         isort = self.isort()
+        results: list[Result] = []
+
         if profile is not None:
-            isort.set_profile(profile)
+            results.append(isort.set_profile(profile))
         if line_length is not None:
-            isort.set_line_length(line_length)
+            results.append(isort.set_line_length(line_length))
         if known_first_party is not None:
-            isort.set_known_first_party(known_first_party)
+            results.append(isort.set_known_first_party(known_first_party))
         if known_third_party is not None:
-            isort.set_known_third_party(known_third_party)
+            results.append(isort.set_known_third_party(known_third_party))
         if skip is not None:
-            isort.set_skip(skip)
+            results.append(isort.set_skip(skip))
         if kwargs:
-            return isort.set(**kwargs)
-        return Result(success=True, message="Configured isort")
+            results.append(isort.set(**kwargs))
+
+        if not results:
+            return Result(success=True, message="No isort configuration changes specified")
+
+        batch = BatchResult(results)
+        if batch.all_failed:
+            return batch.results[0] if batch.results else Result(success=False, message="Configuration failed")
+
+        return Result(
+            success=True,
+            message="Configured isort",
+            files_changed=[self.pyproject_path],
+        )
 
     def get_tool_config(self, tool_name: str) -> dict[str, Any]:
         """Get configuration for a tool.

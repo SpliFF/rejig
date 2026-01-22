@@ -7,10 +7,41 @@ import libcst as cst
 
 
 class InsertAtMatch(cst.CSTTransformer):
-    """
-    Insert code before/after or replace a line matching a regex pattern within a scope.
+    """Insert code before/after or replace a line matching a regex pattern.
 
     Supports scopes: module level, within a class, or within a method.
+
+    Parameters
+    ----------
+    pattern : str
+        Regex pattern to match against statement code.
+    code : str
+        Code to insert or use as replacement.
+    position : str
+        Where to insert: "before", "after", or "replace". Defaults to "before".
+    scope : str | None
+        Target scope: "module", "class", "method", or None (any). Defaults to None.
+    class_name : str | None
+        When scope is "class" or "method", the class to target.
+    method_name : str | None
+        When scope is "method", the method to target.
+
+    Attributes
+    ----------
+    matched : bool
+        True if the pattern was matched and code was inserted/replaced.
+
+    Examples
+    --------
+    >>> # Insert logging after a specific line in a method
+    >>> transformer = InsertAtMatch(
+    ...     pattern=r"result = calculate\\(\\)",
+    ...     code='logger.info(f"Result: {result}")',
+    ...     position="after",
+    ...     class_name="Calculator",
+    ...     method_name="run"
+    ... )
+    >>> new_tree = tree.visit(transformer)
     """
 
     def __init__(

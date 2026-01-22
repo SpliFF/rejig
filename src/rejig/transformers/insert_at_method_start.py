@@ -5,7 +5,38 @@ import libcst as cst
 
 
 class InsertAtMethodStart(cst.CSTTransformer):
-    """Insert a statement at the start of a method body."""
+    """Insert a statement at the start of a method or function body.
+
+    The statement is inserted after the docstring if one exists.
+
+    Parameters
+    ----------
+    class_name : str | None
+        Name of the class containing the method. Use None for module-level functions.
+    method_name : str
+        Name of the method or function to modify.
+    statement : str
+        Statement code to insert.
+
+    Attributes
+    ----------
+    inserted : bool
+        True if the statement was inserted.
+
+    Examples
+    --------
+    >>> # Add validation at method start
+    >>> transformer = InsertAtMethodStart(
+    ...     "UserService",
+    ...     "create_user",
+    ...     "self._validate_permissions()"
+    ... )
+    >>> new_tree = tree.visit(transformer)
+
+    >>> # Add to a module-level function
+    >>> transformer = InsertAtMethodStart(None, "main", "setup_logging()")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, class_name: str | None, method_name: str, statement: str):
         super().__init__()

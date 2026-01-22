@@ -5,9 +5,31 @@ import libcst as cst
 
 
 class AddFirstParameter(cst.CSTTransformer):
-    """Add a first parameter (like 'cls' or 'self') to a method."""
+    """Add a first parameter (like 'cls' or 'self') to a method.
 
-    def __init__(self, class_name: str | None, method_name: str, param_name: str = "cls"):
+    Useful for converting static methods to class methods or instance methods.
+
+    Parameters
+    ----------
+    class_name : str | None
+        Name of the class containing the method. Use None for module-level functions.
+    method_name : str
+        Name of the method or function to modify.
+    param_name : str
+        Name of the parameter to add. Defaults to "cls".
+
+    Attributes
+    ----------
+    added : bool
+        True if the parameter was added.
+
+    Examples
+    --------
+    >>> transformer = AddFirstParameter("MyClass", "my_method", "cls")
+    >>> new_tree = tree.visit(transformer)
+    """
+
+    def __init__(self, class_name: str | None, method_name: str, param_name: str = "cls") -> None:
         super().__init__()
         self.class_name = class_name
         self.method_name = method_name

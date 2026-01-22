@@ -5,7 +5,31 @@ import libcst as cst
 
 
 class RenameMethod(cst.CSTTransformer):
-    """Rename a method within a class."""
+    """Rename a method within a class.
+
+    Note: This only renames the method definition itself. It does not update
+    call sites or references elsewhere. For semantic renaming with automatic
+    reference updates, use Rope integration.
+
+    Parameters
+    ----------
+    class_name : str
+        Name of the class containing the method.
+    old_name : str
+        Current name of the method.
+    new_name : str
+        New name for the method.
+
+    Attributes
+    ----------
+    renamed : bool
+        True if the method was found and renamed.
+
+    Examples
+    --------
+    >>> transformer = RenameMethod("Calculator", "calculate", "compute")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, class_name: str, old_name: str, new_name: str):
         super().__init__()

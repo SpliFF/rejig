@@ -407,3 +407,31 @@ class TomlTarget(Target):
             Result of the operation.
         """
         return self.set_section(f"tool.{tool_name}", config)
+
+    def rewrite(self, new_content: str) -> Result:
+        """Replace the entire content of the TOML file.
+
+        Validates the content is valid TOML before writing.
+
+        Parameters
+        ----------
+        new_content : str
+            New TOML content.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        if tomllib is None:
+            return self._operation_failed(
+                "rewrite",
+                "tomllib (Python 3.11+) or tomli is required. Install with: pip install tomli",
+            )
+
+        try:
+            # Validate TOML by parsing it
+            data = tomllib.loads(new_content)
+            return self._save(data)
+        except Exception as e:
+            return self._operation_failed("rewrite", f"Invalid TOML: {e}", e)

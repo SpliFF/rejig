@@ -5,7 +5,29 @@ import libcst as cst
 
 
 class RenameClass(cst.CSTTransformer):
-    """Rename a class."""
+    """Rename a class definition.
+
+    Note: This only renames the class definition itself. It does not update
+    references to the class elsewhere in the code. For semantic renaming with
+    automatic reference updates, use Rope integration.
+
+    Parameters
+    ----------
+    old_name : str
+        Current name of the class.
+    new_name : str
+        New name for the class.
+
+    Attributes
+    ----------
+    renamed : bool
+        True if the class was found and renamed.
+
+    Examples
+    --------
+    >>> transformer = RenameClass("OldName", "NewName")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, old_name: str, new_name: str):
         super().__init__()

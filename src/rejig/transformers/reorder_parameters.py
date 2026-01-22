@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import libcst as cst
 
+from rejig.transformers.parameter_utils import fix_param_commas
+
 
 class ReorderParameters(cst.CSTTransformer):
     """Reorder parameters in a method or function signature.
@@ -90,28 +92,14 @@ class ReorderParameters(cst.CSTTransformer):
 
         self.reordered = True
 
-        # Fix commas - all params except last need commas
-        fixed_params: list[cst.Param] = []
-        for i, p in enumerate(reordered):
-            if i < len(reordered) - 1:
-                # Not the last param - ensure it has a comma
-                if isinstance(p.comma, cst.MaybeSentinel):
-                    p = p.with_changes(
-                        comma=cst.Comma(whitespace_after=cst.SimpleWhitespace(" "))
-                    )
-                fixed_params.append(p)
-            else:
-                # Last param - check if kwonly or star_kwarg follows
-                has_more = params.kwonly_params or params.star_kwarg is not None
-                if has_more:
-                    if isinstance(p.comma, cst.MaybeSentinel):
-                        p = p.with_changes(
-                            comma=cst.Comma(whitespace_after=cst.SimpleWhitespace(" "))
-                        )
-                else:
-                    # Remove comma from last param
-                    p = p.with_changes(comma=cst.MaybeSentinel.DEFAULT)
-                fixed_params.append(p)
+        # Use utility for comma fixing
+        has_star_arg = isinstance(params.star_arg, cst.ParamStar) or isinstance(params.star_arg, cst.Param)
+        fixed_params = fix_param_commas(
+            reordered,
+            has_kwonly=bool(params.kwonly_params),
+            has_star_kwarg=params.star_kwarg is not None,
+            has_star_arg=has_star_arg,
+        )
 
         new_parameters = params.with_changes(params=fixed_params)
         return updated_node.with_changes(params=new_parameters)

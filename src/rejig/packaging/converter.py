@@ -375,7 +375,19 @@ class PackageConfigConverter:
         return spec
 
     def _poetry_version_to_pep440(self, version: str) -> str:
-        """Convert Poetry version constraint to PEP 440."""
+        """Convert Poetry version constraint to PEP 440.
+
+        Parameters
+        ----------
+        version : str
+            Poetry version constraint (e.g., "^1.2.3", "~1.2").
+
+        Returns
+        -------
+        str
+            PEP 440 compatible version specifier.
+            Returns original version if conversion fails.
+        """
         version = version.strip()
 
         # Handle caret (^) - compatible release
@@ -383,13 +395,16 @@ class PackageConfigConverter:
             base = version[1:]
             parts = base.split(".")
             if len(parts) >= 2:
-                major = int(parts[0])
-                if major == 0:
-                    if len(parts) >= 2:
+                try:
+                    major = int(parts[0])
+                    if major == 0:
                         minor = int(parts[1])
                         return f">={base},<0.{minor + 1}.0"
-                else:
-                    return f">={base},<{major + 1}.0.0"
+                    else:
+                        return f">={base},<{major + 1}.0.0"
+                except ValueError:
+                    # Invalid version number, return as-is
+                    return f">={base}"
             return f">={base}"
 
         # Handle tilde (~) - approximately equivalent
@@ -397,9 +412,13 @@ class PackageConfigConverter:
             base = version[1:]
             parts = base.split(".")
             if len(parts) >= 2:
-                major = parts[0]
-                minor = int(parts[1])
-                return f">={base},<{major}.{minor + 1}.0"
+                try:
+                    major = parts[0]
+                    minor = int(parts[1])
+                    return f">={base},<{major}.{minor + 1}.0"
+                except ValueError:
+                    # Invalid version number, return as-is
+                    return f">={base}"
             return f">={base}"
 
         return version

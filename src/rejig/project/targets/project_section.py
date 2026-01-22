@@ -266,7 +266,7 @@ class ProjectSectionTarget(TomlTarget):
         authors : list[dict | str]
             List of authors. Each can be:
             - A dict with "name" and optionally "email"
-            - A string in "Name <email>" format
+            - A string in "Name <email>" format (RFC 2822 format)
 
         Returns
         -------
@@ -280,16 +280,25 @@ class ProjectSectionTarget(TomlTarget):
         ...     "Jane Doe <jane@example.com>"
         ... ])
         """
+        import email.utils
+
         parsed_authors = []
         for author in authors:
             if isinstance(author, dict):
                 parsed_authors.append(author)
-            elif "<" in author and ">" in author:
-                name = author.split("<")[0].strip()
-                email = author.split("<")[1].rstrip(">").strip()
-                parsed_authors.append({"name": name, "email": email})
             else:
-                parsed_authors.append({"name": author})
+                # Use proper RFC 2822 email parsing
+                name, addr = email.utils.parseaddr(author)
+                if name and addr:
+                    parsed_authors.append({"name": name, "email": addr})
+                elif name:
+                    parsed_authors.append({"name": name})
+                elif addr:
+                    # Just an email address
+                    parsed_authors.append({"name": addr, "email": addr})
+                else:
+                    # Treat as plain name
+                    parsed_authors.append({"name": author.strip()})
 
         return self.set("project.authors", parsed_authors)
 

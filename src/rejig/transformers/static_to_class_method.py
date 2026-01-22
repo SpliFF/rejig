@@ -5,7 +5,30 @@ import libcst as cst
 
 
 class StaticToClassMethod(cst.CSTTransformer):
-    """Convert @staticmethod to @classmethod for a specific method."""
+    """Convert @staticmethod to @classmethod for a specific method.
+
+    Replaces the @staticmethod decorator with @classmethod. Note that this
+    only changes the decorator; you should also add a 'cls' parameter using
+    AddFirstParameter to make the method fully functional as a classmethod.
+
+    Parameters
+    ----------
+    class_name : str
+        Name of the class containing the method.
+    method_name : str
+        Name of the method to convert.
+
+    Attributes
+    ----------
+    converted : bool
+        True if the conversion was performed.
+
+    Examples
+    --------
+    >>> transformer = StaticToClassMethod("Factory", "create")
+    >>> new_tree = tree.visit(transformer)
+    >>> # Then add 'cls' parameter with AddFirstParameter
+    """
 
     def __init__(self, class_name: str, method_name: str):
         super().__init__()

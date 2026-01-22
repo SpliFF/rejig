@@ -5,7 +5,38 @@ import libcst as cst
 
 
 class ReplaceIdentifier(cst.CSTTransformer):
-    """Replace identifier references within a specific class method."""
+    """Replace identifier references within a specific class method.
+
+    Useful for renaming variables or replacing simple identifiers with
+    attribute accesses (e.g., replacing `data` with `cls.data`).
+
+    Parameters
+    ----------
+    class_name : str
+        Name of the class containing the method.
+    method_name : str
+        Name of the method to search within.
+    old_name : str
+        Identifier name to replace.
+    new_name : str
+        New expression to replace with (can be "cls.attr" style).
+
+    Attributes
+    ----------
+    replaced_count : int
+        Number of replacements made.
+
+    Examples
+    --------
+    >>> # Replace all 'data' references with 'cls.data' in a method
+    >>> transformer = ReplaceIdentifier(
+    ...     "DataService",
+    ...     "process",
+    ...     "data",
+    ...     "cls.data"
+    ... )
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, class_name: str, method_name: str, old_name: str, new_name: str):
         super().__init__()

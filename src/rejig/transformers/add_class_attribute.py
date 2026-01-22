@@ -5,7 +5,33 @@ import libcst as cst
 
 
 class AddClassAttribute(cst.CSTTransformer):
-    """Add a class-level attribute with type annotation."""
+    """Add a class-level attribute with type annotation.
+
+    Inserts a new annotated assignment at the class level, typically after
+    the class docstring if one exists.
+
+    Parameters
+    ----------
+    class_name : str
+        Name of the class to add the attribute to.
+    attr_name : str
+        Name of the attribute to add.
+    type_annotation : str
+        Type annotation as a string (e.g., "str", "int | None", "list[str]").
+    default_value : str
+        Default value as a string. Defaults to "None".
+
+    Attributes
+    ----------
+    added : bool
+        True if the attribute was added.
+
+    Examples
+    --------
+    >>> transformer = AddClassAttribute("User", "email", "str | None", "None")
+    >>> new_tree = tree.visit(transformer)
+    >>> # Adds: email: str | None = None
+    """
 
     def __init__(
         self,

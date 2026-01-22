@@ -80,7 +80,8 @@ class SetParameterType(cst.CSTTransformer):
         # Parse the type annotation
         try:
             type_annotation = cst.parse_expression(self.param_type)
-        except Exception:
+        except cst.ParserSyntaxError:
+            # Invalid type annotation syntax - skip this parameter
             return updated_node
 
         self.changed = True

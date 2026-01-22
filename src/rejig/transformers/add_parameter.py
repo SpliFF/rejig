@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import libcst as cst
 
+from rejig.transformers.parameter_utils import find_insert_position, fix_param_commas
+
 
 class AddParameter(cst.CSTTransformer):
     """Add a parameter to a method or function.
@@ -86,28 +88,22 @@ class AddParameter(cst.CSTTransformer):
             )
 
         existing_params = list(updated_node.params.params)
+        params = updated_node.params
 
-        if self.position == "start":
-            # Insert after self/cls if present
-            insert_idx = 0
-            if existing_params and existing_params[0].name.value in ("cls", "self"):
-                insert_idx = 1
+        # Find insert position using utility
+        insert_idx = find_insert_position(existing_params, self.position)
 
-            # Add comma after new param if there are more params after it
-            if insert_idx < len(existing_params):
-                new_param = new_param.with_changes(comma=cst.MaybeSentinel.DEFAULT)
+        # Insert the new parameter
+        existing_params.insert(insert_idx, new_param)
 
-            existing_params.insert(insert_idx, new_param)
-        else:
-            # Add at the end
-            # Ensure previous param has a comma if there are existing params
-            if existing_params:
-                # The last param needs a comma to separate from our new param
-                last_idx = len(existing_params) - 1
-                existing_params[last_idx] = existing_params[last_idx].with_changes(
-                    comma=cst.MaybeSentinel.DEFAULT
-                )
-            existing_params.append(new_param)
+        # Fix all commas using utility
+        has_star_arg = isinstance(params.star_arg, cst.ParamStar) or isinstance(params.star_arg, cst.Param)
+        existing_params = fix_param_commas(
+            existing_params,
+            has_kwonly=bool(params.kwonly_params),
+            has_star_kwarg=params.star_kwarg is not None,
+            has_star_arg=has_star_arg,
+        )
 
         self.added = True
 

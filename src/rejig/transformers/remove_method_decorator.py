@@ -5,7 +5,35 @@ import libcst as cst
 
 
 class RemoveMethodDecorator(cst.CSTTransformer):
-    """Remove a decorator from a method."""
+    """Remove a decorator from a method within a class.
+
+    Specifically targets methods inside a class. For removing decorators from
+    module-level functions or classes, use RemoveDecorator instead.
+
+    Parameters
+    ----------
+    class_name : str
+        Name of the class containing the method.
+    method_name : str
+        Name of the method to modify.
+    decorator : str
+        Name of the decorator to remove (without the @ symbol).
+
+    Attributes
+    ----------
+    removed : bool
+        True if the decorator was found and removed.
+
+    Examples
+    --------
+    >>> # Remove @staticmethod from a method
+    >>> transformer = RemoveMethodDecorator("Calculator", "add", "staticmethod")
+    >>> new_tree = tree.visit(transformer)
+
+    >>> # Remove @property from a method
+    >>> transformer = RemoveMethodDecorator("User", "full_name", "property")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, class_name: str, method_name: str, decorator: str):
         super().__init__()

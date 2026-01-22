@@ -93,53 +93,59 @@ class StringLiteralTarget(Target):
         """
         return Result(success=True, message="OK", data=self.value)
 
-    def rewrite(self, new_value: str) -> Result:
+    def rewrite(self, new_value: str | None = None, *, new_content: str | None = None) -> Result:
         """Replace this string literal with a new value.
 
         Parameters
         ----------
         new_value : str
-            New string value.
+            New string value (preferred parameter name for string literals).
+        new_content : str
+            Alias for new_value for API consistency with other targets.
 
         Returns
         -------
         Result
             Result of the operation.
         """
+        # Support both new_value and new_content for API consistency
+        value = new_value if new_value is not None else new_content
+        if value is None:
+            return self._operation_failed("rewrite", "Either new_value or new_content must be provided")
+
         if not self.path.exists():
             return self._operation_failed("rewrite", f"File not found: {self.path}")
 
         try:
             content = self.path.read_text()
 
-            # Determine the quote style from raw_content
-            if self.raw_content.startswith('"""') or self.raw_content.startswith("'''"):
-                quote = self.raw_content[:3]
-            elif self.raw_content.startswith('"'):
+            # Determine the prefix (f, r, b, u, fr, etc.) and quote style
+            prefix = ""
+            raw = self.raw_content
+
+            # Extract prefix (can be 1-2 chars: f, r, b, u, fr, rf, br, rb)
+            for i, char in enumerate(raw[:2]):
+                if char in "frbuFRBU":
+                    prefix += char
+                else:
+                    break
+
+            # Get the quote from after the prefix
+            quote_start = raw[len(prefix):]
+            if quote_start.startswith('"""') or quote_start.startswith("'''"):
+                quote = quote_start[:3]
+            elif quote_start.startswith('"'):
                 quote = '"'
-            elif self.raw_content.startswith("'"):
+            elif quote_start.startswith("'"):
                 quote = "'"
-            elif self.raw_content.startswith('f"') or self.raw_content.startswith("f'"):
-                quote = self.raw_content[1]
-                prefix = "f"
-            elif self.raw_content.startswith('r"') or self.raw_content.startswith("r'"):
-                quote = self.raw_content[1]
-                prefix = "r"
             else:
                 quote = '"'
-
-            # Build new raw content
-            prefix = ""
-            if self.raw_content.startswith(("f", "r", "b", "u")):
-                prefix = self.raw_content[0]
-                if self.raw_content[1:].startswith(("f", "r", "b")):
-                    prefix = self.raw_content[:2]
 
             if len(quote) == 3:
-                new_raw = f'{prefix}{quote}{new_value}{quote}'
+                new_raw = f'{prefix}{quote}{value}{quote}'
             else:
                 # Escape quotes in the value
-                escaped = new_value.replace("\\", "\\\\").replace(quote, f"\\{quote}")
+                escaped = value.replace("\\", "\\\\").replace(quote, f"\\{quote}")
                 new_raw = f'{prefix}{quote}{escaped}{quote}'
 
             # Replace in content
@@ -156,7 +162,7 @@ class StringLiteralTarget(Target):
                 )
 
             self.path.write_text(new_content)
-            self.value = new_value
+            self.value = value
             self.raw_content = new_raw
             return Result(
                 success=True,

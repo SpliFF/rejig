@@ -104,6 +104,33 @@ class IniTarget(Target):
         except Exception as e:
             return self._operation_failed("get_content", f"Failed to read file: {e}", e)
 
+    def get_data(self) -> Result:
+        """Get the parsed INI data as a nested dictionary.
+
+        Returns
+        -------
+        Result
+            Result with parsed dict in `data` field if successful.
+            The dict has section names as keys and section data dicts as values.
+
+        Examples
+        --------
+        >>> result = ini.get_data()
+        >>> if result.success:
+        ...     for section, values in result.data.items():
+        ...         print(f"[{section}]")
+        """
+        config = self._load()
+        if config is None:
+            return self._operation_failed("get_data", f"Failed to load INI from {self.path}")
+
+        # Convert ConfigParser to nested dict
+        data: dict[str, dict[str, str]] = {}
+        for section in config.sections():
+            data[section] = dict(config.items(section))
+
+        return Result(success=True, message="OK", data=data)
+
     def get(self, section: str, key: str, default: str | None = None) -> str | None:
         """Get a value from a section.
 

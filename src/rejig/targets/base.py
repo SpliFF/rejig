@@ -69,8 +69,17 @@ class Target(ABC):
         return self._rejig.dry_run
 
     def exists(self) -> bool:
-        """Check if this target exists in the codebase."""
-        raise NotImplementedError
+        """Check if this target exists in the codebase.
+
+        Default implementation returns False. Subclasses should override
+        to provide proper existence checking.
+
+        Returns
+        -------
+        bool
+            True if the target exists, False otherwise.
+        """
+        return False
 
     def get_content(self) -> Result:
         """Get the content/source code of this target."""

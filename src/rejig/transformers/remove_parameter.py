@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import libcst as cst
 
+from rejig.transformers.parameter_utils import fix_kwonly_commas, fix_param_commas
+
 
 class RemoveParameter(cst.CSTTransformer):
     """Remove a parameter from a method or function.
@@ -84,29 +86,15 @@ class RemoveParameter(cst.CSTTransformer):
         if not self.removed:
             return updated_node
 
-        # Fix comma on last param of new_params
-        if new_params and not new_kwonly and new_star_kwarg is None:
-            # Last param shouldn't have comma if nothing follows
-            new_params[-1] = new_params[-1].with_changes(
-                comma=cst.MaybeSentinel.DEFAULT
-            )
-        elif new_params and (new_kwonly or new_star_kwarg is not None or isinstance(new_star_arg, cst.ParamStar)):
-            # Ensure last param has comma if something follows
-            if new_params[-1].comma == cst.MaybeSentinel.DEFAULT:
-                new_params[-1] = new_params[-1].with_changes(
-                    comma=cst.Comma(whitespace_after=cst.SimpleWhitespace(" "))
-                )
-
-        # Fix comma on last kwonly param
-        if new_kwonly and new_star_kwarg is None:
-            new_kwonly[-1] = new_kwonly[-1].with_changes(
-                comma=cst.MaybeSentinel.DEFAULT
-            )
-        elif new_kwonly and new_star_kwarg is not None:
-            if new_kwonly[-1].comma == cst.MaybeSentinel.DEFAULT:
-                new_kwonly[-1] = new_kwonly[-1].with_changes(
-                    comma=cst.Comma(whitespace_after=cst.SimpleWhitespace(" "))
-                )
+        # Use utility functions for comma handling
+        has_star_arg = isinstance(new_star_arg, cst.ParamStar) or isinstance(new_star_arg, cst.Param)
+        new_params = fix_param_commas(
+            new_params,
+            has_kwonly=bool(new_kwonly),
+            has_star_kwarg=new_star_kwarg is not None,
+            has_star_arg=has_star_arg,
+        )
+        new_kwonly = fix_kwonly_commas(new_kwonly, has_star_kwarg=new_star_kwarg is not None)
 
         new_parameters = params.with_changes(
             params=new_params,

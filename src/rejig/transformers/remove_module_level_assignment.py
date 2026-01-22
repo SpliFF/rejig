@@ -5,7 +5,27 @@ import libcst as cst
 
 
 class RemoveModuleLevelAssignment(cst.CSTTransformer):
-    """Remove a module-level assignment by variable name."""
+    """Remove a module-level assignment by variable name.
+
+    Removes simple assignments at module level (not inside classes or functions).
+    Handles standard assignments like `VAR = value`.
+
+    Parameters
+    ----------
+    var_name : str
+        Name of the variable to remove.
+
+    Attributes
+    ----------
+    removed : bool
+        True if the assignment was found and removed.
+
+    Examples
+    --------
+    >>> # Remove deprecated module constant
+    >>> transformer = RemoveModuleLevelAssignment("DEPRECATED_SETTING")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, var_name: str):
         super().__init__()

@@ -240,7 +240,10 @@ class ScriptsTarget(TomlTarget):
         if entry_point is None:
             return self._operation_failed("rename", f"Script {old_name} not found")
 
-        self.remove(old_name)
+        remove_result = self.remove(old_name)
+        if not remove_result.success:
+            return remove_result
+
         return self.add(new_name, entry_point)
 
     def clear(self) -> Result:

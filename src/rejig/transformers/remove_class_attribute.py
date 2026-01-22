@@ -5,7 +5,28 @@ import libcst as cst
 
 
 class RemoveClassAttribute(cst.CSTTransformer):
-    """Remove a class-level attribute."""
+    """Remove a class-level attribute.
+
+    Removes both annotated assignments (attr: Type = value) and simple
+    assignments (attr = value) from the specified class.
+
+    Parameters
+    ----------
+    class_name : str
+        Name of the class containing the attribute.
+    attr_name : str
+        Name of the attribute to remove.
+
+    Attributes
+    ----------
+    removed : bool
+        True if the attribute was found and removed.
+
+    Examples
+    --------
+    >>> transformer = RemoveClassAttribute("User", "deprecated_field")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, class_name: str, attr_name: str):
         super().__init__()

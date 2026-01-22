@@ -5,7 +5,35 @@ import libcst as cst
 
 
 class RemoveDecorator(cst.CSTTransformer):
-    """Remove a decorator from a class or function."""
+    """Remove a decorator from a class or function.
+
+    Removes a specific decorator from either a class or a module-level function.
+    For removing decorators from methods within a class, use RemoveMethodDecorator.
+
+    Parameters
+    ----------
+    name : str
+        Name of the class or function to modify.
+    decorator : str
+        Name of the decorator to remove (without the @ symbol).
+    target_type : str
+        Type of target: "class" or "function". Defaults to "class".
+
+    Attributes
+    ----------
+    removed : bool
+        True if the decorator was found and removed.
+
+    Examples
+    --------
+    >>> # Remove @dataclass from a class
+    >>> transformer = RemoveDecorator("User", "dataclass", "class")
+    >>> new_tree = tree.visit(transformer)
+
+    >>> # Remove @cache from a function
+    >>> transformer = RemoveDecorator("get_data", "cache", "function")
+    >>> new_tree = tree.visit(transformer)
+    """
 
     def __init__(self, name: str, decorator: str, target_type: str = "class"):
         super().__init__()
