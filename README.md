@@ -1,12 +1,24 @@
 # Rejig
 
-A comprehensive Python library for programmatic code refactoring, analysis, and transformation using LibCST.
+A comprehensive Python library for programmatic code refactoring, analysis, and transformation. The goal of this library is to help you automate common editing, refactoring and optimisations within a python codebase. Rejig is not an AI/LLM, it is an API for making targeted changes to code.
+
+## Use-cases
+
+I built this library primarily to automate codebase changes that were too complex for basic tools like sed or patch - however it has been fleshed out to perform a wide variety of tasks I consider useful for python code development. I wanted the power of a library like libCST without the complexity. While it doesn't always make sense to automate changes, sometimes it does - this library is for those times.
+
+Where this library really shines is when you want to automate changes to a codebase but you don't know what other changes have been made. This may be the case where you have multiple projects based on the same/similar template but diverged enough that you can't just use git or patch to ship a set of changes. That was exactly the scenario that led me to write this - dealing with 20+ repos based on the same original code but with no common git history. Git didn't want to know about it because it needs a common parent commit and regular patch would fail due to line number or whitespace changes. One of the things Rejig does well is let you accurately target the thing you want to change even when you don't know exactly where it is.
+
+Here are some other usage suggestions:
+
+- **As an IDE or AI Backend** — This framework supports a lot of features you get in an IDE like PyCharm, except it's headless. You could wrap this in a UI or build an MCP server.
+- **Improve Code** — Use it to find and modernize legacy programming patterns in a older codebase. Find errors and dead code. Add documentation, directives and type hints. Break up long files.
+- **Migrate Frameworks** — ie, Move your Flask project to Django. Switch from Poetry to UV, etc
+- **As an LLM alternative** - You want to automate some things with CoPilot/Claude but perhaps you're not allowed due to contract restrictions. This library provides a compromise between AI automation and tedious manual edits. It also means you get deterministic output instead of whatever an LLM thinks is right at the time.
 
 ## Features
 
 - **Fluent Target API** — Chain operations naturally: `rj.file("app.py").find_class("User").find_method("save")`
 - **Batch Operations** — Apply changes to multiple targets at once with `TargetList`
-- **Safe by Default** — Operations return `Result` objects instead of raising exceptions
 - **Atomic Transactions** — Collect changes and apply them atomically with rollback support
 - **Dry-run Mode** — Preview all changes before applying them
 - **Code Analysis** — Detect complexity issues, dead code, and patterns
@@ -18,6 +30,7 @@ A comprehensive Python library for programmatic code refactoring, analysis, and 
 - **Config File Support** — Manipulate TOML, YAML, JSON, and INI files
 - **Project Management** — Manage pyproject.toml, dependencies, and tool configs
 - **Framework Support** — Django, Flask, FastAPI, and SQLAlchemy integrations
+- **Patch to Script** - Convert a patch file into a python script and vice-versa.
 
 ## Installation
 
@@ -549,3 +562,7 @@ Full documentation: [docs/](docs/)
 ## License
 
 MIT
+
+## Contributing
+
+A significant portion of this library was generated using Claude Code. That doesn't mean humans aren't welcome to contribute. Contact the author via Github Repository (https://github.com/SpliFF/rejig) or email (spliff@warriorhut.org) if you have feature requests or contributions you think should be included.

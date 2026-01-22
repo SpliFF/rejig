@@ -23,6 +23,9 @@ toml.delete_key("tool.deprecated-tool")
 
 # Get entire sections
 black_config = toml.get_section("tool.black")
+
+# Replace entire file content (validates TOML syntax)
+toml.rewrite(new_content)
 ```
 
 ### Common pyproject.toml Operations
@@ -112,6 +115,9 @@ ini.delete_key("options", "deprecated_option")
 # Add sections
 ini.add_section("tool:pytest")
 ini.set("tool:pytest", "testpaths", "tests")
+
+# Get entire file as nested dict
+data = ini.get_data()
 ```
 
 ## Text Files

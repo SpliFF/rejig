@@ -336,6 +336,7 @@ for s in strings:
 
 # Operations
 s.rewrite("new content")          # Replace content (keeps quotes)
+s.rewrite(new_content="...")      # Alias for API consistency
 s.convert_to_fstring()            # Convert .format() to f-string
 s.convert_to_raw()                # Add r prefix
 s.convert_to_multiline()          # Convert to triple-quoted
@@ -364,6 +365,7 @@ toml.get("missing.key", default=None)
 toml.set("project.version", "2.0.0")
 toml.delete_key("tool.old-tool")
 toml.get_section("tool.black")
+toml.rewrite(new_content)     # Replace entire file content (validates TOML)
 ```
 
 ### YamlTarget
@@ -404,6 +406,7 @@ ini.get("metadata", "name")
 ini.set("metadata", "version", "2.0.0")
 ini.delete_key("options", "old_option")
 ini.add_section("tool:pytest")
+ini.get_data()                # Get entire file as nested dict
 ```
 
 ### TextFileTarget
