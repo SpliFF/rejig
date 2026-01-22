@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING, Generator
 
 import libcst as cst
 
-from rejig.core.results import Result
+from rejig.core.results import BatchResult, Result
 
 if TYPE_CHECKING:
     from rejig.core.transaction import Transaction
     from rejig.packaging.models import PackageConfig
+    from rejig.patching.targets import PatchTarget
     from rejig.project.targets import PyprojectTarget
     from rejig.targets import (
         ClassTarget,
@@ -526,6 +527,112 @@ class Rejig:
 
         resolved = self._resolve_path(path)
         return IniTarget(self, resolved)
+
+    # =========================================================================
+    # Patching Methods
+    # =========================================================================
+
+    def patch(self, patch_text: str) -> PatchTarget:
+        """
+        Create a PatchTarget from a diff string.
+
+        Parse a unified diff or git diff string into a PatchTarget
+        that can be applied, reversed, or converted to rejig code.
+
+        Parameters
+        ----------
+        patch_text : str
+            Unified diff or git diff text.
+
+        Returns
+        -------
+        PatchTarget
+            A target for performing operations on the patch.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> patch = rj.patch(diff_text)
+        >>> print(patch.file_count)
+        >>> result = patch.apply()
+        >>>
+        >>> # Reverse a patch
+        >>> undo = patch.reverse()
+        >>> undo.apply()
+        """
+        from rejig.patching import PatchParser, PatchTarget
+
+        parser = PatchParser()
+        parsed_patch = parser.parse(patch_text)
+        return PatchTarget(self, parsed_patch)
+
+    def patch_from_file(self, path: str | Path) -> PatchTarget:
+        """
+        Load a patch from a file.
+
+        Parameters
+        ----------
+        path : str | Path
+            Path to the patch file (relative to root or absolute).
+
+        Returns
+        -------
+        PatchTarget
+            A target for performing operations on the patch.
+            Returns empty PatchTarget if file doesn't exist.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> patch = rj.patch_from_file("changes.patch")
+        >>> print(f"Files: {patch.file_count}, +{patch.total_additions}/-{patch.total_deletions}")
+        >>> result = patch.apply()
+        """
+        from rejig.patching import Patch, PatchParser, PatchTarget
+
+        resolved = self._resolve_path(path)
+        parser = PatchParser()
+        parsed_patch = parser.parse_file(resolved)
+        if parsed_patch is None:
+            parsed_patch = Patch()
+        return PatchTarget(self, parsed_patch)
+
+    def generate_patch(self, result: Result | BatchResult) -> PatchTarget:
+        """
+        Generate a patch from rejig operation results.
+
+        Creates a PatchTarget from the diffs contained in a Result
+        or BatchResult from rejig operations.
+
+        Parameters
+        ----------
+        result : Result | BatchResult
+            A Result or BatchResult from rejig operations.
+
+        Returns
+        -------
+        PatchTarget
+            A target for the generated patch.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/", dry_run=True)
+        >>> result = rj.find_class("Foo").rename("Bar")
+        >>> patch = rj.generate_patch(result)
+        >>> patch.save("rename.patch")
+        >>>
+        >>> # From batch result
+        >>> batch = rj.find_classes("^Test").add_decorator("@pytest.mark.slow")
+        >>> patch = rj.generate_patch(batch)
+        """
+        from rejig.patching import PatchGenerator, PatchTarget
+
+        generator = PatchGenerator()
+        if isinstance(result, BatchResult):
+            parsed_patch = generator.from_batch_result(result)
+        else:
+            parsed_patch = generator.from_result(result)
+        return PatchTarget(self, parsed_patch)
 
     # =========================================================================
     # Batch Find Methods (return TargetList)

@@ -240,6 +240,53 @@ DRYAnalyzer
 LoopOptimizer
     Find loops that can be replaced with comprehensions or builtins.
 
+Patching
+--------
+Patch
+    A complete patch containing changes to one or more files.
+
+FilePatch
+    All changes to a single file.
+
+Hunk
+    A contiguous block of changes in a file.
+
+Change
+    A single line addition, deletion, or context line.
+
+PatchFormat
+    Enum for patch formats (UNIFIED, GIT).
+
+ChangeType
+    Enum for change types (ADD, DELETE, CONTEXT).
+
+PatchTarget
+    Target for a complete patch (fluent API).
+
+PatchFileTarget
+    Target for a single file within a patch.
+
+PatchHunkTarget
+    Target for a single hunk within a file patch.
+
+PatchParser
+    Parser for unified diff and git diff formats.
+
+PatchGenerator
+    Generator for creating patches from rejig operations.
+
+PatchConverter
+    Converter for patches to rejig operations.
+
+PatchAnalyzer
+    Analyzer for detecting higher-level operations in patches.
+
+DetectedOperation
+    A detected operation from patch analysis.
+
+OperationType
+    Enum for types of operations detected in patches.
+
 Framework Extensions
 --------------------
 FlaskProject
@@ -328,6 +375,23 @@ from .optimize import (
     OptimizeTarget,
     OptimizeTargetList,
     OptimizeType,
+)
+from .patching import (
+    Change,
+    ChangeType,
+    DetectedOperation,
+    FilePatch,
+    Hunk,
+    OperationType,
+    Patch,
+    PatchAnalyzer,
+    PatchConverter,
+    PatchFileTarget,
+    PatchFormat,
+    PatchGenerator,
+    PatchHunkTarget,
+    PatchParser,
+    PatchTarget,
 )
 from .targets import (
     ClassTarget,
@@ -452,6 +516,22 @@ __all__ = [
     "OptimizeFinding",
     "DRYAnalyzer",
     "LoopOptimizer",
+    # Patching
+    "Patch",
+    "FilePatch",
+    "Hunk",
+    "Change",
+    "PatchFormat",
+    "ChangeType",
+    "PatchTarget",
+    "PatchFileTarget",
+    "PatchHunkTarget",
+    "PatchParser",
+    "PatchGenerator",
+    "PatchConverter",
+    "PatchAnalyzer",
+    "DetectedOperation",
+    "OperationType",
     # Framework Extensions
     "FlaskProject",
     "FastAPIProject",

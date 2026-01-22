@@ -1,9 +1,9 @@
 site_name: Rejig
 site_description: Programmatic Python refactoring with LibCST
-site_url: https://github.com/your-org/rejig
+site_url: https://github.com/SpliFF/rejig
 
-repo_name: your-org/rejig
-repo_url: https://github.com/your-org/rejig
+repo_name: SpliFF/rejig
+repo_url: https://github.com/SpliFF/rejig
 
 theme:
   name: material
@@ -57,16 +57,41 @@ nav:
     - Quickstart: getting-started/quickstart.md
     - Core Concepts: getting-started/concepts.md
   - Guides:
-    - Finding Code: guides/finding-code.md
-    - Modifying Code: guides/modifying-code.md
-    - Line Operations: guides/line-operations.md
-    - Batch Operations: guides/batch-operations.md
-    - Config Files: guides/config-files.md
+    - Finding & Modifying Code:
+      - Finding Code: guides/finding-code.md
+      - Modifying Code: guides/modifying-code.md
+      - Batch Operations: guides/batch-operations.md
+      - Line Operations: guides/line-operations.md
+    - Code Quality:
+      - Code Analysis: guides/code-analysis.md
+      - Security Analysis: guides/security-analysis.md
+      - Code Optimization: guides/code-optimization.md
+    - Code Transformation:
+      - Import Management: guides/imports.md
+      - Type Hints: guides/type-hints.md
+      - Docstrings: guides/docstrings.md
+      - Code Generation: guides/code-generation.md
+    - Configuration:
+      - Config Files: guides/config-files.md
+      - Project Management: guides/project-management.md
+      - Transactions: guides/transactions.md
+      - Patching: guides/patching.md
+    - Framework-Specific:
+      - Django: guides/frameworks/django.md
+      - Flask: guides/frameworks/flask.md
+      - FastAPI: guides/frameworks/fastapi.md
     - Error Handling: guides/error-handling.md
-  - API Reference:
-    - Rejig: reference/rejig.md
-    - Targets: reference/targets.md
-    - Results: reference/results.md
-  - Examples:
+  - Examples & Recipes:
     - Refactoring Patterns: examples/refactoring-patterns.md
     - Codemod Recipes: examples/codemod-recipes.md
+    - Optimization Recipes: examples/optimization-recipes.md
+    - Analysis Recipes: examples/analysis-recipes.md
+    - Security Recipes: examples/security-recipes.md
+  - API Reference:
+    - Rejig Class: reference/rejig.md
+    - Targets: reference/targets.md
+    - Results: reference/results.md
+    - Patching: reference/patching.md
+    - Analysis: reference/analysis.md
+    - Security: reference/security.md
+  - Sample Projects: sample-projects/README.md

@@ -11,6 +11,7 @@ Rejig provides a fluent API for finding and modifying Python code elements. Whet
 - **Fluent chaining** — `rj.file("app.py").find_class("User").find_method("save")`
 - **Batch operations** — Apply changes to multiple targets with `TargetList`
 - **Atomic transactions** — Collect changes and apply atomically with rollback
+- **Patch support** — Parse, generate, apply, and reverse unified/git diffs
 - **Safe by default** — Operations return `Result` objects, never raise exceptions
 - **Dry-run mode** — Preview all changes before applying
 
@@ -118,6 +119,7 @@ pip install rejig[all]
 - [Config Files](guides/config-files.md) — TOML, YAML, JSON, INI manipulation
 - [Project Management](guides/project-management.md) — pyproject.toml and dependencies
 - [Transactions](guides/transactions.md) — Atomic operations with rollback
+- [Patching](guides/patching.md) — Parse, generate, apply, and reverse patches
 
 #### Framework-Specific
 - [Django](guides/frameworks/django.md) — Django project operations
@@ -138,6 +140,7 @@ pip install rejig[all]
 - [Rejig Class](reference/rejig.md) — Main entry point
 - [Targets](reference/targets.md) — All target classes
 - [Results](reference/results.md) — Result classes
+- [Patching](reference/patching.md) — Patch parsing, generation, and targets
 - [Analysis](reference/analysis.md) — Analysis types and findings
 - [Security](reference/security.md) — Security types and findings
 - [Transformers](reference/transformers.md) — LibCST transformers
