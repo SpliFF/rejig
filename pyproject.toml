@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "rejig"
 version = "0.1.0"
-description = "A Python library for programmatic code refactoring using LibCST"
+description = "A Python library for programmatic code refactoring and transformation."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Alliance Software" },
+    { name = "Shannon Baker" },
 ]
 keywords = ["refactoring", "cst", "libcst", "code-transformation", "ast"]
 classifiers = [
@@ -47,9 +47,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/alliancesoftware/rejig"
-Documentation = "https://github.com/alliancesoftware/rejig#readme"
-Repository = "https://github.com/alliancesoftware/rejig"
+Homepage = "https://github.com/SpliFF/rejig"
+Documentation = "https://spliff.github.io/rejig/"
+Repository = "https://github.com/SpliFF/rejig"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rejig"]
