@@ -1,0 +1,4064 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Programmatic Python refactoring with LibCST">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/SpliFF/rejig/reference/patching/">
+      
+      
+        <link rel="prev" href="../results/">
+      
+      
+        <link rel="next" href="../analysis/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Patching - Rejig</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#patching-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Rejig" class="md-header__button md-logo" aria-label="Rejig" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Rejig
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Patching
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/SpliFF/rejig" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SpliFF/rejig
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Rejig" class="md-nav__button md-logo" aria-label="Rejig" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Rejig
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/SpliFF/rejig" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    SpliFF/rejig
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Modifying Code
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Finding & Modifying Code
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/finding-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/modifying-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modifying Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/batch-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/line-operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Line Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Quality
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Code Quality
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/code-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/security-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/code-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Transformation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Code Transformation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/imports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Import Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/type-hints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Hints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/docstrings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docstrings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/code-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/config-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/project-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/transactions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/patching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Framework-Specific
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Framework-Specific
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/frameworks/django/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Django
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/frameworks/flask/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flask
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/frameworks/fastapi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples & Recipes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples & Recipes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/refactoring-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refactoring Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/codemod-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codemod Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/optimization-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/analysis-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/security-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rejig/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rejig Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../targets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Targets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patching
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Patching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filepatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FilePatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hunk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hunk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchformat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchFormat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChangeType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operationtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OperationType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#target-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target Classes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Target Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchtarget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchTarget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchfiletarget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchFileTarget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchhunktarget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchHunkTarget
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parser
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchparser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convenience-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convenience Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convenience-functions_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convenience Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Converter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Converter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchconverter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchConverter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convenience-functions_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convenience Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analyzer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analyzer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Analyzer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchanalyzer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchAnalyzer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detectedoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DetectedOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rejig-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rejig Methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rejig Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        patch()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch_from_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        patch_from_file()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate_patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_patch()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sample-projects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Projects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filepatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FilePatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hunk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hunk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchformat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchFormat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChangeType
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operationtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OperationType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#target-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target Classes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Target Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchtarget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchTarget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchfiletarget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchFileTarget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patchhunktarget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchHunkTarget
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parser
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchparser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convenience-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convenience Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchgenerator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchGenerator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convenience-functions_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convenience Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Converter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Converter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchconverter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchConverter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convenience-functions_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convenience Functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analyzer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analyzer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Analyzer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patchanalyzer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PatchAnalyzer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detectedoperation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DetectedOperation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rejig-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rejig Methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rejig Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        patch()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch_from_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        patch_from_file()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate_patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_patch()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="patching-reference">Patching Reference<a class="headerlink" href="#patching-reference" title="Permanent link">&para;</a></h1>
+<p>Complete API reference for the patching module.</p>
+<h2 id="data-models">Data Models<a class="headerlink" href="#data-models" title="Permanent link">&para;</a></h2>
+<h3 id="patch">Patch<a class="headerlink" href="#patch" title="Permanent link">&para;</a></h3>
+<p>A complete patch containing changes to one or more files.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">Patch</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">Patch</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="n">PatchFormat</span><span class="o">.</span><span class="n">UNIFIED</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>files</code></td>
+<td><code>list[FilePatch]</code></td>
+<td>List of file patches</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>PatchFormat</code></td>
+<td>Patch format (UNIFIED or GIT)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file_count</code></td>
+<td><code>int</code></td>
+<td>Number of files in the patch</td>
+</tr>
+<tr>
+<td><code>total_additions</code></td>
+<td><code>int</code></td>
+<td>Total added lines across all files</td>
+</tr>
+<tr>
+<td><code>total_deletions</code></td>
+<td><code>int</code></td>
+<td>Total deleted lines across all files</td>
+</tr>
+<tr>
+<td><code>paths</code></td>
+<td><code>list[Path]</code></td>
+<td>All file paths affected</td>
+</tr>
+<tr>
+<td><code>new_files</code></td>
+<td><code>list[FilePatch]</code></td>
+<td>Files being created</td>
+</tr>
+<tr>
+<td><code>deleted_files</code></td>
+<td><code>list[FilePatch]</code></td>
+<td>Files being deleted</td>
+</tr>
+<tr>
+<td><code>renamed_files</code></td>
+<td><code>list[FilePatch]</code></td>
+<td>Files being renamed</td>
+</tr>
+<tr>
+<td><code>modified_files</code></td>
+<td><code>list[FilePatch]</code></td>
+<td>Files with content changes only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_file(path)</code></td>
+<td><code>FilePatch \| None</code></td>
+<td>Get file patch by path</td>
+</tr>
+<tr>
+<td><code>reverse()</code></td>
+<td><code>Patch</code></td>
+<td>Create reversed patch (undo)</td>
+</tr>
+<tr>
+<td><code>to_unified_diff()</code></td>
+<td><code>str</code></td>
+<td>Convert to unified diff string</td>
+</tr>
+<tr>
+<td><code>summary()</code></td>
+<td><code>str</code></td>
+<td>Human-readable summary</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="filepatch">FilePatch<a class="headerlink" href="#filepatch" title="Permanent link">&para;</a></h3>
+<p>All changes to a single file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">FilePatch</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">fp</span> <span class="o">=</span> <span class="n">FilePatch</span><span class="p">(</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">old_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;old.py&quot;</span><span class="p">),</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">new_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;new.py&quot;</span><span class="p">),</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">hunks</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">is_renamed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>old_path</code></td>
+<td><code>Path \| None</code></td>
+<td>Path in original version</td>
+</tr>
+<tr>
+<td><code>new_path</code></td>
+<td><code>Path \| None</code></td>
+<td>Path in new version</td>
+</tr>
+<tr>
+<td><code>hunks</code></td>
+<td><code>list[Hunk]</code></td>
+<td>List of change hunks</td>
+</tr>
+<tr>
+<td><code>is_new</code></td>
+<td><code>bool</code></td>
+<td>Whether file is new</td>
+</tr>
+<tr>
+<td><code>is_deleted</code></td>
+<td><code>bool</code></td>
+<td>Whether file is deleted</td>
+</tr>
+<tr>
+<td><code>is_renamed</code></td>
+<td><code>bool</code></td>
+<td>Whether file is renamed</td>
+</tr>
+<tr>
+<td><code>is_binary</code></td>
+<td><code>bool</code></td>
+<td>Whether file is binary</td>
+</tr>
+<tr>
+<td><code>old_mode</code></td>
+<td><code>str \| None</code></td>
+<td>Original file mode</td>
+</tr>
+<tr>
+<td><code>new_mode</code></td>
+<td><code>str \| None</code></td>
+<td>New file mode</td>
+</tr>
+<tr>
+<td><code>similarity_index</code></td>
+<td><code>int \| None</code></td>
+<td>Similarity % for renames</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td><code>Path \| None</code></td>
+<td>Primary path (new_path or old_path)</td>
+</tr>
+<tr>
+<td><code>additions_count</code></td>
+<td><code>int</code></td>
+<td>Total added lines</td>
+</tr>
+<tr>
+<td><code>deletions_count</code></td>
+<td><code>int</code></td>
+<td>Total deleted lines</td>
+</tr>
+<tr>
+<td><code>has_changes</code></td>
+<td><code>bool</code></td>
+<td>Whether file has any changes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_header_lines()</code></td>
+<td><code>list[str]</code></td>
+<td>Generate diff header lines</td>
+</tr>
+<tr>
+<td><code>to_unified_diff()</code></td>
+<td><code>str</code></td>
+<td>Convert to unified diff</td>
+</tr>
+<tr>
+<td><code>reverse()</code></td>
+<td><code>FilePatch</code></td>
+<td>Create reversed file patch</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="hunk">Hunk<a class="headerlink" href="#hunk" title="Permanent link">&para;</a></h3>
+<p>A contiguous block of changes in a file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hunk</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">hunk</span> <span class="o">=</span> <span class="n">Hunk</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">old_start</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">old_count</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">new_start</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">new_count</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">changes</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">function_context</span><span class="o">=</span><span class="s2">&quot;def my_func():&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>old_start</code></td>
+<td><code>int</code></td>
+<td>Starting line in original file</td>
+</tr>
+<tr>
+<td><code>old_count</code></td>
+<td><code>int</code></td>
+<td>Line count in original file</td>
+</tr>
+<tr>
+<td><code>new_start</code></td>
+<td><code>int</code></td>
+<td>Starting line in new file</td>
+</tr>
+<tr>
+<td><code>new_count</code></td>
+<td><code>int</code></td>
+<td>Line count in new file</td>
+</tr>
+<tr>
+<td><code>changes</code></td>
+<td><code>list[Change]</code></td>
+<td>List of changes</td>
+</tr>
+<tr>
+<td><code>function_context</code></td>
+<td><code>str \| None</code></td>
+<td>Function context from @@ line</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>additions</code></td>
+<td><code>list[Change]</code></td>
+<td>Added lines only</td>
+</tr>
+<tr>
+<td><code>deletions</code></td>
+<td><code>list[Change]</code></td>
+<td>Deleted lines only</td>
+</tr>
+<tr>
+<td><code>additions_count</code></td>
+<td><code>int</code></td>
+<td>Count of added lines</td>
+</tr>
+<tr>
+<td><code>deletions_count</code></td>
+<td><code>int</code></td>
+<td>Count of deleted lines</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_header()</code></td>
+<td><code>str</code></td>
+<td>Generate @@ header line</td>
+</tr>
+<tr>
+<td><code>to_diff_lines()</code></td>
+<td><code>list[str]</code></td>
+<td>Get diff lines including header</td>
+</tr>
+<tr>
+<td><code>reverse()</code></td>
+<td><code>Hunk</code></td>
+<td>Create reversed hunk</td>
+</tr>
+<tr>
+<td><code>get_old_content()</code></td>
+<td><code>str</code></td>
+<td>Original content (deletions + context)</td>
+</tr>
+<tr>
+<td><code>get_new_content()</code></td>
+<td><code>str</code></td>
+<td>New content (additions + context)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="change">Change<a class="headerlink" href="#change" title="Permanent link">&para;</a></h3>
+<p>A single line change in a hunk.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">Change</span><span class="p">,</span> <span class="n">ChangeType</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">change</span> <span class="o">=</span> <span class="n">Change</span><span class="p">(</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="nb">type</span><span class="o">=</span><span class="n">ChangeType</span><span class="o">.</span><span class="n">ADD</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">content</span><span class="o">=</span><span class="s2">&quot;new line&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">old_line</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">new_line</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>ChangeType</code></td>
+<td>Type of change</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td><code>str</code></td>
+<td>Line content (without +/- prefix)</td>
+</tr>
+<tr>
+<td><code>old_line</code></td>
+<td><code>int \| None</code></td>
+<td>Line number in original file</td>
+</tr>
+<tr>
+<td><code>new_line</code></td>
+<td><code>int \| None</code></td>
+<td>Line number in new file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>is_addition</code></td>
+<td><code>bool</code></td>
+<td>True if added line</td>
+</tr>
+<tr>
+<td><code>is_deletion</code></td>
+<td><code>bool</code></td>
+<td>True if deleted line</td>
+</tr>
+<tr>
+<td><code>is_context</code></td>
+<td><code>bool</code></td>
+<td>True if context line</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_diff_line()</code></td>
+<td><code>str</code></td>
+<td>Convert to diff line with prefix</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">&para;</a></h3>
+<h4 id="patchformat">PatchFormat<a class="headerlink" href="#patchformat" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">PatchFormat</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">PatchFormat</span><span class="o">.</span><span class="n">UNIFIED</span>  <span class="c1"># Standard unified diff</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">PatchFormat</span><span class="o">.</span><span class="n">GIT</span>      <span class="c1"># Git extended format</span>
+</code></pre></div>
+<h4 id="changetype">ChangeType<a class="headerlink" href="#changetype" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChangeType</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">ChangeType</span><span class="o">.</span><span class="n">ADD</span>      <span class="c1"># Added line (+)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">ChangeType</span><span class="o">.</span><span class="n">DELETE</span>   <span class="c1"># Deleted line (-)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">ChangeType</span><span class="o">.</span><span class="n">CONTEXT</span>  <span class="c1"># Context line ( )</span>
+</code></pre></div>
+<h4 id="operationtype">OperationType<a class="headerlink" href="#operationtype" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">OperationType</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Class operations</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">CLASS_ADD</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">CLASS_DELETE</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">CLASS_RENAME</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># Function operations</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">FUNCTION_ADD</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">FUNCTION_DELETE</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">FUNCTION_RENAME</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="c1"># Method operations</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">METHOD_ADD</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">METHOD_DELETE</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">METHOD_RENAME</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="c1"># Decorator operations</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">DECORATOR_ADD</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">DECORATOR_REMOVE</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="c1"># Import operations</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">IMPORT_ADD</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">IMPORT_REMOVE</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="c1"># Line operations</span>
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">LINE_REWRITE</span>
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">LINE_INSERT</span>
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">LINE_DELETE</span>
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>
+<a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a><span class="c1"># File operations</span>
+<a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">FILE_CREATE</span>
+<a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">FILE_DELETE</span>
+<a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a><span class="n">OperationType</span><span class="o">.</span><span class="n">FILE_RENAME</span>
+</code></pre></div>
+<hr />
+<h2 id="target-classes">Target Classes<a class="headerlink" href="#target-classes" title="Permanent link">&para;</a></h2>
+<h3 id="patchtarget">PatchTarget<a class="headerlink" href="#patchtarget" title="Permanent link">&para;</a></h3>
+<p>Target for a complete patch. Provides fluent API for patch operations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rejig</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">rj</span> <span class="o">=</span> <span class="n">Rejig</span><span class="p">(</span><span class="s2">&quot;src/&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">rj</span><span class="o">.</span><span class="n">patch_from_file</span><span class="p">(</span><span class="s2">&quot;changes.patch&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>patch</code></td>
+<td><code>Patch</code></td>
+<td>Underlying Patch object</td>
+</tr>
+<tr>
+<td><code>file_count</code></td>
+<td><code>int</code></td>
+<td>Number of files</td>
+</tr>
+<tr>
+<td><code>total_additions</code></td>
+<td><code>int</code></td>
+<td>Total added lines</td>
+</tr>
+<tr>
+<td><code>total_deletions</code></td>
+<td><code>int</code></td>
+<td>Total deleted lines</td>
+</tr>
+<tr>
+<td><code>paths</code></td>
+<td><code>list[Path]</code></td>
+<td>All affected paths</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exists()</code></td>
+<td><code>bool</code></td>
+<td>True if patch has files</td>
+</tr>
+<tr>
+<td><code>files()</code></td>
+<td><code>TargetList[PatchFileTarget]</code></td>
+<td>Get all file targets</td>
+</tr>
+<tr>
+<td><code>file(path)</code></td>
+<td><code>PatchFileTarget \| None</code></td>
+<td>Get specific file target</td>
+</tr>
+<tr>
+<td><code>apply()</code></td>
+<td><code>Result</code></td>
+<td>Apply the patch</td>
+</tr>
+<tr>
+<td><code>reverse()</code></td>
+<td><code>PatchTarget</code></td>
+<td>Create reversed patch target</td>
+</tr>
+<tr>
+<td><code>to_rejig_code(var, smart)</code></td>
+<td><code>str</code></td>
+<td>Convert to rejig code</td>
+</tr>
+<tr>
+<td><code>to_script(**kwargs)</code></td>
+<td><code>str</code></td>
+<td>Generate complete Python script</td>
+</tr>
+<tr>
+<td><code>save_script(path, **kwargs)</code></td>
+<td><code>Result</code></td>
+<td>Save Python script to file</td>
+</tr>
+<tr>
+<td><code>to_unified_diff()</code></td>
+<td><code>str</code></td>
+<td>Get as unified diff string</td>
+</tr>
+<tr>
+<td><code>save(path, overwrite)</code></td>
+<td><code>Result</code></td>
+<td>Save to file</td>
+</tr>
+<tr>
+<td><code>analyze()</code></td>
+<td><code>list[DetectedOperation]</code></td>
+<td>Detect operations</td>
+</tr>
+<tr>
+<td><code>summary()</code></td>
+<td><code>str</code></td>
+<td>Human-readable summary</td>
+</tr>
+<tr>
+<td><code>get_content()</code></td>
+<td><code>Result</code></td>
+<td>Get diff in result.data</td>
+</tr>
+</tbody>
+</table>
+<p><strong>to_script() Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>variable_name</code></td>
+<td><code>str</code></td>
+<td><code>"rj"</code></td>
+<td>Variable name for Rejig instance</td>
+</tr>
+<tr>
+<td><code>root_path</code></td>
+<td><code>str</code></td>
+<td><code>"."</code></td>
+<td>Root path for Rejig instance</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Script docstring description</td>
+</tr>
+<tr>
+<td><code>dry_run</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Generate dry-run mode script</td>
+</tr>
+<tr>
+<td><code>smart_mode</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Use smart operation detection</td>
+</tr>
+<tr>
+<td><code>include_error_handling</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Include result checking code</td>
+</tr>
+<tr>
+<td><code>include_summary</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Include patch summary comments</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="patchfiletarget">PatchFileTarget<a class="headerlink" href="#patchfiletarget" title="Permanent link">&para;</a></h3>
+<p>Target for a single file within a patch.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">file_target</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">file</span><span class="p">(</span><span class="s2">&quot;src/models.py&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file_patch</code></td>
+<td><code>FilePatch</code></td>
+<td>Underlying FilePatch</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td><code>Path \| None</code></td>
+<td>Primary path</td>
+</tr>
+<tr>
+<td><code>old_path</code></td>
+<td><code>Path \| None</code></td>
+<td>Original path</td>
+</tr>
+<tr>
+<td><code>new_path</code></td>
+<td><code>Path \| None</code></td>
+<td>New path</td>
+</tr>
+<tr>
+<td><code>is_new</code></td>
+<td><code>bool</code></td>
+<td>Whether new file</td>
+</tr>
+<tr>
+<td><code>is_deleted</code></td>
+<td><code>bool</code></td>
+<td>Whether deleted</td>
+</tr>
+<tr>
+<td><code>is_renamed</code></td>
+<td><code>bool</code></td>
+<td>Whether renamed</td>
+</tr>
+<tr>
+<td><code>additions_count</code></td>
+<td><code>int</code></td>
+<td>Added lines</td>
+</tr>
+<tr>
+<td><code>deletions_count</code></td>
+<td><code>int</code></td>
+<td>Deleted lines</td>
+</tr>
+<tr>
+<td><code>hunk_count</code></td>
+<td><code>int</code></td>
+<td>Number of hunks</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exists()</code></td>
+<td><code>bool</code></td>
+<td>True if has changes</td>
+</tr>
+<tr>
+<td><code>hunks()</code></td>
+<td><code>TargetList[PatchHunkTarget]</code></td>
+<td>Get all hunk targets</td>
+</tr>
+<tr>
+<td><code>hunk(index)</code></td>
+<td><code>PatchHunkTarget \| None</code></td>
+<td>Get hunk by index</td>
+</tr>
+<tr>
+<td><code>apply()</code></td>
+<td><code>Result</code></td>
+<td>Apply this file's changes</td>
+</tr>
+<tr>
+<td><code>reverse()</code></td>
+<td><code>PatchFileTarget</code></td>
+<td>Create reversed target</td>
+</tr>
+<tr>
+<td><code>to_unified_diff()</code></td>
+<td><code>str</code></td>
+<td>Get as unified diff</td>
+</tr>
+<tr>
+<td><code>get_content()</code></td>
+<td><code>Result</code></td>
+<td>Get diff in result.data</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="patchhunktarget">PatchHunkTarget<a class="headerlink" href="#patchhunktarget" title="Permanent link">&para;</a></h3>
+<p>Target for a single hunk within a file patch.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">hunk_target</span> <span class="o">=</span> <span class="n">file_target</span><span class="o">.</span><span class="n">hunk</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hunk</code></td>
+<td><code>Hunk</code></td>
+<td>Underlying Hunk</td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td>Index in parent file</td>
+</tr>
+<tr>
+<td><code>old_start</code></td>
+<td><code>int</code></td>
+<td>Start line in original</td>
+</tr>
+<tr>
+<td><code>old_count</code></td>
+<td><code>int</code></td>
+<td>Line count in original</td>
+</tr>
+<tr>
+<td><code>new_start</code></td>
+<td><code>int</code></td>
+<td>Start line in new</td>
+</tr>
+<tr>
+<td><code>new_count</code></td>
+<td><code>int</code></td>
+<td>Line count in new</td>
+</tr>
+<tr>
+<td><code>function_context</code></td>
+<td><code>str \| None</code></td>
+<td>Function context</td>
+</tr>
+<tr>
+<td><code>additions_count</code></td>
+<td><code>int</code></td>
+<td>Added lines</td>
+</tr>
+<tr>
+<td><code>deletions_count</code></td>
+<td><code>int</code></td>
+<td>Deleted lines</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exists()</code></td>
+<td><code>bool</code></td>
+<td>True if has changes</td>
+</tr>
+<tr>
+<td><code>apply()</code></td>
+<td><code>Result</code></td>
+<td>Apply this hunk</td>
+</tr>
+<tr>
+<td><code>reverse()</code></td>
+<td><code>PatchHunkTarget</code></td>
+<td>Create reversed target</td>
+</tr>
+<tr>
+<td><code>get_old_content()</code></td>
+<td><code>str</code></td>
+<td>Original content</td>
+</tr>
+<tr>
+<td><code>get_new_content()</code></td>
+<td><code>str</code></td>
+<td>New content</td>
+</tr>
+<tr>
+<td><code>to_header()</code></td>
+<td><code>str</code></td>
+<td>Get @@ header</td>
+</tr>
+<tr>
+<td><code>to_diff_lines()</code></td>
+<td><code>list[str]</code></td>
+<td>Get diff lines</td>
+</tr>
+<tr>
+<td><code>get_content()</code></td>
+<td><code>Result</code></td>
+<td>Get diff in result.data</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="parser">Parser<a class="headerlink" href="#parser" title="Permanent link">&para;</a></h2>
+<h3 id="patchparser">PatchParser<a class="headerlink" href="#patchparser" title="Permanent link">&para;</a></h3>
+<p>Parser for unified diff and git diff formats.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">PatchParser</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">parser</span> <span class="o">=</span> <span class="n">PatchParser</span><span class="p">()</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">diff_text</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parse(text)</code></td>
+<td><code>Patch</code></td>
+<td>Parse diff text</td>
+</tr>
+<tr>
+<td><code>parse_file(path)</code></td>
+<td><code>Patch \| None</code></td>
+<td>Parse from file</td>
+</tr>
+<tr>
+<td><code>parse_to_result(text)</code></td>
+<td><code>Result</code></td>
+<td>Parse with result wrapper</td>
+</tr>
+</tbody>
+</table>
+<h3 id="convenience-functions">Convenience Functions<a class="headerlink" href="#convenience-functions" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_patch</span><span class="p">,</span> <span class="n">parse_patch_file</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Parse from string</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">parse_patch</span><span class="p">(</span><span class="n">diff_text</span><span class="p">)</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="c1"># Parse from file</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">parse_patch_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;changes.patch&quot;</span><span class="p">))</span>
+</code></pre></div>
+<hr />
+<h2 id="generator">Generator<a class="headerlink" href="#generator" title="Permanent link">&para;</a></h2>
+<h3 id="patchgenerator">PatchGenerator<a class="headerlink" href="#patchgenerator" title="Permanent link">&para;</a></h3>
+<p>Generate patches from rejig operations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">PatchGenerator</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">gen</span> <span class="o">=</span> <span class="n">PatchGenerator</span><span class="p">()</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">from_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>from_result(result)</code></td>
+<td><code>Patch</code></td>
+<td>From single Result</td>
+</tr>
+<tr>
+<td><code>from_batch_result(batch)</code></td>
+<td><code>Patch</code></td>
+<td>From BatchResult</td>
+</tr>
+<tr>
+<td><code>from_transaction(tx)</code></td>
+<td><code>Patch</code></td>
+<td>From Transaction</td>
+</tr>
+<tr>
+<td><code>from_files(original, modified)</code></td>
+<td><code>Patch</code></td>
+<td>From file content dicts</td>
+</tr>
+<tr>
+<td><code>from_diff_string(text)</code></td>
+<td><code>Patch</code></td>
+<td>From raw diff text</td>
+</tr>
+<tr>
+<td><code>to_file(patch, path, overwrite)</code></td>
+<td><code>Result</code></td>
+<td>Save patch to file</td>
+</tr>
+</tbody>
+</table>
+<h3 id="convenience-functions_1">Convenience Functions<a class="headerlink" href="#convenience-functions_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_patch_from_result</span><span class="p">,</span> <span class="n">generate_patch_from_batch</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">generate_patch_from_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">generate_patch_from_batch</span><span class="p">(</span><span class="n">batch_result</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="converter">Converter<a class="headerlink" href="#converter" title="Permanent link">&para;</a></h2>
+<h3 id="patchconverter">PatchConverter<a class="headerlink" href="#patchconverter" title="Permanent link">&para;</a></h3>
+<p>Convert patches to rejig operations and code.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">PatchConverter</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">converter</span> <span class="o">=</span> <span class="n">PatchConverter</span><span class="p">(</span><span class="n">rejig</span><span class="p">,</span> <span class="n">smart_mode</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Constructor Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rejig</code></td>
+<td><code>Rejig</code></td>
+<td>required</td>
+<td>Rejig instance</td>
+</tr>
+<tr>
+<td><code>smart_mode</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Detect high-level operations</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>to_rejig_code(patch, var)</code></td>
+<td><code>str</code></td>
+<td>Convert to rejig code</td>
+</tr>
+<tr>
+<td><code>to_script(patch, **kwargs)</code></td>
+<td><code>str</code></td>
+<td>Generate complete Python script</td>
+</tr>
+<tr>
+<td><code>save_script(patch, path, **kwargs)</code></td>
+<td><code>Result</code></td>
+<td>Save script to file</td>
+</tr>
+<tr>
+<td><code>apply(patch)</code></td>
+<td><code>Result</code></td>
+<td>Apply patch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>to_script() Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>variable_name</code></td>
+<td><code>str</code></td>
+<td><code>"rj"</code></td>
+<td>Variable name for Rejig instance</td>
+</tr>
+<tr>
+<td><code>root_path</code></td>
+<td><code>str</code></td>
+<td><code>"."</code></td>
+<td>Root path for Rejig instance</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Script docstring description</td>
+</tr>
+<tr>
+<td><code>dry_run</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Generate dry-run mode script</td>
+</tr>
+<tr>
+<td><code>include_error_handling</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Include result checking code</td>
+</tr>
+<tr>
+<td><code>include_summary</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Include patch summary comments</td>
+</tr>
+</tbody>
+</table>
+<h3 id="convenience-functions_2">Convenience Functions<a class="headerlink" href="#convenience-functions_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="n">convert_patch_to_code</span><span class="p">,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="n">apply_patch</span><span class="p">,</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="n">generate_script_from_patch</span><span class="p">,</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="n">save_script_from_patch</span><span class="p">,</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="p">)</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="n">code</span> <span class="o">=</span> <span class="n">convert_patch_to_code</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">rejig</span><span class="p">,</span> <span class="n">smart_mode</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="n">result</span> <span class="o">=</span> <span class="n">apply_patch</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">rejig</span><span class="p">)</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="c1"># Script generation</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="n">script</span> <span class="o">=</span> <span class="n">generate_script_from_patch</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">rejig</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;My script&quot;</span><span class="p">)</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="n">result</span> <span class="o">=</span> <span class="n">save_script_from_patch</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">rejig</span><span class="p">,</span> <span class="s2">&quot;apply.py&quot;</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="analyzer">Analyzer<a class="headerlink" href="#analyzer" title="Permanent link">&para;</a></h2>
+<h3 id="patchanalyzer">PatchAnalyzer<a class="headerlink" href="#patchanalyzer" title="Permanent link">&para;</a></h3>
+<p>Analyze patches to detect high-level operations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">PatchAnalyzer</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">analyzer</span> <span class="o">=</span> <span class="n">PatchAnalyzer</span><span class="p">()</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="n">operations</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Methods:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>analyze(patch)</code></td>
+<td><code>list[DetectedOperation]</code></td>
+<td>Detect all operations</td>
+</tr>
+<tr>
+<td><code>analyze_file_patch(fp)</code></td>
+<td><code>list[DetectedOperation]</code></td>
+<td>Analyze single file</td>
+</tr>
+<tr>
+<td><code>analyze_hunk(hunk, path, idx)</code></td>
+<td><code>list[DetectedOperation]</code></td>
+<td>Analyze single hunk</td>
+</tr>
+<tr>
+<td><code>get_optimal_operations(patch)</code></td>
+<td><code>list[DetectedOperation]</code></td>
+<td>Get optimized operation set</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="detectedoperation">DetectedOperation<a class="headerlink" href="#detectedoperation" title="Permanent link">&para;</a></h3>
+<p>A detected operation from patch analysis.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rejig.patching</span><span class="w"> </span><span class="kn">import</span> <span class="n">DetectedOperation</span><span class="p">,</span> <span class="n">OperationType</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">op</span> <span class="o">=</span> <span class="n">DetectedOperation</span><span class="p">(</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="nb">type</span><span class="o">=</span><span class="n">OperationType</span><span class="o">.</span><span class="n">CLASS_RENAME</span><span class="p">,</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">file_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;models.py&quot;</span><span class="p">),</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">details</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;old_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Foo&quot;</span><span class="p">,</span> <span class="s2">&quot;new_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Bar&quot;</span><span class="p">},</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    <span class="n">confidence</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>OperationType</code></td>
+<td>Type of operation</td>
+</tr>
+<tr>
+<td><code>file_path</code></td>
+<td><code>Path</code></td>
+<td>Affected file</td>
+</tr>
+<tr>
+<td><code>details</code></td>
+<td><code>dict</code></td>
+<td>Operation-specific details</td>
+</tr>
+<tr>
+<td><code>hunk_index</code></td>
+<td><code>int \| None</code></td>
+<td>Hunk index (if applicable)</td>
+</tr>
+<tr>
+<td><code>confidence</code></td>
+<td><code>float</code></td>
+<td>Confidence score (0.0-1.0)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="rejig-methods">Rejig Methods<a class="headerlink" href="#rejig-methods" title="Permanent link">&para;</a></h2>
+<p>Methods added to the <code>Rejig</code> class for patching support.</p>
+<h3 id="patch_1">patch()<a class="headerlink" href="#patch_1" title="Permanent link">&para;</a></h3>
+<p>Create a PatchTarget from diff text.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">rj</span><span class="o">.</span><span class="n">patch</span><span class="p">(</span><span class="n">diff_text</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>patch_text</code></td>
+<td><code>str</code></td>
+<td>Unified or git diff text</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> <code>PatchTarget</code></p>
+<hr />
+<h3 id="patch_from_file">patch_from_file()<a class="headerlink" href="#patch_from_file" title="Permanent link">&para;</a></h3>
+<p>Load a patch from a file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">rj</span><span class="o">.</span><span class="n">patch_from_file</span><span class="p">(</span><span class="s2">&quot;changes.patch&quot;</span><span class="p">)</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">rj</span><span class="o">.</span><span class="n">patch_from_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;changes.patch&quot;</span><span class="p">))</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td><code>str \| Path</code></td>
+<td>Path to patch file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> <code>PatchTarget</code> (empty if file doesn't exist)</p>
+<hr />
+<h3 id="generate_patch">generate_patch()<a class="headerlink" href="#generate_patch" title="Permanent link">&para;</a></h3>
+<p>Generate a patch from operation results.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">rj</span><span class="o">.</span><span class="n">generate_patch</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">patch</span> <span class="o">=</span> <span class="n">rj</span><span class="o">.</span><span class="n">generate_patch</span><span class="p">(</span><span class="n">batch_result</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>result</code></td>
+<td><code>Result \| BatchResult</code></td>
+<td>Operation result(s)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> <code>PatchTarget</code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
