@@ -36,6 +36,8 @@ wheels/
 # Secrets
 .env*
 SECRET*
+# ...but never ignore the security package's source (SECRET* matches it case-insensitively on macOS)
+!src/rejig/security/secrets.py
 
 # IDEs
 .idea/

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-18
+
+### Fixed
+
+- **Packaging**: Include `rejig.security.secrets` in distributions. A `.gitignore`
+  `SECRET*` rule matched `src/rejig/security/secrets.py` (case-insensitively on
+  macOS), so the file was never committed and the 0.1.0 wheel/sdist shipped without
+  it, breaking `import rejig`. 0.1.0 is broken; use 0.1.1.
+
 ## [0.1.0] - 2026-01-22
 
 ### Added

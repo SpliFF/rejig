@@ -428,7 +428,7 @@ from .targets import (
     YamlTarget,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # Core essentials only. For all symbols, use: from rejig.all import *
 __all__ = [
