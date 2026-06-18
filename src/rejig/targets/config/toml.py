@@ -79,7 +79,7 @@ class TomlTarget(Target):
             with open(self.path, "rb") as f:
                 self._data = tomllib.load(f)
             return self._data
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError):
             return None
 
     def _save(self, data: dict[str, Any]) -> Result:

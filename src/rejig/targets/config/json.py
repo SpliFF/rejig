@@ -59,7 +59,7 @@ class JsonTarget(Target):
             content = self.path.read_text()
             self._data = json.loads(content)
             return self._data
-        except Exception:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return None
 
     def _save(self, data: dict[str, Any] | list[Any], indent: int = 2) -> Result:

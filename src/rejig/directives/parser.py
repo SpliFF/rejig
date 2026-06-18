@@ -301,7 +301,7 @@ class DirectiveParser:
                 directives = self.parse_line(line)
                 for directive in directives:
                     results.append((line_number, directive))
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             pass
 
         return results

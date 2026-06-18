@@ -288,6 +288,47 @@ class FileTarget(Target):
 
     # ===== Modification operations =====
 
+    def replace_pattern(
+        self,
+        pattern: str,
+        replacement: str,
+        count: int = 0,
+        flags: int = 0,
+    ) -> Result:
+        """Replace occurrences of a regex pattern in this file.
+
+        Operates on raw text — use the CST-based methods (``find_function``,
+        ``find_class``, etc.) when you need to respect Python structure.
+
+        Parameters
+        ----------
+        pattern : str
+            Regular expression pattern to replace.
+        replacement : str
+            Replacement string (may include backreferences like ``\\1``).
+        count : int
+            Maximum replacements (0 = unlimited).
+        flags : int
+            Regex flags.
+
+        Returns
+        -------
+        Result
+            Result of the operation. Success with "No matches found" message
+            when the pattern doesn't match anything.
+        """
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        new_content = re.sub(pattern, replacement, content, count=count, flags=flags)
+
+        if new_content == content:
+            return Result(success=True, message="No matches found", files_changed=[])
+
+        return self._write_content(new_content)
+
     def add_import(self, import_statement: str) -> Result:
         """Add an import statement to this file.
 

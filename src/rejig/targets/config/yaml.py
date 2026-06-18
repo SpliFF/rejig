@@ -70,7 +70,7 @@ class YamlTarget(Target):
             with open(self.path) as f:
                 self._data = yaml.safe_load(f)
             return self._data
-        except Exception:
+        except (OSError, yaml.YAMLError):
             return None
 
     def _save(self, data: dict[str, Any] | list[Any]) -> Result:

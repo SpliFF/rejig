@@ -16,11 +16,13 @@ Example
 """
 from __future__ import annotations
 
+from .cache import CSTCache
 from .rejig import Rejig
 from .results import BatchResult, ErrorResult, Result
 from .transaction import Transaction
 
 __all__ = [
+    "CSTCache",
     "Rejig",
     "Result",
     "ErrorResult",

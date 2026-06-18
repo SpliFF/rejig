@@ -28,6 +28,10 @@ from rejig.analysis.reporter import (
     AnalysisReport,
     AnalysisReporter,
 )
+from rejig.analysis.split_analysis import (
+    SplitAnalyzer,
+    SplitAnalysisResult,
+)
 from rejig.analysis.targets import (
     AnalysisTarget,
     AnalysisTargetList,
@@ -40,6 +44,7 @@ __all__ = [
     "PatternFinder",
     "CodeMetrics",
     "AnalysisReporter",
+    "SplitAnalyzer",
     # Results
     "ComplexityResult",
     "NestingResult",
@@ -48,6 +53,7 @@ __all__ = [
     "FileMetrics",
     "ModuleMetrics",
     "AnalysisReport",
+    "SplitAnalysisResult",
     # Targets
     "AnalysisTarget",
     "AnalysisTargetList",

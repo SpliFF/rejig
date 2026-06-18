@@ -44,11 +44,20 @@ class InsertAtMethodEnd(cst.CSTTransformer):
             self.in_target_class = False
         return updated_node
 
+    @staticmethod
+    def _is_return_statement(stmt: cst.BaseCompoundStatement | cst.BaseStatement) -> bool:
+        """Check if a statement is a return statement."""
+        if isinstance(stmt, cst.SimpleStatementLine):
+            return any(isinstance(s, cst.Return) for s in stmt.body)
+        return False
+
     def leave_FunctionDef(
         self,
         original_node: cst.FunctionDef,
         updated_node: cst.FunctionDef,
     ) -> cst.FunctionDef:
+        if self.inserted:
+            return updated_node
         if not self.in_target_class or updated_node.name.value != self.method_name:
             return updated_node
 
@@ -59,8 +68,11 @@ class InsertAtMethodEnd(cst.CSTTransformer):
         if isinstance(updated_node.body, cst.IndentedBlock):
             existing_body = list(updated_node.body.body)
 
-            # Append at the end
-            existing_body.append(new_stmt)
+            # Insert before final return statement if present, otherwise append
+            if existing_body and self._is_return_statement(existing_body[-1]):
+                existing_body.insert(len(existing_body) - 1, new_stmt)
+            else:
+                existing_body.append(new_stmt)
             self.inserted = True
 
             return updated_node.with_changes(

@@ -65,6 +65,8 @@ class InsertAtMethodStart(cst.CSTTransformer):
         original_node: cst.FunctionDef,
         updated_node: cst.FunctionDef,
     ) -> cst.FunctionDef:
+        if self.inserted:
+            return updated_node
         if not self.in_target_class or updated_node.name.value != self.method_name:
             return updated_node
 

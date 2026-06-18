@@ -50,7 +50,7 @@ class ExportsManager:
         try:
             content = file_path.read_text()
             return self._parse_all(content)
-        except Exception:
+        except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
             return []
 
     def generate_exports(
@@ -270,7 +270,7 @@ class ExportsManager:
         """Parse __all__ from file content."""
         try:
             tree = cst.parse_module(content)
-        except Exception:
+        except cst.ParserSyntaxError:
             return []
 
         for node in tree.body:

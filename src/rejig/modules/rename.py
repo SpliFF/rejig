@@ -193,7 +193,7 @@ class ModuleRenamer:
                     if re.search(pattern, content):
                         files.append(file_path)
                         break
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
 
         return files
@@ -207,13 +207,16 @@ class ModuleRenamer:
                 content = file_path.read_text()
                 original_content = content
 
-                # Update various import forms
-                content = self._update_import_statements(content, old_module, new_module)
+                # Update imports using CST transformer
+                tree = cst.parse_module(content)
+                transformer = ImportUpdater(old_module, new_module)
+                new_tree = tree.visit(transformer)
+                new_content = new_tree.code
 
-                if content != original_content:
-                    file_path.write_text(content)
+                if new_content != original_content:
+                    file_path.write_text(new_content)
                     files_changed.append(file_path)
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
 
         return {"files": files_changed}
@@ -265,6 +268,23 @@ class ImportUpdater(cst.CSTTransformer):
         self.new_module = new_module
         self.changed = False
 
+    def leave_Import(
+        self,
+        original_node: cst.Import,
+        updated_node: cst.Import,
+    ) -> cst.Import:
+        if not isinstance(updated_node.names, cst.ImportStar):
+            new_names = []
+            for alias in updated_node.names:
+                name = self._get_full_name(alias.name)
+                if name == self.old_module:
+                    self.changed = True
+                    new_names.append(alias.with_changes(name=self._build_module(self.new_module)))
+                else:
+                    new_names.append(alias)
+            return updated_node.with_changes(names=new_names)
+        return updated_node
+
     def leave_ImportFrom(
         self,
         original_node: cst.ImportFrom,
@@ -279,6 +299,27 @@ class ImportUpdater(cst.CSTTransformer):
             self.changed = True
             new_module_node = self._build_module(self.new_module)
             return updated_node.with_changes(module=new_module_node)
+
+        # Handle: from parent import name (where parent.name == old_module)
+        if "." in self.old_module and not isinstance(updated_node.names, cst.ImportStar):
+            parent, name = self.old_module.rsplit(".", 1)
+            if module_name == parent:
+                new_parent, new_name = self.new_module.rsplit(".", 1)
+                new_names = []
+                for alias in updated_node.names:
+                    alias_name = alias.name.value if isinstance(alias.name, cst.Name) else ""
+                    if alias_name == name:
+                        self.changed = True
+                        new_names.append(alias.with_changes(name=cst.Name(new_name)))
+                    else:
+                        new_names.append(alias)
+                if self.changed and new_parent != parent:
+                    return updated_node.with_changes(
+                        module=self._build_module(new_parent),
+                        names=new_names,
+                    )
+                elif self.changed:
+                    return updated_node.with_changes(names=new_names)
 
         return updated_node
 

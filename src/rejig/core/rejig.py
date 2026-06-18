@@ -31,7 +31,7 @@ if TYPE_CHECKING:
         TomlTarget,
         YamlTarget,
     )
-    from rejig.targets.base import TargetList
+    from rejig.targets.base import Target, TargetList
     from rejig.targets.python.todo import TodoTargetList
     from rejig.targets.text.text_block import TextBlock
 
@@ -91,6 +91,28 @@ class Rejig:
         self._rope_project: RopeProject | None = None
         self._root_path: Path | None = None
         self._transaction: Transaction | None = None
+        # CST parse cache - avoids re-parsing unchanged files
+        from rejig.core.cache import CSTCache
+        self._cache = CSTCache()
+
+    def _parse_file(self, file_path: str | Path) -> cst.Module:
+        """Parse a Python file using the CST cache.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path to the file to parse.
+
+        Returns
+        -------
+        cst.Module
+            The parsed CST module.
+        """
+        return self._cache.parse_module(str(file_path))
+
+    def _invalidate_cache(self, file_path: str | Path) -> None:
+        """Invalidate the CST cache for a file after writing."""
+        self._cache.invalidate(str(file_path))
 
     @property
     def root(self) -> Path:
@@ -704,15 +726,14 @@ class Rejig:
 
         for file_path in self.files:
             try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
+                tree = self._parse_file(file_path)
 
                 for node in tree.body:
                     if isinstance(node, cst.ClassDef):
                         name = node.name.value
                         if regex is None or regex.search(name):
                             targets.append(ClassTarget(self, name, file_path=file_path))
-            except Exception:
+            except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
                 continue
 
         return TargetList(self, targets)
@@ -745,15 +766,14 @@ class Rejig:
 
         for file_path in self.files:
             try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
+                tree = self._parse_file(file_path)
 
                 for node in tree.body:
                     if isinstance(node, cst.FunctionDef):
                         name = node.name.value
                         if regex is None or regex.search(name):
                             targets.append(FunctionTarget(self, name, file_path=file_path))
-            except Exception:
+            except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
                 continue
 
         return TargetList(self, targets)
@@ -795,7 +815,7 @@ class Rejig:
                 for i, line in enumerate(content.splitlines(), 1):
                     if regex.search(line):
                         targets.append(LineTarget(self, file_path, i))
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
 
         return TargetList(self, targets)
@@ -888,7 +908,7 @@ class Rejig:
 
         content = file_path.read_text()
         try:
-            tree = cst.parse_module(content)
+            tree = self._parse_file(file_path)
             new_tree = tree.visit(transformer)
             new_content = new_tree.code
 
@@ -906,6 +926,7 @@ class Rejig:
                 )
 
             file_path.write_text(new_content)
+            self._invalidate_cache(file_path)
             return Result(
                 success=True,
                 message=f"Transformed {file_path}",
@@ -983,6 +1004,7 @@ class Rejig:
             )
 
         file_path.write_text(new_content)
+        self._invalidate_cache(file_path)
         return Result(
             success=True,
             message=f"Added import to {file_path}",
@@ -1032,6 +1054,7 @@ class Rejig:
             )
 
         file_path.write_text(new_content)
+        self._invalidate_cache(file_path)
         return Result(
             success=True,
             message=f"Removed import from {file_path}",
@@ -1041,6 +1064,27 @@ class Rejig:
     # -------------------------------------------------------------------------
     # Rope-based Move Operations
     # -------------------------------------------------------------------------
+
+    def _resolve_source_file(self, source: str | Path | "Target") -> Path:
+        """Coerce a rope-API ``source_file`` argument to an absolute Path.
+
+        Accepts a string, a Path (absolute or relative to ``self.root_path``),
+        or any Target exposing a ``file_path`` attribute (FunctionTarget,
+        ClassTarget, FileTarget, ...).
+        """
+        from rejig.targets.base import Target as _Target
+
+        if isinstance(source, _Target):
+            path = source.file_path
+            if path is None:
+                raise ValueError(f"Cannot resolve file path from {source!r}")
+        elif isinstance(source, str):
+            path = Path(source)
+        else:
+            path = source
+        if not path.is_absolute():
+            path = self.root_path / path
+        return path
 
     def _get_class_offset(self, file_path: Path, class_name: str) -> int | None:
         """Get the character offset of a class name in a class definition."""
@@ -1056,7 +1100,7 @@ class Rejig:
 
     def move_class(
         self,
-        source_file: Path,
+        source_file: str | Path | "Target",
         class_name: str,
         dest_module: str,
     ) -> Result:
@@ -1067,8 +1111,10 @@ class Rejig:
 
         Parameters
         ----------
-        source_file : Path
-            Path to the file containing the class.
+        source_file : str | Path | Target
+            Path to the file containing the class. May be a string, an absolute
+            or project-relative Path, or any Target with a ``file_path``
+            (FileTarget, ClassTarget, ...).
         class_name : str
             Name of the class to move.
         dest_module : str
@@ -1087,6 +1133,7 @@ class Rejig:
         """
         from rope.refactor.move import create_move
 
+        source_file = self._resolve_source_file(source_file)
         offset = self._get_class_offset(source_file, class_name)
         if offset is None:
             return Result(
@@ -1128,7 +1175,7 @@ class Rejig:
 
     def move_function(
         self,
-        source_file: Path,
+        source_file: str | Path | "Target",
         function_name: str,
         dest_module: str,
     ) -> Result:
@@ -1139,8 +1186,10 @@ class Rejig:
 
         Parameters
         ----------
-        source_file : Path
-            Path to the file containing the function.
+        source_file : str | Path | Target
+            Path to the file containing the function. May be a string, an
+            absolute or project-relative Path, or any Target with a
+            ``file_path`` (FileTarget, FunctionTarget, ...).
         function_name : str
             Name of the function to move.
         dest_module : str
@@ -1159,6 +1208,7 @@ class Rejig:
         """
         from rope.refactor.move import create_move
 
+        source_file = self._resolve_source_file(source_file)
         offset = self._get_function_offset(source_file, function_name)
         if offset is None:
             return Result(
@@ -1197,6 +1247,123 @@ class Rejig:
                 success=False,
                 message=f"Error moving {function_name}: {e}",
             )
+
+    def _rope_rename(
+        self,
+        source_file: Path,
+        offset: int,
+        old_name: str,
+        new_name: str,
+        kind: str,
+    ) -> Result:
+        """Run a rope Rename refactor at the given offset.
+
+        Updates the definition and every reference across the project.
+        """
+        from rope.refactor.rename import Rename
+
+        try:
+            relative_path = source_file.relative_to(self.root_path)
+            resource = self.rope_project.get_resource(str(relative_path))
+
+            renamer = Rename(self.rope_project, resource, offset)
+            changes = renamer.get_changes(new_name)
+
+            changed_files = [
+                Path(self.root_path / change.path)
+                for change in changes.get_changed_resources()
+            ]
+
+            if self.dry_run:
+                return Result(
+                    success=True,
+                    message=f"[DRY RUN] Would rename {kind} {old_name} to {new_name}",
+                    files_changed=changed_files,
+                )
+
+            self.rope_project.do(changes)
+            return Result(
+                success=True,
+                message=f"Renamed {kind} {old_name} to {new_name}",
+                files_changed=changed_files,
+            )
+        except Exception as e:
+            return Result(
+                success=False,
+                message=f"Error renaming {kind} {old_name}: {e}",
+            )
+
+    def rename_function(
+        self,
+        source_file: str | Path | "Target",
+        function_name: str,
+        new_name: str,
+    ) -> Result:
+        """Rename a function and update every caller using rope.
+
+        Parameters
+        ----------
+        source_file : str | Path | Target
+            Path to the file containing the function definition. May be a
+            string, an absolute or project-relative Path, or any Target with a
+            ``file_path`` (FileTarget, FunctionTarget, ...).
+        function_name : str
+            Current name of the function.
+        new_name : str
+            New name for the function.
+
+        Returns
+        -------
+        Result
+            Result with success status and the list of files rope rewrote.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> rj.rename_function("src/utils.py", "old_name", "new_name")
+        >>> rj.close()
+        """
+        source_file = self._resolve_source_file(source_file)
+        offset = self._get_function_offset(source_file, function_name)
+        if offset is None:
+            return Result(
+                success=False,
+                message=f"Could not find function {function_name} in {source_file}",
+            )
+        return self._rope_rename(source_file, offset, function_name, new_name, "function")
+
+    def rename_class(
+        self,
+        source_file: str | Path | "Target",
+        class_name: str,
+        new_name: str,
+    ) -> Result:
+        """Rename a class and update every reference using rope.
+
+        Parameters
+        ----------
+        source_file : str | Path | Target
+            Path to the file containing the class definition. May be a string,
+            an absolute or project-relative Path, or any Target with a
+            ``file_path`` (FileTarget, ClassTarget, ...).
+        class_name : str
+            Current name of the class.
+        new_name : str
+            New name for the class.
+
+        Returns
+        -------
+        Result
+            Result with success status and the list of files rope rewrote.
+        """
+        source_file = self._resolve_source_file(source_file)
+        offset = self._get_class_offset(source_file, class_name)
+        if offset is None:
+            return Result(
+                success=False,
+                message=f"Could not find class {class_name} in {source_file}",
+            )
+        return self._rope_rename(source_file, offset, class_name, new_name, "class")
 
     # -------------------------------------------------------------------------
     # TODO Comment Operations
@@ -1730,10 +1897,11 @@ class Rejig:
                         total_changes += 1
                     else:
                         file_path.write_text(content)
+                        self._invalidate_cache(file_path)
                         files_changed.append(file_path)
                         total_changes += 1
 
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
 
         if self.dry_run:
@@ -1853,8 +2021,7 @@ class Rejig:
 
         for file_path in self.files:
             try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
+                tree = self._parse_file(file_path)
 
                 for node in tree.body:
                     if isinstance(node, cst.FunctionDef):
@@ -1863,7 +2030,7 @@ class Rejig:
                             targets.append(
                                 FunctionTarget(self, node.name.value, file_path=file_path)
                             )
-            except Exception:
+            except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
                 continue
 
         return TargetList(self, targets)
@@ -1897,8 +2064,7 @@ class Rejig:
 
         for file_path in self.files:
             try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
+                tree = self._parse_file(file_path)
 
                 class ParamFinder(cst.CSTVisitor):
                     def __init__(self):
@@ -1940,7 +2106,7 @@ class Rejig:
                         target = FunctionTarget(self, func_name, file_path=file_path)
                         results.append((target, param_name))
 
-            except Exception:
+            except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
                 continue
 
         return results
@@ -2744,7 +2910,7 @@ class Rejig:
 
                     for match in re.finditer(r"def test_(\w+)", content):
                         tested_functions.add(match.group(1))
-                except Exception:
+                except (OSError, UnicodeDecodeError):
                     continue
 
         # Find functions without tests
@@ -2756,8 +2922,7 @@ class Rejig:
                 continue
 
             try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
+                tree = self._parse_file(file_path)
 
                 for node in tree.body:
                     if isinstance(node, cst.FunctionDef):
@@ -2770,7 +2935,7 @@ class Rejig:
                             targets.append(
                                 FunctionTarget(self, func_name, file_path=file_path)
                             )
-            except Exception:
+            except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
                 continue
 
         return TargetList(self, targets)
@@ -2818,7 +2983,7 @@ class Rejig:
                     # Extract test class names (TestXyz -> Xyz)
                     for match in re.finditer(r"class Test(\w+)", content):
                         tested_classes.add(match.group(1))
-                except Exception:
+                except (OSError, UnicodeDecodeError):
                     continue
 
         # Find classes without tests
@@ -2830,8 +2995,7 @@ class Rejig:
                 continue
 
             try:
-                content = file_path.read_text()
-                tree = cst.parse_module(content)
+                tree = self._parse_file(file_path)
 
                 for node in tree.body:
                     if isinstance(node, cst.ClassDef):
@@ -2842,7 +3006,7 @@ class Rejig:
                         # Check if tested
                         if class_name not in tested_classes:
                             targets.append(ClassTarget(self, class_name, file_path=file_path))
-            except Exception:
+            except (OSError, UnicodeDecodeError, cst.ParserSyntaxError):
                 continue
 
         return TargetList(self, targets)
@@ -3154,6 +3318,125 @@ class Rejig:
         analyzer = ComplexityAnalyzer(self)
         return analyzer.find_long_classes(max_lines)
 
+    def find_long_files(self, min_lines: int = 500) -> TargetList[FileTarget]:
+        """
+        Find files exceeding line count threshold.
+
+        Parameters
+        ----------
+        min_lines : int
+            Minimum lines to consider a file "long". Default 500.
+
+        Returns
+        -------
+        TargetList[FileTarget]
+            Files exceeding the threshold, sorted by line count descending.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> long_files = rj.find_long_files(min_lines=500)
+        >>> for f in long_files:
+        ...     metrics = rj.get_code_metrics().get_file_metrics(f.path)
+        ...     print(f"{f.path.name}: {metrics.total_lines} lines")
+        """
+        from rejig.analysis.metrics import CodeMetrics
+        from rejig.targets.base import TargetList
+        from rejig.targets.python.file import FileTarget
+
+        metrics = CodeMetrics(self)
+        long_files: list[tuple[int, FileTarget]] = []
+
+        for file_path in self.files:
+            file_metrics = metrics.get_file_metrics(file_path)
+            if file_metrics.total_lines >= min_lines:
+                long_files.append((file_metrics.total_lines, FileTarget(self, file_path)))
+
+        # Sort by line count descending
+        long_files.sort(key=lambda x: x[0], reverse=True)
+
+        return TargetList(self, [f[1] for f in long_files])
+
+    def get_split_analyzer(
+        self,
+        min_lines: int = 500,
+        min_classes_to_split: int = 2,
+        min_functions_to_split: int = 3,
+    ):
+        """
+        Get a SplitAnalyzer for analyzing files that can be split into modules.
+
+        Parameters
+        ----------
+        min_lines : int
+            Minimum lines to consider a file for splitting. Default 500.
+        min_classes_to_split : int
+            Minimum number of classes to consider splitting by class. Default 2.
+        min_functions_to_split : int
+            Minimum number of functions to consider splitting by function. Default 3.
+
+        Returns
+        -------
+        SplitAnalyzer
+            Analyzer instance configured with the given parameters.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> analyzer = rj.get_split_analyzer(min_lines=300)
+        >>> splittable = analyzer.find_splittable_files()
+        >>> for result in splittable:
+        ...     print(f"{result.file_path.name}: {result.reason}")
+        """
+        from rejig.analysis.split_analysis import SplitAnalyzer
+
+        return SplitAnalyzer(
+            self,
+            min_lines=min_lines,
+            min_classes_to_split=min_classes_to_split,
+            min_functions_to_split=min_functions_to_split,
+        )
+
+    def find_splittable_files(
+        self,
+        min_lines: int = 500,
+        min_classes_to_split: int = 2,
+        min_functions_to_split: int = 3,
+    ):
+        """
+        Find files that can be split into modules.
+
+        Parameters
+        ----------
+        min_lines : int
+            Minimum lines to consider a file for splitting. Default 500.
+        min_classes_to_split : int
+            Minimum number of classes to consider splitting by class. Default 2.
+        min_functions_to_split : int
+            Minimum number of functions to consider splitting by function. Default 3.
+
+        Returns
+        -------
+        list[SplitAnalysisResult]
+            List of analysis results for splittable files.
+
+        Examples
+        --------
+        >>> rj = Rejig("src/")
+        >>> splittable = rj.find_splittable_files(min_lines=500)
+        >>> for result in splittable:
+        ...     print(f"{result.file_path.name}: split by {result.split_by}")
+        """
+        from rejig.analysis.split_analysis import SplitAnalyzer
+
+        analyzer = SplitAnalyzer(
+            self,
+            min_lines=min_lines,
+            min_classes_to_split=min_classes_to_split,
+            min_functions_to_split=min_functions_to_split,
+        )
+        return analyzer.find_splittable_files()
+
     def find_deeply_nested(self, max_depth: int = 4):
         """
         Find functions with excessive nesting depth.
@@ -3362,7 +3645,7 @@ class Rejig:
             if parts[-1] == "__init__":
                 parts = parts[:-1]
             return ".".join(parts) if parts else None
-        except Exception:
+        except ValueError:
             return None
 
     def find_internal_dependencies(self, module: str):

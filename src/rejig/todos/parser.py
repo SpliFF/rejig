@@ -160,7 +160,7 @@ class TodoParser:
                 todo = self.parse_line(line, file_path, line_number)
                 if todo:
                     todos.append(todo)
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             pass
 
         return todos

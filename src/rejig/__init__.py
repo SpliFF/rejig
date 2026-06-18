@@ -4,27 +4,36 @@ Rejig - A Python library for programmatic code refactoring.
 A comprehensive toolkit for programmatic refactoring of Python projects using
 LibCST. Provides a fluent API for finding and modifying code elements.
 
+Import Strategy
+---------------
+Core essentials are available at the top level::
+
+    from rejig import Rejig, Result, FileTarget, ClassTarget
+
+Specialized modules are available via subpackage imports::
+
+    from rejig.analysis import ComplexityAnalyzer, CodeMetrics
+    from rejig.security import SecretsScanner, VulnerabilityScanner
+    from rejig.imports import ImportOrganizer, ImportGraph
+    from rejig.packaging import Dependency, PackageConfig
+    from rejig.patching import Patch, PatchParser
+    from rejig.frameworks import FlaskProject, FastAPIProject
+    from rejig.optimize import DRYAnalyzer, LoopOptimizer
+
+For backward compatibility, all symbols remain importable from the top level
+(e.g., ``from rejig import SecretsScanner`` still works), but ``__all__``
+only advertises the core essentials. For a full star-import::
+
+    from rejig.all import *
+
 Example
 -------
 >>> from rejig import Rejig
 >>>
->>> # Initialize with a directory
 >>> rj = Rejig("src/")
->>>
->>> # Find and modify a class
 >>> rj.find_class("MyClass").add_attribute("count", "int", "0")
->>>
->>> # Chain operations on methods
 >>> rj.find_class("MyClass").find_method("process").insert_statement("self.validate()")
->>>
->>> # Use the target API
->>> rj.file("mymodule.py").find_class("MyClass").add_method("process")
 >>> rj.toml("pyproject.toml").set("project.version", "2.0.0")
->>>
->>> # Preview changes without modifying files
->>> rj = Rejig("src/", dry_run=True)
->>> result = rj.find_class("MyClass").add_attribute("x", "int", "0")
->>> print(result.message)  # [DRY RUN] Would add attribute...
 
 Classes
 -------
@@ -302,7 +311,9 @@ from __future__ import annotations
 
 from .core import BatchResult, ErrorResult, Rejig, Result
 from .core.transaction import Transaction
-from .imports import (
+# Backward-compatible imports - all symbols remain importable from top level.
+# For new code, prefer importing from subpackages directly.
+from .imports import (  # noqa: F401
     CircularImport,
     ImportAnalyzer,
     ImportGraph,
@@ -311,7 +322,7 @@ from .imports import (
     ImportTarget,
     ImportTargetList,
 )
-from .packaging import (
+from .packaging import (  # noqa: F401
     Dependency,
     FormatDetector,
     PackageConfig,
@@ -322,7 +333,7 @@ from .packaging import (
     RequirementsParser,
     UVParser,
 )
-from .project import (
+from .project import (  # noqa: F401
     PythonProject,
     PyprojectTarget,
     ProjectSectionTarget,
@@ -336,7 +347,7 @@ from .project import (
     IsortConfigTarget,
     CoverageConfigTarget,
 )
-from .analysis import (
+from .analysis import (  # noqa: F401
     AnalysisTarget,
     AnalysisTargetList,
     AnalysisReport,
@@ -352,8 +363,8 @@ from .analysis import (
     FileMetrics,
     ModuleMetrics,
 )
-from .analysis.targets import AnalysisFinding, AnalysisType
-from .security import (
+from .analysis.targets import AnalysisFinding, AnalysisType  # noqa: F401
+from .security import (  # noqa: F401
     SecurityFinding,
     SecurityReport,
     SecurityReporter,
@@ -363,12 +374,12 @@ from .security import (
     SecurityType,
     VulnerabilityScanner,
 )
-from .frameworks import (
+from .frameworks import (  # noqa: F401
     FlaskProject,
     FastAPIProject,
     SQLAlchemyProject,
 )
-from .optimize import (
+from .optimize import (  # noqa: F401
     DRYAnalyzer,
     LoopOptimizer,
     OptimizeFinding,
@@ -376,7 +387,7 @@ from .optimize import (
     OptimizeTargetList,
     OptimizeType,
 )
-from .patching import (
+from .patching import (  # noqa: F401
     Change,
     ChangeType,
     DetectedOperation,
@@ -418,6 +429,8 @@ from .targets import (
 )
 
 __version__ = "0.1.0"
+
+# Core essentials only. For all symbols, use: from rejig.all import *
 __all__ = [
     # Main entry point
     "Rejig",
@@ -431,109 +444,10 @@ __all__ = [
     "Target",
     "ErrorTarget",
     "TargetList",
-    # Python targets
+    # Most commonly used targets
     "FileTarget",
     "ModuleTarget",
-    "PackageTarget",
     "ClassTarget",
     "FunctionTarget",
     "MethodTarget",
-    "LineTarget",
-    "LineBlockTarget",
-    "CodeBlockTarget",
-    "CommentTarget",
-    "StringLiteralTarget",
-    # Config targets
-    "TomlTarget",
-    "YamlTarget",
-    "JsonTarget",
-    "IniTarget",
-    # Text targets
-    "TextFileTarget",
-    "TextBlock",
-    "TextMatch",
-    # Packaging
-    "Dependency",
-    "PackageMetadata",
-    "PackageConfig",
-    "RequirementsParser",
-    "PEP621Parser",
-    "PoetryParser",
-    "UVParser",
-    "FormatDetector",
-    "PackageConfigConverter",
-    # Import Management
-    "ImportTarget",
-    "ImportTargetList",
-    "ImportAnalyzer",
-    "ImportInfo",
-    "ImportOrganizer",
-    "ImportGraph",
-    "CircularImport",
-    # Project Management
-    "PythonProject",
-    "PyprojectTarget",
-    "ProjectSectionTarget",
-    "DependenciesTarget",
-    "ScriptsTarget",
-    "ToolConfigTarget",
-    "BlackConfigTarget",
-    "RuffConfigTarget",
-    "MypyConfigTarget",
-    "PytestConfigTarget",
-    "IsortConfigTarget",
-    "CoverageConfigTarget",
-    # Code Analysis
-    "AnalysisTarget",
-    "AnalysisTargetList",
-    "AnalysisType",
-    "AnalysisFinding",
-    "AnalysisReport",
-    "AnalysisReporter",
-    "ComplexityAnalyzer",
-    "ComplexityResult",
-    "NestingResult",
-    "DeadCodeAnalyzer",
-    "UnusedCodeResult",
-    "PatternFinder",
-    "PatternMatch",
-    "CodeMetrics",
-    "FileMetrics",
-    "ModuleMetrics",
-    # Security Analysis
-    "SecurityTarget",
-    "SecurityTargetList",
-    "SecurityType",
-    "SecurityFinding",
-    "SecurityReport",
-    "SecurityReporter",
-    "SecretsScanner",
-    "VulnerabilityScanner",
-    # Code Optimization
-    "OptimizeTarget",
-    "OptimizeTargetList",
-    "OptimizeType",
-    "OptimizeFinding",
-    "DRYAnalyzer",
-    "LoopOptimizer",
-    # Patching
-    "Patch",
-    "FilePatch",
-    "Hunk",
-    "Change",
-    "PatchFormat",
-    "ChangeType",
-    "PatchTarget",
-    "PatchFileTarget",
-    "PatchHunkTarget",
-    "PatchParser",
-    "PatchGenerator",
-    "PatchConverter",
-    "PatchAnalyzer",
-    "DetectedOperation",
-    "OperationType",
-    # Framework Extensions
-    "FlaskProject",
-    "FastAPIProject",
-    "SQLAlchemyProject",
 ]

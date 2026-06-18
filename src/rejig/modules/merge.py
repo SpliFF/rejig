@@ -121,7 +121,7 @@ class ModuleMerger:
         """Extract content from a module and add to merged content."""
         try:
             tree = cst.parse_module(content)
-        except Exception:
+        except cst.ParserSyntaxError:
             # If parsing fails, just add raw content to definitions
             merged.definitions.append(content)
             return

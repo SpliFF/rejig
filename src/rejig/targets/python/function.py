@@ -16,6 +16,7 @@ from rejig.transformers import (
     ConvertToAsync,
     ConvertToSync,
     InferTypeHints,
+    InsertAtMatch,
     InsertAtMethodEnd,
     InsertAtMethodStart,
     RemoveParameter,
@@ -436,16 +437,19 @@ class FunctionTarget(Target):
         except Exception as e:
             return self._operation_failed("remove_decorator", f"Failed to remove decorator: {e}", e)
 
-    def rename(self, new_name: str) -> Result:
+    def rename(self, new_name: str, update_callers: bool = True) -> Result:
         """Rename this function.
 
-        Note: This only renames the function definition. It does not update
-        calls to the function throughout the codebase.
+        When ``update_callers`` is True (default), uses rope to rename the
+        definition and every caller across the project. When False, or when
+        rope is unavailable, only the ``def`` line is rewritten via regex.
 
         Parameters
         ----------
         new_name : str
             New name for the function.
+        update_callers : bool
+            If True, also update calls to the function throughout the project.
 
         Returns
         -------
@@ -455,6 +459,16 @@ class FunctionTarget(Target):
         file_path = self._find_function()
         if not file_path:
             return self._operation_failed("rename", f"Function '{self.name}' not found")
+
+        if update_callers and hasattr(self._rejig, "rename_function"):
+            try:
+                result = self._rejig.rename_function(file_path, self.name, new_name)
+            except ImportError:
+                result = None  # rope not installed — fall through to regex path
+            if result is not None:
+                if result.success:
+                    self.name = new_name
+                return result
 
         try:
             content = file_path.read_text()
@@ -506,6 +520,81 @@ class FunctionTarget(Target):
             return self._rejig.move_function(file_path, self.name, dest_module)
 
         return self._unsupported_operation("move_to")
+
+    def insert_before_match(self, pattern: str, code: str) -> Result:
+        """Insert code before a line matching a regex pattern.
+
+        Parameters
+        ----------
+        pattern : str
+            Regex pattern to match against line content.
+        code : str
+            Code to insert before the matching line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        transformer = InsertAtMatch(
+            pattern=pattern,
+            code=code,
+            position="before",
+            scope="function",
+            class_name=None,
+            method_name=self.name,
+        )
+        return self._transform(transformer)
+
+    def insert_after_match(self, pattern: str, code: str) -> Result:
+        """Insert code after a line matching a regex pattern.
+
+        Parameters
+        ----------
+        pattern : str
+            Regex pattern to match against line content.
+        code : str
+            Code to insert after the matching line.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        transformer = InsertAtMatch(
+            pattern=pattern,
+            code=code,
+            position="after",
+            scope="function",
+            class_name=None,
+            method_name=self.name,
+        )
+        return self._transform(transformer)
+
+    def replace_match(self, pattern: str, code: str) -> Result:
+        """Replace a line matching a regex pattern with new code.
+
+        Parameters
+        ----------
+        pattern : str
+            Regex pattern to match against line content.
+        code : str
+            Code to replace the matching line with.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+        """
+        transformer = InsertAtMatch(
+            pattern=pattern,
+            code=code,
+            position="replace",
+            scope="function",
+            class_name=None,
+            method_name=self.name,
+        )
+        return self._transform(transformer)
 
     def delete(self) -> Result:
         """Delete this function from the file.
@@ -559,6 +648,165 @@ class FunctionTarget(Target):
             )
         except Exception as e:
             return self._operation_failed("delete", f"Failed to delete function: {e}", e)
+
+    def replace_body(self, new_body: str) -> Result:
+        """Replace the body of this function.
+
+        Preserves the existing signature, decorators, and docstring (when the
+        docstring is the first statement and ``new_body`` does not start with
+        one).
+
+        Parameters
+        ----------
+        new_body : str
+            New function body as a Python source string. Should NOT be indented;
+            indentation is handled automatically.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.replace_body("return value * 2")
+        >>> func.replace_body("if x:\\n    return x\\nreturn 0")
+        """
+        try:
+            body_module = cst.parse_module(new_body)
+        except cst.ParserSyntaxError as e:
+            return self._operation_failed("replace_body", f"Invalid body syntax: {e}", e)
+
+        new_statements = list(body_module.body)
+        if not new_statements:
+            return self._operation_failed("replace_body", "Body must contain at least one statement")
+
+        target_name = self.name
+
+        class BodyReplacer(cst.CSTTransformer):
+            def __init__(self) -> None:
+                self.replaced = False
+
+            def leave_FunctionDef(
+                self,
+                original_node: cst.FunctionDef,
+                updated_node: cst.FunctionDef,
+            ) -> cst.FunctionDef:
+                if original_node.name.value != target_name:
+                    return updated_node
+                self.replaced = True
+                statements = list(new_statements)
+                existing = updated_node.body.body
+                if existing and isinstance(existing[0], cst.SimpleStatementLine):
+                    first = existing[0].body[0]
+                    if isinstance(first, cst.Expr) and isinstance(
+                        first.value, (cst.SimpleString, cst.ConcatenatedString)
+                    ):
+                        first_new = statements[0]
+                        keep_docstring = True
+                        if isinstance(first_new, cst.SimpleStatementLine):
+                            inner = first_new.body[0]
+                            if isinstance(inner, cst.Expr) and isinstance(
+                                inner.value, (cst.SimpleString, cst.ConcatenatedString)
+                            ):
+                                keep_docstring = False
+                        if keep_docstring:
+                            statements = [existing[0], *statements]
+                new_body_block = updated_node.body.with_changes(body=statements)
+                return updated_node.with_changes(body=new_body_block)
+
+        replacer = BodyReplacer()
+        result = self._transform(replacer)
+        if result.success and not replacer.replaced:
+            return self._operation_failed("replace_body", f"Function '{self.name}' not found")
+        return result
+
+    def set_signature(
+        self,
+        params: str | None = None,
+        return_type: str | None = None,
+    ) -> Result:
+        """Replace the parameter list and/or return type of this function.
+
+        Pass ``params=""`` to clear all parameters. Pass ``return_type=""`` to
+        remove an existing return annotation.
+
+        Parameters
+        ----------
+        params : str | None
+            New parameter list as a Python source string (e.g.
+            ``"x: int, y: int = 0"``). ``None`` leaves the existing
+            parameter list untouched.
+        return_type : str | None
+            New return type as a Python source string (e.g. ``"bool"``).
+            ``None`` leaves the existing return annotation untouched;
+            ``""`` removes it.
+
+        Returns
+        -------
+        Result
+            Result of the operation.
+
+        Examples
+        --------
+        >>> func.set_signature(params="token: str, timeout: int = 60")
+        >>> func.set_signature(return_type="bool")
+        >>> func.set_signature(return_type="")  # drop annotation
+        """
+        if params is None and return_type is None:
+            return Result(success=True, message="No signature changes requested", files_changed=[])
+
+        new_params: cst.Parameters | None = None
+        if params is not None:
+            try:
+                stub = cst.parse_statement(f"def _stub({params}): pass")
+            except cst.ParserSyntaxError as e:
+                return self._operation_failed("set_signature", f"Invalid params: {e}", e)
+            if not isinstance(stub, cst.FunctionDef):
+                return self._operation_failed("set_signature", f"Invalid params: {params!r}")
+            new_params = stub.params
+
+        new_return: cst.Annotation | None | object = None  # sentinel
+        unset = object()
+        if return_type is not None:
+            if return_type == "":
+                new_return = None
+            else:
+                try:
+                    new_return = cst.Annotation(annotation=cst.parse_expression(return_type))
+                except cst.ParserSyntaxError as e:
+                    return self._operation_failed(
+                        "set_signature", f"Invalid return type: {e}", e
+                    )
+        else:
+            new_return = unset
+
+        target_name = self.name
+
+        class SignatureUpdater(cst.CSTTransformer):
+            def __init__(self) -> None:
+                self.updated = False
+
+            def leave_FunctionDef(
+                self,
+                original_node: cst.FunctionDef,
+                updated_node: cst.FunctionDef,
+            ) -> cst.FunctionDef:
+                if original_node.name.value != target_name:
+                    return updated_node
+                self.updated = True
+                changes: dict = {}
+                if new_params is not None:
+                    changes["params"] = new_params
+                if new_return is not unset:
+                    changes["returns"] = new_return  # type: ignore[assignment]
+                return updated_node.with_changes(**changes)
+
+        updater = SignatureUpdater()
+        result = self._transform(updater)
+        if result.success and not updater.updated:
+            return self._operation_failed("set_signature", f"Function '{self.name}' not found")
+        return result
 
     # ===== Type hint operations =====
 

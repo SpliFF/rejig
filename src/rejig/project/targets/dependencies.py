@@ -92,6 +92,21 @@ class DependenciesTarget(TomlTarget):
         import re
         return re.sub(r"[-_.]+", "-", name).lower()
 
+    @staticmethod
+    def _split_name_version(spec: str) -> tuple[str, str | None]:
+        """Split a dependency string into (name, version_spec).
+
+        Handles PEP 508 operators (``<>=!~``) and Poetry caret/tilde shorthand
+        (``^``/``~``). Returns ``(name, None)`` when no version is present.
+        """
+        import re
+        # Strip extras: foo[bar,baz]>=1.0 -> foo>=1.0
+        bare = re.sub(r"\[[^\]]*\]", "", spec, count=1)
+        match = re.search(r"[<>=!~^]", bare)
+        if not match:
+            return bare.strip(), None
+        return bare[: match.start()].strip(), bare[match.start() :].strip()
+
     # =========================================================================
     # Read Operations
     # =========================================================================
@@ -156,8 +171,8 @@ class DependenciesTarget(TomlTarget):
         """
         normalized = self._normalize_name(name)
         for dep in self.list():
-            dep_name = self._normalize_name(dep.split("[")[0].split("<")[0].split(">")[0].split("=")[0].split("!")[0])
-            if dep_name == normalized:
+            dep_name, _ = self._split_name_version(dep)
+            if self._normalize_name(dep_name) == normalized:
                 return True
         return False
 
@@ -176,12 +191,9 @@ class DependenciesTarget(TomlTarget):
         """
         normalized = self._normalize_name(name)
         for dep in self.list():
-            dep_name = self._normalize_name(dep.split("[")[0].split("<")[0].split(">")[0].split("=")[0].split("!")[0])
-            if dep_name == normalized:
-                # Extract version from spec
-                import re
-                match = re.search(r"[<>=!~].+$", dep)
-                return match.group(0) if match else None
+            dep_name, version = self._split_name_version(dep)
+            if self._normalize_name(dep_name) == normalized:
+                return version
         return None
 
     # =========================================================================

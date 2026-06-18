@@ -541,22 +541,37 @@ class ClassTarget(Target):
         except Exception as e:
             return self._operation_failed("add_method", f"Failed to add method: {e}", e)
 
-    def rename(self, new_name: str) -> Result:
+    def rename(self, new_name: str, update_references: bool = True) -> Result:
         """Rename this class.
 
-        Note: This only renames the class definition. It does not update
-        references to the class throughout the codebase.
+        When ``update_references`` is True (default), uses rope to rename the
+        class and every reference across the project. When False, or when rope
+        is unavailable, only the ``class`` definition is rewritten via libcst.
 
         Parameters
         ----------
         new_name : str
             New name for the class.
+        update_references : bool
+            If True, also update references to the class throughout the project.
 
         Returns
         -------
         Result
             Result of the operation.
         """
+        if update_references and hasattr(self._rejig, "rename_class"):
+            file_path = self._find_class()
+            if file_path is not None:
+                try:
+                    result = self._rejig.rename_class(file_path, self.name, new_name)
+                except ImportError:
+                    result = None  # rope not installed — fall through to libcst path
+                if result is not None:
+                    if result.success:
+                        self.name = new_name
+                    return result
+
         transformer = RenameClass(self.name, new_name)
         result = self._transform(transformer)
 

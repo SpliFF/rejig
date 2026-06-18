@@ -60,7 +60,7 @@ class IniTarget(Target):
             self._config = configparser.ConfigParser()
             self._config.read(self.path)
             return self._config
-        except Exception:
+        except (OSError, configparser.Error):
             return None
 
     def _save(self) -> Result:
