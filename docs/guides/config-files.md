@@ -65,6 +65,12 @@ yaml.set("database.pool_size", 10)
 yaml.delete("deprecated_setting")
 ```
 
+YAML editing uses [ruamel.yaml](https://yaml.readthedocs.io/) in round-trip mode,
+so untouched parts of the file keep their original formatting — comments, quote
+styles, key order, and scalar wrapping are all preserved. Only the keys you
+change are rewritten, keeping diffs minimal. Install the dependency with
+`pip install rejig[yaml]`.
+
 ### Nested Structures
 
 ```python

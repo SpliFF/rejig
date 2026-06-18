@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rejig"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Python library for programmatic code refactoring and transformation."
 readme = "README.md"
 license = "MIT"
@@ -27,6 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "libcst>=1.0.0",
+    "isort>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -48,9 +49,15 @@ fastapi = [
 sqlalchemy = [
     "rope>=1.0.0",
 ]
+# YAML round-trip editing (rj.yaml()). ruamel.yaml preserves comments, quote
+# styles and key order so writes produce minimal diffs.
+yaml = [
+    "ruamel.yaml>=0.17.0",
+]
 # All runtime features.
 all = [
     "rope>=1.0.0",
+    "ruamel.yaml>=0.17.0",
 ]
 dev = [
     "pytest>=7.0.0",

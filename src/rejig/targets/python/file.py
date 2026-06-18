@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import isort
 import libcst as cst
 
 from rejig.targets.base import ErrorResult, ErrorTarget, Result, Target, TargetList
@@ -329,13 +330,23 @@ class FileTarget(Target):
 
         return self._write_content(new_content)
 
-    def add_import(self, import_statement: str) -> Result:
+    def add_import(self, import_statement: str, sort: bool | None = None) -> Result:
         """Add an import statement to this file.
+
+        The statement is inserted after the last existing import; the file's
+        imports are then re-sorted and grouped with isort unless sorting is
+        disabled (see ``sort``). Sorting fixes the insertion point, so the
+        added import lands in its correct group regardless of where it was
+        placed textually.
 
         Parameters
         ----------
         import_statement : str
             Import statement to add (without newline).
+        sort : bool | None
+            Whether to re-sort imports afterwards. ``None`` (default) follows
+            the parent ``Rejig(auto_sort_imports=...)`` setting; ``True`` or
+            ``False`` overrides it for this call. See :meth:`sort_imports`.
 
         Returns
         -------
@@ -347,7 +358,11 @@ class FileTarget(Target):
             return result
 
         content = result.data
-        if import_statement in content:
+        # Match whole import lines, not substrings: a naive `in content` check
+        # treats "import time" as already present when the file merely contains
+        # "from calendar import timegm", so the import is silently skipped.
+        target = import_statement.strip()
+        if any(line.strip() == target for line in content.splitlines()):
             return Result(success=True, message=f"Import already exists in {self.path}")
 
         lines = content.splitlines(keepends=True)
@@ -371,7 +386,54 @@ class FileTarget(Target):
             lines.insert(insert_idx, import_statement + "\n")
 
         new_content = "".join(lines)
-        return self._write_content(new_content)
+        write_result = self._write_content(new_content)
+        if write_result.success and not self.dry_run and self._auto_sort_enabled(sort):
+            self.sort_imports()
+        return write_result
+
+    def _auto_sort_enabled(self, sort: bool | None) -> bool:
+        """Resolve whether to auto-sort imports after a mutation.
+
+        An explicit ``sort`` argument wins; otherwise fall back to the parent
+        Rejig instance's ``auto_sort_imports`` setting (default True).
+        """
+        if sort is not None:
+            return sort
+        return getattr(self._rejig, "auto_sort_imports", True)
+
+    def sort_imports(self) -> Result:
+        """Sort and group this file's imports with isort.
+
+        isort is configured from the project's own settings, discovered by
+        searching upward from the file for the nearest ``pyproject.toml`` /
+        ``setup.cfg`` / ``.isort.cfg``. The result therefore matches what the
+        project's own ``isort`` / pre-commit / CI run would produce, including
+        project-specific options such as ``force_single_line``,
+        ``known_third_party`` and ``src_paths``.
+
+        This is the manual counterpart to the automatic sorting performed by
+        :meth:`add_import` and :meth:`remove_unused_imports`.
+
+        Returns
+        -------
+        Result
+            Result of the operation. Succeeds with a no-op message when the
+            imports are already sorted.
+        """
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        original = result.data
+        try:
+            config = isort.Config(settings_path=str(self.path.resolve().parent))
+            sorted_content = isort.code(original, config=config)
+        except Exception as e:
+            return self._operation_failed("sort_imports", f"isort failed: {e}", e)
+
+        if sorted_content == original:
+            return Result(success=True, message=f"Imports already sorted in {self.path}")
+        return self._write_content(sorted_content)
 
     def add_class(self, name: str, body: str = "pass", **kwargs: str) -> Result:
         """Add a class to this file.
@@ -700,8 +762,18 @@ class FileTarget(Target):
         organizer = ImportOrganizer(self._rejig, first_party_packages)
         return organizer.organize(self.path)
 
-    def remove_unused_imports(self) -> Result:
+    def remove_unused_imports(self, sort: bool | None = None) -> Result:
         """Remove all unused imports from this file.
+
+        After removing imports, the remaining imports are re-sorted and grouped
+        with isort unless sorting is disabled (see ``sort``).
+
+        Parameters
+        ----------
+        sort : bool | None
+            Whether to re-sort imports afterwards. ``None`` (default) follows
+            the parent ``Rejig(auto_sort_imports=...)`` setting; ``True`` or
+            ``False`` overrides it for this call. See :meth:`sort_imports`.
 
         Returns
         -------
@@ -730,6 +802,9 @@ class FileTarget(Target):
             result = imp.delete()
             if result.success:
                 count += 1
+
+        if count > 0 and not self.dry_run and self._auto_sort_enabled(sort):
+            self.sort_imports()
 
         return Result(
             success=True,

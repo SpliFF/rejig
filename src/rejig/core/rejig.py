@@ -75,7 +75,12 @@ class Rejig:
     >>> print(result.message)  # [DRY RUN] Would add attribute...
     """
 
-    def __init__(self, path: str | Path, dry_run: bool = False) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        dry_run: bool = False,
+        auto_sort_imports: bool = True,
+    ) -> None:
         """Initialize a Rejig instance for code refactoring.
 
         Parameters
@@ -84,9 +89,16 @@ class Rejig:
             Path to the file, directory, or glob pattern to work with.
         dry_run : bool
             If True, operations don't modify files, only preview changes.
+        auto_sort_imports : bool
+            If True (default), import-mutating file operations
+            (``add_import``, ``remove_unused_imports``) re-sort the file's
+            imports with isort using the project's own configuration. Set
+            False to leave import ordering untouched. Individual calls can
+            override this with their ``sort`` argument.
         """
         self.path = Path(path) if isinstance(path, str) else path
         self.dry_run = dry_run
+        self.auto_sort_imports = auto_sort_imports
         self._files: list[Path] | None = None
         self._rope_project: RopeProject | None = None
         self._root_path: Path | None = None

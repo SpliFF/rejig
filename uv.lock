@@ -596,13 +596,18 @@ wheels = [
 
 [[package]]
 name = "rejig"
-version = "0.1.0"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
+    { name = "isort" },
     { name = "libcst" },
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "rope" },
+    { name = "ruamel-yaml" },
+]
 dev = [
     { name = "black" },
     { name = "isort" },
@@ -614,23 +619,42 @@ dev = [
 django = [
     { name = "rope" },
 ]
+fastapi = [
+    { name = "rope" },
+]
+flask = [
+    { name = "rope" },
+]
 rope = [
     { name = "rope" },
+]
+sqlalchemy = [
+    { name = "rope" },
+]
+yaml = [
+    { name = "ruamel-yaml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
+    { name = "isort", specifier = ">=5.0.0" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "libcst", specifier = ">=1.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "rope", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "rope", marker = "extra == 'django'", specifier = ">=1.0.0" },
+    { name = "rope", marker = "extra == 'fastapi'", specifier = ">=1.0.0" },
+    { name = "rope", marker = "extra == 'flask'", specifier = ">=1.0.0" },
     { name = "rope", marker = "extra == 'rope'", specifier = ">=1.0.0" },
+    { name = "rope", marker = "extra == 'sqlalchemy'", specifier = ">=1.0.0" },
+    { name = "ruamel-yaml", marker = "extra == 'all'", specifier = ">=0.17.0" },
+    { name = "ruamel-yaml", marker = "extra == 'yaml'", specifier = ">=0.17.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]
-provides-extras = ["rope", "django", "dev"]
+provides-extras = ["rope", "django", "flask", "fastapi", "sqlalchemy", "yaml", "all", "dev"]
 
 [[package]]
 name = "rope"
@@ -642,6 +666,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/74/3a/85e60d154f26ecdc1d47a63ac58bd9f32a5a9f3f771f6672197f02a00ade/rope-1.14.0.tar.gz", hash = "sha256:8803e3b667315044f6270b0c69a10c0679f9f322ed8efe6245a93ceb7658da69", size = 296801, upload-time = "2025-07-12T17:46:07.786Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/75/35/130469d1901da2b3a5a377539b4ffcd8a5c983f1c9e3ba5ffdd8d71ae314/rope-1.14.0-py3-none-any.whl", hash = "sha256:00a7ea8c0c376fc0b053b2f2f8ef3bfb8b50fecf1ebf3eb80e4f8bd7f1941918", size = 207143, upload-time = "2025-07-12T17:46:05.928Z" },
+]
+
+[[package]]
+name = "ruamel-yaml"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
 ]
 
 [[package]]

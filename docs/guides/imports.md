@@ -24,6 +24,11 @@ file.add_import("import numpy as np")
 file.add_import("from myapp.models import User")
 ```
 
+The new import is inserted after the last existing import and the file's imports
+are then re-sorted with isort, so it ends up in the correct group regardless of
+where it was placed. See [Sorting Imports](#sorting-imports) to control or
+disable this.
+
 ### Remove Imports
 
 Imports are removed through targets. Find them with `find_imports()` or
@@ -40,6 +45,59 @@ file.find_unused_imports().delete()
 imp = file.find_imports().filter_relative().to_list()[0]
 imp.delete()
 ```
+
+`remove_unused_imports()` also re-sorts the remaining imports by default (see
+[Sorting Imports](#sorting-imports)).
+
+## Sorting Imports
+
+Rejig sorts imports with [isort](https://pycqa.github.io/isort/), configured from
+your project's own settings. isort discovers the nearest `pyproject.toml`,
+`setup.cfg`, or `.isort.cfg` by searching upward from the file, so the result
+matches exactly what your project's `isort` / pre-commit / CI run would produce —
+including options such as `profile`, `force_single_line`, `known_third_party`,
+and `src_paths`.
+
+### Automatic sorting
+
+By default, the import-mutating operations re-sort a file's imports right after
+they change it. This is why `add_import` does not need to guess the correct group
+for a new import — it is inserted anywhere, and isort moves it to its section:
+
+```python
+rj = Rejig("src/")
+file = rj.file("module.py")
+
+file.add_import("import os")     # inserted, then imports re-sorted
+file.remove_unused_imports()    # unused removed, then imports re-sorted
+```
+
+Disable it globally on the `Rejig` instance, or per call with the `sort`
+argument:
+
+```python
+# Never auto-sort in this session
+rj = Rejig("src/", auto_sort_imports=False)
+
+# Auto-sort is on by default, but skip it for a single call
+file.add_import("import os", sort=False)
+file.remove_unused_imports(sort=False)
+```
+
+### Manual sorting
+
+Call `sort_imports()` to sort a file's imports on demand — for example after a
+batch of edits made with `auto_sort_imports=False`:
+
+```python
+file.sort_imports()
+
+# Before:        After:
+# import sys     import os
+# import os      import sys
+```
+
+`sort_imports()` reports success as a no-op when the imports are already sorted.
 
 ## Finding Imports
 
@@ -137,9 +195,11 @@ for name in missing:
 
 ## Import Organization
 
-Rejig can organize imports similar to isort. The organizer sorts imports into
-sections (future, standard library, third-party, first-party, local) and orders
-them within each section.
+For most cases, prefer [`sort_imports()`](#sorting-imports), which runs isort
+itself with your project's configuration. `ImportOrganizer` is a built-in
+alternative that organizes imports without an isort dependency on the call site:
+it sorts imports into sections (future, standard library, third-party,
+first-party, local) and orders them within each section.
 
 ```python
 from rejig import ImportOrganizer

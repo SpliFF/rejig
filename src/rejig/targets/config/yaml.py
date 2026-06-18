@@ -9,14 +9,33 @@ from rejig.targets.base import Result, Target
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
 
-# Try to import PyYAML
+# Round-trip YAML support via ruamel.yaml. Round-trip mode preserves comments,
+# quote styles, key order and scalar formatting, so a load -> mutate -> dump
+# cycle only changes the nodes actually touched. PyYAML's safe_load/dump cannot
+# do this: it discards all formatting and re-styles the whole document.
 try:
-    import yaml
+    from ruamel.yaml import YAML
+    from ruamel.yaml.error import YAMLError
 
     HAS_YAML = True
-except ImportError:
-    yaml = None  # type: ignore
+except ImportError:  # pragma: no cover - exercised only when ruamel is absent
+    YAML = None  # type: ignore
+    YAMLError = Exception  # type: ignore
     HAS_YAML = False
+
+
+def _make_yaml() -> "YAML":
+    """Build a configured round-trip YAML handler.
+
+    Preserves existing quote styles and disables line wrapping so long scalars
+    (for example a URL inside a ``reason`` field) are not folded across lines.
+    """
+    handler = YAML(typ="rt")
+    handler.preserve_quotes = True
+    handler.width = 4096  # effectively disable line folding of long scalars
+    handler.default_flow_style = False
+    handler.allow_unicode = True
+    return handler
 
 
 class YamlTarget(Target):
@@ -68,9 +87,9 @@ class YamlTarget(Target):
 
         try:
             with open(self.path) as f:
-                self._data = yaml.safe_load(f)
+                self._data = _make_yaml().load(f)
             return self._data
-        except (OSError, yaml.YAMLError):
+        except (OSError, YAMLError):
             return None
 
     def _save(self, data: dict[str, Any] | list[Any]) -> Result:
@@ -78,7 +97,7 @@ class YamlTarget(Target):
         if not HAS_YAML:
             return self._operation_failed(
                 "save",
-                "PyYAML is required to write YAML files. Install with: pip install pyyaml",
+                "ruamel.yaml is required to write YAML files. Install with: pip install ruamel.yaml",
             )
 
         try:
@@ -90,7 +109,7 @@ class YamlTarget(Target):
                 )
 
             with open(self.path, "w") as f:
-                yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                _make_yaml().dump(data, f)
 
             self._data = data
             return Result(
@@ -129,7 +148,7 @@ class YamlTarget(Target):
         if not HAS_YAML:
             return self._operation_failed(
                 "get_data",
-                "PyYAML is required. Install with: pip install pyyaml",
+                "ruamel.yaml is required. Install with: pip install ruamel.yaml",
             )
 
         data = self._load()
@@ -340,14 +359,14 @@ class YamlTarget(Target):
         if not HAS_YAML:
             return self._operation_failed(
                 "rewrite",
-                "PyYAML is required. Install with: pip install pyyaml",
+                "ruamel.yaml is required. Install with: pip install ruamel.yaml",
             )
 
         try:
             # Validate YAML
-            data = yaml.safe_load(new_content)
+            data = _make_yaml().load(new_content)
             return self._save(data)
-        except yaml.YAMLError as e:
+        except YAMLError as e:
             return self._operation_failed("rewrite", f"Invalid YAML: {e}", e)
 
     def append_to_list(self, key_path: str, value: Any) -> Result:

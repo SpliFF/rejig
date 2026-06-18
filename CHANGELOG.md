@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-18
+
+### Added
+
+- **Import sorting via isort**: `FileTarget.sort_imports()` sorts and groups a
+  file's imports using isort, configured from the project's own
+  `pyproject.toml` / `setup.cfg` / `.isort.cfg` (discovered by searching upward
+  from the file). Output matches what the project's own isort / pre-commit / CI
+  run produces, honoring options like `profile`, `force_single_line`,
+  `known_third_party`, and `src_paths`. `add_import()` and
+  `remove_unused_imports()` now re-sort imports automatically, controlled by the
+  new `Rejig(auto_sort_imports=True)` flag (default on) and a per-call `sort`
+  argument. isort is now a runtime dependency.
+
+### Changed
+
+- **YAML editing preserves formatting**: `YamlTarget` now uses `ruamel.yaml` in
+  round-trip mode instead of PyYAML. Comments, quote styles, key order, and
+  scalar wrapping in untouched parts of a file are preserved, so a
+  load → mutate → dump cycle only rewrites the keys actually changed and keeps
+  diffs minimal. Requires the `rejig[yaml]` extra (`ruamel.yaml`).
+
+### Fixed
+
+- **`add_import` no longer skips imports that are substrings of an existing
+  line**: the "already present" check used substring containment, so
+  `add_import("import time")` was silently skipped when the file merely contained
+  `from calendar import timegm`. It now matches whole import lines.
+
 ## [0.1.1] - 2026-06-18
 
 ### Fixed
@@ -70,5 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Various code quality improvements across all modules
 
-[Unreleased]: https://github.com/SpliFF/rejig/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/SpliFF/rejig/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/SpliFF/rejig/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/SpliFF/rejig/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/SpliFF/rejig/releases/tag/v0.1.0
