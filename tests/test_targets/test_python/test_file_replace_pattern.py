@@ -106,3 +106,58 @@ class TestReplacePattern:
         assert result.success is True
         assert "[DRY RUN]" in result.message
         assert python_file.read_text() == before
+
+
+class TestReplaceLiteral:
+    def test_replace_is_literal_not_regex(self, rj: Rejig, python_file: Path) -> None:
+        # The pattern contains '(', an invalid standalone regex; literal replace
+        # must handle it without error and only touch the call sites.
+        result = rj.file(python_file.name).replace("is_token_expired(", "is_token_valid(")
+        assert result.success is True
+        content = python_file.read_text()
+        assert 'is_token_valid("y")' in content
+        # The bare NAME = "is_token_expired" (no paren) is untouched.
+        assert 'NAME = "is_token_expired"' in content
+
+    def test_count_limits_replacements(self, rj: Rejig, python_file: Path) -> None:
+        result = rj.file(python_file.name).replace("is_token_expired", "X", count=1)
+        assert result.success is True
+        content = python_file.read_text()
+        assert content.count("X") == 1
+        assert content.count("is_token_expired") == 2
+
+    def test_no_match_is_noop(self, rj: Rejig, python_file: Path) -> None:
+        before = python_file.read_text()
+        result = rj.file(python_file.name).replace("non_existent", "X")
+        assert result.success is True
+        assert result.files_changed == []
+        assert python_file.read_text() == before
+
+    def test_dry_run_does_not_write(self, tmp_path: Path, python_file: Path) -> None:
+        before = python_file.read_text()
+        with Rejig(str(tmp_path), dry_run=True) as rj:
+            result = rj.file(python_file.name).replace("is_token_expired", "X")
+        assert result.success is True
+        assert "[DRY RUN]" in result.message
+        assert python_file.read_text() == before
+
+
+class TestReplaceAllAcrossFiles:
+    def test_replace_all_over_glob(self, tmp_path: Path) -> None:
+        for name in ("a", "b"):
+            pkg = tmp_path / "pkg" / name
+            pkg.mkdir(parents=True)
+            (pkg / "api.py").write_text("x = not is_token_expired(t)\n")
+        # Outside the glob -> must stay untouched.
+        (tmp_path / "pkg" / "other.py").write_text("not is_token_expired(t)\n")
+
+        with Rejig(str(tmp_path)) as rj:
+            result = rj.find_files("pkg/*/api.py").replace_all(
+                "not is_token_expired(", "is_token_expired("
+            )
+
+        assert result.success
+        assert len(result.files_changed) == 2
+        for name in ("a", "b"):
+            assert (tmp_path / "pkg" / name / "api.py").read_text() == "x = is_token_expired(t)\n"
+        assert (tmp_path / "pkg" / "other.py").read_text() == "not is_token_expired(t)\n"

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-18
+
+### Added
+
+- **Literal file replacement**: `FileTarget.replace(pattern, replacement, count=0)`
+  performs an in-place literal text replacement (plain `str.replace`), so regex
+  metacharacters match themselves. It is the literal counterpart to the existing
+  regex `replace_pattern()`, and — because `TargetList.replace_all()` dispatches
+  to it — enables one-line whole-tree find-and-replace:
+  `rj.find_files("app/*/api.py").replace_all("foo(", "bar(")`.
+
 ## [0.1.2] - 2026-06-18
 
 ### Added
@@ -99,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Various code quality improvements across all modules
 
-[Unreleased]: https://github.com/SpliFF/rejig/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/SpliFF/rejig/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/SpliFF/rejig/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/SpliFF/rejig/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/SpliFF/rejig/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/SpliFF/rejig/releases/tag/v0.1.0

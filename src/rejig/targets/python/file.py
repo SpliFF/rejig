@@ -109,6 +109,47 @@ class FileTarget(Target):
         except Exception as e:
             return self._operation_failed("transform", f"Transformation failed: {e}", e)
 
+    def replace(self, pattern: str, replacement: str, count: int = 0) -> Result:
+        """Replace literal text in this file, in place.
+
+        ``pattern`` is matched literally (plain ``str.replace``), so regex
+        metacharacters such as ``(`` or ``.`` stand for themselves. For regular
+        expressions and backreferences, use :meth:`replace_pattern`.
+
+        Because :meth:`TargetList.replace_all` dispatches to this method, a
+        whole-tree literal find-and-replace is a one-liner::
+
+            rj.find_files("app/*/api.py").replace_all("foo(", "bar(")
+
+        Parameters
+        ----------
+        pattern : str
+            Literal text to search for.
+        replacement : str
+            Replacement text.
+        count : int
+            Maximum number of replacements (0 = all).
+
+        Returns
+        -------
+        Result
+            Result of the operation; a no-op success when nothing matched.
+        """
+        result = self.get_content()
+        if result.is_error():
+            return result
+
+        content = result.data
+        new_content = (
+            content.replace(pattern, replacement, count)
+            if count
+            else content.replace(pattern, replacement)
+        )
+
+        if new_content == content:
+            return Result(success=True, message="No matches found", files_changed=[])
+        return self._write_content(new_content)
+
     # ===== Navigation methods =====
 
     def find_class(self, name: str) -> Target:

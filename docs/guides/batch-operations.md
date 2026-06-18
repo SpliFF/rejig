@@ -108,6 +108,25 @@ methods = cls.find_methods()
 results = methods.insert_statement("self.log_call()", position="start")
 ```
 
+### Text Replacement Across Files
+
+`replace_all` performs a literal in-place text replacement on every file in the
+list, making whole-tree find-and-replace a one-liner:
+
+```python
+# Drop the `not` from every is_token_expired caller under django-root/*/api.py
+result = rj.find_files("django-root/*/api.py").replace_all(
+    "not is_token_expired(", "is_token_expired("
+)
+for path in result.files_changed:
+    print(f"updated {path}")
+```
+
+The match is **literal** — the `(` above is taken verbatim, not as a regex
+group. For regex (with backreferences, flags, or `count`), call
+`file.replace_pattern(...)` on individual `FileTarget`s, or `file.replace(old,
+new)` for a single-file literal replacement.
+
 ### Aliases
 
 Some batch methods have `_all` aliases for clarity:
