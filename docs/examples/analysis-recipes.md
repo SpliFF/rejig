@@ -7,15 +7,14 @@ Ready-to-use scripts for analyzing your Python codebase.
 ```python
 #!/usr/bin/env python
 """Quick codebase audit script."""
-from rejig import Rejig
+from rejig import Rejig, DRYAnalyzer, LoopOptimizer
 
 def audit(path: str = "src/") -> None:
     rj = Rejig(path)
 
     # Get all issues
-    issues = rj.find_analysis_issues()
+    report = rj.analyze_code()
     security = rj.find_security_issues()
-    optimization = rj.find_optimization_opportunities()
 
     # Summary
     print("=" * 60)
@@ -25,28 +24,38 @@ def audit(path: str = "src/") -> None:
 
     # Analysis issues
     print("Code Analysis:")
-    print(f"  {issues.summary()}")
-    if issues.by_severity("high"):
-        print("\n  High Priority:")
-        for issue in issues.by_severity("high")[:5]:
-            print(f"    - {issue.file_path}:{issue.line_number}")
-            print(f"      {issue.type}: {issue.message}")
+    print(f"  Total issues: {report.total_issues}")
+    for label, findings in (
+        ("Complexity", report.complexity_issues),
+        ("Patterns", report.pattern_issues),
+        ("Dead code", report.dead_code),
+    ):
+        if findings:
+            print(f"  {label}: {len(findings)}")
+            for issue in findings.sorted_by_severity()[:3]:
+                print(f"    - {issue.file_path}:{issue.line_number}")
+                print(f"      {issue.type.name}: {issue.message}")
 
     # Security issues
     print("\nSecurity:")
     print(f"  {security.summary()}")
-    if security.critical() or security.high():
+    critical = security.critical()
+    high = security.high()
+    if critical or high:
         print("\n  Critical/High Issues:")
-        for issue in (security.critical() + security.high())[:5]:
+        for issue in list(critical)[:5] + list(high)[:5]:
             print(f"    - [{issue.severity}] {issue.file_path}:{issue.line_number}")
             print(f"      {issue.message}")
 
     # Optimization opportunities
+    dry = DRYAnalyzer(rj).find_all_issues()
+    loops = LoopOptimizer(rj).find_all_issues()
     print("\nOptimization Opportunities:")
-    print(f"  Total: {len(optimization)} findings")
-    by_type = optimization.count_by_type()
-    for type_name, count in sorted(by_type.items(), key=lambda x: -x[1])[:5]:
-        print(f"    {type_name}: {count}")
+    print(f"  Total: {len(dry) + len(loops)} findings")
+    for label, findings in (("DRY", dry), ("Loops", loops)):
+        by_type = findings.count_by_type()
+        for opt_type, count in sorted(by_type.items(), key=lambda x: -x[1])[:3]:
+            print(f"    {label} {opt_type.name}: {count}")
 
     print()
     print("=" * 60)
@@ -73,8 +82,9 @@ def complexity_report(path: str = "src/", threshold: int = 10) -> None:
     print(f"Threshold: {threshold}")
     print()
 
-    # Find complex functions
-    complex_funcs = analyzer.find_complex_functions(threshold)
+    # find_complex_functions returns an AnalysisTargetList; each finding's
+    # `value` holds the measured cyclomatic complexity.
+    complex_funcs = analyzer.find_complex_functions(max_complexity=threshold)
 
     if not complex_funcs:
         print("No functions exceed complexity threshold.")
@@ -84,19 +94,16 @@ def complexity_report(path: str = "src/", threshold: int = 10) -> None:
 
     # Group by file
     by_file = {}
-    for func, complexity in complex_funcs:
-        file_path = str(func.file_path)
-        if file_path not in by_file:
-            by_file[file_path] = []
-        by_file[file_path].append((func, complexity))
+    for finding in complex_funcs:
+        file_path = str(finding.file_path)
+        by_file.setdefault(file_path, []).append(finding)
 
-    for file_path, funcs in sorted(by_file.items()):
+    for file_path, findings in sorted(by_file.items()):
         print(f"{file_path}")
-        for func, c in sorted(funcs, key=lambda x: -x[1].cyclomatic):
-            print(f"  {func.name}:")
-            print(f"    Cyclomatic: {c.cyclomatic}")
-            print(f"    Nesting: {c.max_nesting}")
-            print(f"    Lines: {c.lines}")
+        for finding in sorted(findings, key=lambda f: -(f.value or 0)):
+            print(f"  {finding.name}:")
+            print(f"    Cyclomatic: {finding.value}")
+            print(f"    {finding.message}")
         print()
 
 if __name__ == "__main__":
@@ -124,12 +131,7 @@ def find_dead_code(path: str = "src/") -> None:
     unused_funcs = analyzer.find_unused_functions()
     print(f"Unused Functions: {len(unused_funcs)}")
     for func in unused_funcs[:10]:
-        confidence_marker = {
-            "high": "[!]",
-            "medium": "[?]",
-            "low": "[ ]",
-        }.get(func.confidence, "[ ]")
-        print(f"  {confidence_marker} {func.file_path}:{func.line_number} - {func.name}")
+        print(f"  [{func.severity}] {func.file_path}:{func.line_number} - {func.name}")
     if len(unused_funcs) > 10:
         print(f"  ... and {len(unused_funcs) - 10} more")
     print()
@@ -141,15 +143,13 @@ def find_dead_code(path: str = "src/") -> None:
         print(f"  {cls.file_path}:{cls.line_number} - {cls.name}")
     print()
 
-    # Unused imports
-    unused_imports = analyzer.find_unused_imports()
+    # Unused imports (provided by the Rejig facade, not DeadCodeAnalyzer)
+    unused_imports = rj.find_unused_imports()
     print(f"Unused Imports: {len(unused_imports)}")
     by_file = {}
     for imp in unused_imports:
         file_path = str(imp.file_path)
-        if file_path not in by_file:
-            by_file[file_path] = []
-        by_file[file_path].append(imp)
+        by_file.setdefault(file_path, []).append(imp)
 
     for file_path, imps in sorted(by_file.items())[:5]:
         print(f"  {file_path}: {len(imps)} unused imports")
@@ -165,39 +165,39 @@ if __name__ == "__main__":
 ```python
 #!/usr/bin/env python
 """Check type hint coverage."""
-from rejig import Rejig, TypeHintAnalyzer
+from collections import defaultdict
+from rejig import Rejig
 
 def type_coverage(path: str = "src/") -> None:
     rj = Rejig(path)
-    analyzer = TypeHintAnalyzer(rj)
 
-    stats = analyzer.coverage_stats()
+    # All module-level functions, and those missing a return annotation.
+    all_funcs = rj.find_functions()
+    untyped = rj.find_functions_without_type_hints()
+
+    total = len(all_funcs)
+    missing = len(untyped)
+    typed = max(total - missing, 0)
+    coverage = (typed / total * 100) if total else 100.0
 
     print("TYPE HINT COVERAGE REPORT")
     print("=" * 60)
     print()
-    print(f"Overall Coverage: {stats.coverage_percent:.1f}%")
-    print()
-    print(f"Functions: {stats.typed_functions}/{stats.total_functions} typed")
-    print(f"Methods: {stats.typed_methods}/{stats.total_methods} typed")
+    print(f"Overall Coverage: {coverage:.1f}%")
+    print(f"Functions: {typed}/{total} typed")
     print()
 
-    # Coverage by file
-    print("Coverage by File:")
+    # Group the untyped findings by file
+    by_file = defaultdict(list)
+    for finding in untyped:
+        by_file[str(finding.file_path)].append(finding)
+
+    print("Files With Untyped Functions:")
     print("-" * 40)
-
-    files = sorted(stats.by_file.items(), key=lambda x: x[1].coverage_percent)
-
-    # Show lowest coverage files
-    print("\nLowest Coverage:")
-    for file_path, file_stats in files[:10]:
-        bar = "#" * int(file_stats.coverage_percent / 5)
-        print(f"  {file_stats.coverage_percent:5.1f}% |{bar:<20}| {file_path}")
-
-    print("\nHighest Coverage:")
-    for file_path, file_stats in files[-10:]:
-        bar = "#" * int(file_stats.coverage_percent / 5)
-        print(f"  {file_stats.coverage_percent:5.1f}% |{bar:<20}| {file_path}")
+    for file_path, findings in sorted(by_file.items(), key=lambda x: -len(x[1]))[:10]:
+        print(f"  {len(findings):3d} untyped | {file_path}")
+        for finding in findings[:3]:
+            print(f"      - {finding.name} (line {finding.line_number})")
 
 if __name__ == "__main__":
     import sys
@@ -210,39 +210,44 @@ if __name__ == "__main__":
 ```python
 #!/usr/bin/env python
 """Check docstring coverage."""
-from rejig import Rejig, DocstringAnalyzer
+from collections import defaultdict
+from rejig import Rejig
 
 def docstring_coverage(path: str = "src/") -> None:
     rj = Rejig(path)
-    analyzer = DocstringAnalyzer(rj)
 
-    report = analyzer.analyze()
+    # All functions/classes that lack a docstring.
+    missing = rj.find_missing_docstrings()
 
     print("DOCSTRING COVERAGE REPORT")
     print("=" * 60)
     print()
-    print(f"Overall Coverage: {report.coverage_percent:.1f}%")
-    print()
-    print(f"Total functions/methods: {report.total_functions}")
-    print(f"With docstrings: {report.with_docstrings}")
-    print(f"Missing docstrings: {report.total_functions - report.with_docstrings}")
-    print()
-
-    # Style breakdown
-    print("Docstring Styles:")
-    for style, count in sorted(report.styles.items(), key=lambda x: -x[1]):
-        print(f"  {style}: {count}")
+    print(f"Items missing docstrings: {len(missing)}")
     print()
 
     # Missing by file
+    missing_by_file = defaultdict(list)
+    for target in missing:
+        missing_by_file[str(target.file_path)].append(target.name)
+
     print("Files Missing Docstrings:")
-    missing_by_file = report.missing_by_file()
-    for file_path, missing in sorted(missing_by_file.items(), key=lambda x: -len(x[1]))[:10]:
-        print(f"  {file_path}: {len(missing)} missing")
-        for func_name in missing[:3]:
-            print(f"    - {func_name}")
-        if len(missing) > 3:
-            print(f"    ... and {len(missing) - 3} more")
+    for file_path, names in sorted(missing_by_file.items(), key=lambda x: -len(x[1]))[:10]:
+        print(f"  {file_path}: {len(names)} missing")
+        for name in names[:3]:
+            print(f"    - {name}")
+        if len(names) > 3:
+            print(f"    ... and {len(names) - 3} more")
+
+    # Also surface docstrings that no longer match their signatures.
+    outdated = rj.find_outdated_docstrings()
+    print()
+    print(f"Outdated docstrings: {len(outdated)}")
+    for item in outdated[:5]:
+        print(f"  {item['file_path']}:{item['name']}")
+        if item["stale_params"]:
+            print(f"    Stale params: {item['stale_params']}")
+        if item["missing_params"]:
+            print(f"    Missing params: {item['missing_params']}")
 
 if __name__ == "__main__":
     import sys
@@ -269,7 +274,9 @@ def track_todos(path: str = "src/") -> None:
     print()
 
     # By type
-    by_type = todos.count_by_type()
+    by_type = defaultdict(int)
+    for todo in todos:
+        by_type[todo.todo_type] += 1
     print("By Type:")
     for todo_type, count in sorted(by_type.items(), key=lambda x: -x[1]):
         print(f"  {todo_type}: {count}")
@@ -287,16 +294,16 @@ def track_todos(path: str = "src/") -> None:
     print()
 
     # High priority
-    high_priority = todos.by_priority(1) + todos.by_priority(2)
+    high_priority = todos.high_priority()
     if high_priority:
         print(f"High Priority ({len(high_priority)}):")
         for todo in high_priority[:10]:
             print(f"  [{todo.todo_type}] {todo.file_path}:{todo.line_number}")
-            print(f"    {todo.text[:60]}...")
+            print(f"    {todo.todo_text[:60]}...")
     print()
 
     # Without issue refs
-    no_issues = todos.without_issue_refs()
+    no_issues = todos.without_issues()
     print(f"Without Issue References: {len(no_issues)}")
     if no_issues:
         print("  Consider linking these to issues for tracking:")
@@ -326,29 +333,37 @@ def analyze_imports(path: str = "src/") -> None:
     print()
 
     # Basic stats
-    print(f"Total modules: {graph.module_count}")
-    print(f"Total import edges: {graph.edge_count}")
+    modules = graph.get_modules()
+    edges = graph.get_edges()
+    print(f"Total modules: {len(modules)}")
+    print(f"Total import edges: {len(edges)}")
     print()
 
     # Circular imports
     cycles = graph.find_circular_imports()
     print(f"Circular Imports: {len(cycles)}")
     for i, cycle in enumerate(cycles[:5], 1):
-        print(f"  {i}. {' -> '.join(cycle.modules)}")
+        print(f"  {i}. {' -> '.join(cycle.cycle)}")
     if len(cycles) > 5:
         print(f"  ... and {len(cycles) - 5} more")
     print()
 
-    # Most imported modules
+    # Most imported modules (by number of dependents)
     print("Most Imported Modules:")
-    most_imported = graph.most_imported(10)
+    most_imported = sorted(
+        ((m, len(graph.get_dependents(m))) for m in modules),
+        key=lambda x: -x[1],
+    )[:10]
     for module, count in most_imported:
         print(f"  {module}: imported by {count} modules")
     print()
 
-    # Modules with most imports
+    # Modules with most imports (by number of dependencies)
     print("Modules with Most Dependencies:")
-    most_deps = graph.most_dependencies(10)
+    most_deps = sorted(
+        ((m, len(graph.get_dependencies(m))) for m in modules),
+        key=lambda x: -x[1],
+    )[:10]
     for module, count in most_deps:
         print(f"  {module}: imports {count} modules")
 
@@ -364,16 +379,11 @@ if __name__ == "__main__":
 #!/usr/bin/env python
 """Generate comprehensive codebase report."""
 import json
-from pathlib import Path
 from rejig import (
     Rejig,
     CodeMetrics,
-    TypeHintAnalyzer,
-    DocstringAnalyzer,
     ComplexityAnalyzer,
     DeadCodeAnalyzer,
-    SecurityReporter,
-    AnalysisReporter,
 )
 
 def full_report(path: str = "src/", output: str = "report.json") -> None:
@@ -390,43 +400,40 @@ def full_report(path: str = "src/", output: str = "report.json") -> None:
         "analysis": {},
     }
 
-    # Code metrics
-    metrics = CodeMetrics(rj)
-    project_metrics = metrics.analyze_project()
+    # Code metrics (get_project_summary returns a dict)
+    summary = CodeMetrics(rj).get_project_summary()
     report["metrics"] = {
-        "files": project_metrics.file_count,
-        "total_loc": project_metrics.total_loc,
-        "functions": project_metrics.total_functions,
-        "classes": project_metrics.total_classes,
-        "avg_complexity": project_metrics.avg_complexity,
+        "files": summary["total_files"],
+        "total_loc": summary["total_lines"],
+        "functions": summary["total_functions"],
+        "classes": summary["total_classes"],
+        "avg_complexity": summary["avg_complexity"],
     }
 
-    # Type hint coverage
-    type_analyzer = TypeHintAnalyzer(rj)
-    type_stats = type_analyzer.coverage_stats()
+    # Type hints: count functions missing a return annotation
+    total_funcs = len(rj.find_functions())
+    untyped = len(rj.find_functions_without_type_hints())
+    typed = max(total_funcs - untyped, 0)
     report["type_hints"] = {
-        "coverage_percent": type_stats.coverage_percent,
-        "typed_functions": type_stats.typed_functions,
-        "total_functions": type_stats.total_functions,
+        "coverage_percent": (typed / total_funcs * 100) if total_funcs else 100.0,
+        "typed_functions": typed,
+        "total_functions": total_funcs,
     }
 
-    # Docstring coverage
-    doc_analyzer = DocstringAnalyzer(rj)
-    doc_report = doc_analyzer.analyze()
+    # Docstrings
+    missing_docs = rj.find_missing_docstrings()
     report["docstrings"] = {
-        "coverage_percent": doc_report.coverage_percent,
-        "with_docstrings": doc_report.with_docstrings,
-        "total": doc_report.total_functions,
+        "missing": len(missing_docs),
+        "outdated": len(rj.find_outdated_docstrings()),
     }
 
-    # Complexity
-    complexity_analyzer = ComplexityAnalyzer(rj)
-    complex_funcs = complexity_analyzer.find_complex_functions(10)
+    # Complexity (findings carry the measured complexity in `value`)
+    complex_funcs = ComplexityAnalyzer(rj).find_complex_functions(max_complexity=10)
     report["complexity"] = {
         "functions_over_threshold": len(complex_funcs),
         "top_5": [
-            {"name": f.name, "file": str(f.file_path), "complexity": c.cyclomatic}
-            for f, c in complex_funcs[:5]
+            {"name": f.name, "file": str(f.file_path), "complexity": f.value}
+            for f in complex_funcs[:5]
         ],
     }
 
@@ -435,23 +442,24 @@ def full_report(path: str = "src/", output: str = "report.json") -> None:
     report["dead_code"] = {
         "unused_functions": len(dead_analyzer.find_unused_functions()),
         "unused_classes": len(dead_analyzer.find_unused_classes()),
-        "unused_imports": len(dead_analyzer.find_unused_imports()),
+        "unused_imports": len(rj.find_unused_imports()),
     }
 
-    # Security
+    # Security (enum keys stringified for JSON)
     security = rj.find_security_issues()
     report["security"] = {
         "total": len(security),
         "by_severity": security.count_by_severity(),
-        "by_type": security.count_by_type(),
+        "by_type": {k.name: v for k, v in security.count_by_type().items()},
     }
 
     # Analysis
-    issues = rj.find_analysis_issues()
+    analysis = rj.analyze_code()
     report["analysis"] = {
-        "total": len(issues),
-        "by_severity": issues.count_by_severity(),
-        "by_type": issues.count_by_type(),
+        "total": analysis.total_issues,
+        "complexity": len(analysis.complexity_issues or []),
+        "patterns": len(analysis.pattern_issues or []),
+        "dead_code": len(analysis.dead_code or []),
     }
 
     # Save report
@@ -466,7 +474,7 @@ def full_report(path: str = "src/", output: str = "report.json") -> None:
     print(f"Files: {report['metrics']['files']}")
     print(f"Lines of code: {report['metrics']['total_loc']}")
     print(f"Type hint coverage: {report['type_hints']['coverage_percent']:.1f}%")
-    print(f"Docstring coverage: {report['docstrings']['coverage_percent']:.1f}%")
+    print(f"Missing docstrings: {report['docstrings']['missing']}")
     print(f"Security issues: {report['security']['total']}")
     print(f"Analysis issues: {report['analysis']['total']}")
 
@@ -489,7 +497,7 @@ def ci_check(
     path: str = "src/",
     max_complexity: int = 15,
     min_type_coverage: float = 80.0,
-    min_doc_coverage: float = 70.0,
+    max_missing_docstrings: int = 50,
     fail_on_security: bool = True,
 ) -> int:
     rj = Rejig(path)
@@ -498,7 +506,7 @@ def ci_check(
     # Security check
     if fail_on_security:
         security = rj.find_security_issues()
-        critical_high = security.critical() + security.high()
+        critical_high = list(security.critical()) + list(security.high())
         if critical_high:
             print(f"FAIL: {len(critical_high)} critical/high security issues")
             for issue in critical_high[:5]:
@@ -510,7 +518,7 @@ def ci_check(
     # Complexity check
     from rejig import ComplexityAnalyzer
     analyzer = ComplexityAnalyzer(rj)
-    complex_funcs = analyzer.find_complex_functions(max_complexity)
+    complex_funcs = analyzer.find_complex_functions(max_complexity=max_complexity)
     if complex_funcs:
         print(f"FAIL: {len(complex_funcs)} functions exceed complexity {max_complexity}")
         failed = True
@@ -518,24 +526,23 @@ def ci_check(
         print(f"PASS: No functions exceed complexity {max_complexity}")
 
     # Type coverage check
-    from rejig import TypeHintAnalyzer
-    type_analyzer = TypeHintAnalyzer(rj)
-    type_stats = type_analyzer.coverage_stats()
-    if type_stats.coverage_percent < min_type_coverage:
-        print(f"FAIL: Type hint coverage {type_stats.coverage_percent:.1f}% < {min_type_coverage}%")
+    total_funcs = len(rj.find_functions())
+    untyped = len(rj.find_functions_without_type_hints())
+    typed = max(total_funcs - untyped, 0)
+    coverage = (typed / total_funcs * 100) if total_funcs else 100.0
+    if coverage < min_type_coverage:
+        print(f"FAIL: Type hint coverage {coverage:.1f}% < {min_type_coverage}%")
         failed = True
     else:
-        print(f"PASS: Type hint coverage {type_stats.coverage_percent:.1f}%")
+        print(f"PASS: Type hint coverage {coverage:.1f}%")
 
-    # Docstring coverage check
-    from rejig import DocstringAnalyzer
-    doc_analyzer = DocstringAnalyzer(rj)
-    doc_report = doc_analyzer.analyze()
-    if doc_report.coverage_percent < min_doc_coverage:
-        print(f"FAIL: Docstring coverage {doc_report.coverage_percent:.1f}% < {min_doc_coverage}%")
+    # Docstring check
+    missing = len(rj.find_missing_docstrings())
+    if missing > max_missing_docstrings:
+        print(f"FAIL: {missing} items missing docstrings (> {max_missing_docstrings})")
         failed = True
     else:
-        print(f"PASS: Docstring coverage {doc_report.coverage_percent:.1f}%")
+        print(f"PASS: {missing} items missing docstrings")
 
     return 1 if failed else 0
 

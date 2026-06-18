@@ -77,7 +77,7 @@ rj.toml("pyproject.toml").set("tool.black.line-length", 110)
 | Add type hints to legacy code | Manual annotation | `rj.find_functions().infer_type_hints()` |
 | Generate docstrings | Write each one | `targets.generate_docstrings()` |
 | Update pyproject.toml | Parse, modify, serialize | `rj.toml(path).set(key, value)` |
-| Find duplicate code | Manual review | `rj.find_optimization_opportunities()` |
+| Find duplicate code | Manual review | `DRYAnalyzer(rj).find_all_issues()` |
 
 ## Installation
 

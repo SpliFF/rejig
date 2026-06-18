@@ -226,7 +226,7 @@ func.add_decorator("cache")
 ### find_files
 
 ```python
-rj.find_files(pattern: str = "**/*.py") -> TargetList[FileTarget]
+rj.find_files(glob: str = "**/*.py") -> TargetList[FileTarget]
 ```
 
 Find files matching a glob pattern.
@@ -276,61 +276,11 @@ all_funcs = rj.find_functions()
 handlers = rj.find_functions(pattern=".*_handler$")
 ```
 
-### find_methods
-
-```python
-rj.find_methods(pattern: str | None = None) -> TargetList[MethodTarget]
-```
-
-Find all methods across all classes.
-
-**Example:**
-
-```python
-getters = rj.find_methods(pattern="^get_")
-```
-
-### find_imports
-
-```python
-rj.find_imports(module: str | None = None) -> TargetList[ImportTarget]
-```
-
-Find import statements.
-
-**Example:**
-
-```python
-typing_imports = rj.find_imports("typing")
-```
-
-### find_comments
-
-```python
-rj.find_comments(pattern: str | None = None) -> TargetList[CommentTarget]
-```
-
-Find comments matching a pattern.
-
-**Example:**
-
-```python
-todos = rj.find_comments(pattern="TODO")
-```
-
-### find_strings
-
-```python
-rj.find_strings() -> TargetList[StringLiteralTarget]
-```
-
-Find all string literals.
-
-**Example:**
-
-```python
-strings = rj.find_strings()
-```
+Methods, imports, comments, and string literals are not searched from the
+`Rejig` instance directly. Find methods through a class target
+(`ClassTarget.find_methods(...)`) and imports through a file target
+(`FileTarget.find_imports()`). See the [Targets reference](targets.md) for the
+full per-target navigation API.
 
 ### find_todos
 
@@ -349,29 +299,39 @@ fixmes = todos.by_type("FIXME")
 
 ## Analysis Methods
 
-### find_analysis_issues
+### analyze_code
 
 ```python
-rj.find_analysis_issues(config: AnalysisConfig | None = None) -> AnalysisTargetList
+rj.analyze_code(
+    include_complexity: bool = True,
+    include_patterns: bool = True,
+    include_dead_code: bool = True,
+    include_coverage: bool = True,
+) -> AnalysisReport
 ```
 
-Run code analysis and return issues.
+Run a full code analysis and return an `AnalysisReport` aggregating complexity,
+pattern, dead-code, and coverage findings. See the
+[Analysis reference](analysis.md) for the report structure and the individual
+analyzers.
 
 **Example:**
 
 ```python
-issues = rj.find_analysis_issues()
-high_complexity = issues.by_type("HIGH_CYCLOMATIC_COMPLEXITY")
-print(issues.summary())
+report = rj.analyze_code()
+print(report)
+print(f"Total issues: {report.total_issues}")
+for finding in report.complexity_issues:
+    print(f"{finding.location}: {finding.message}")
 ```
 
 ### find_security_issues
 
 ```python
-rj.find_security_issues(config: SecurityConfig | None = None) -> SecurityTargetList
+rj.find_security_issues() -> SecurityTargetList
 ```
 
-Run security scanning and return issues.
+Run all security scanners and return the combined findings.
 
 **Example:**
 
@@ -380,19 +340,21 @@ security = rj.find_security_issues()
 critical = security.critical()
 ```
 
-### find_optimization_opportunities
+### Optimization
 
-```python
-rj.find_optimization_opportunities() -> OptimizeTargetList
-```
-
-Find optimization opportunities (duplicate code, loop improvements).
+There is no single `find_optimization_opportunities()` method. Optimization
+analysis is provided by the `DRYAnalyzer` (duplicate code) and `LoopOptimizer`
+(loop improvements) classes in `rejig.optimize`.
 
 **Example:**
 
 ```python
-opts = rj.find_optimization_opportunities()
-duplicates = opts.by_type("DUPLICATE_CODE")
+from rejig import Rejig, DRYAnalyzer, LoopOptimizer
+
+rj = Rejig("src/")
+
+duplicates = DRYAnalyzer(rj).find_all_issues()
+loops = LoopOptimizer(rj).find_all_issues()
 ```
 
 ## Directive Methods
@@ -431,7 +393,8 @@ noqas = rj.find_noqa_comments()
 ### transaction
 
 ```python
-rj.transaction() -> Transaction
+with rj.transaction() as tx:  # context manager yielding Transaction
+    ...
 ```
 
 Start an atomic transaction. Changes are collected and applied together.
@@ -452,7 +415,7 @@ with rj.transaction() as tx:
 ### add_import
 
 ```python
-rj.add_import(path: Path, import_statement: str) -> Result
+rj.add_import(file_path: Path, import_statement: str) -> Result
 ```
 
 Add an import to a file.
@@ -466,7 +429,7 @@ rj.add_import(Path("src/module.py"), "from typing import Optional")
 ### remove_import
 
 ```python
-rj.remove_import(path: Path, pattern: str) -> Result
+rj.remove_import(file_path: Path, import_pattern: str) -> Result
 ```
 
 Remove imports matching a pattern.
@@ -482,7 +445,7 @@ rj.remove_import(Path("src/module.py"), r"from deprecated import.*")
 ### transform_file
 
 ```python
-rj.transform_file(path: Path, transformer: CSTTransformer) -> Result
+rj.transform_file(file_path: Path, transformer: CSTTransformer) -> Result
 ```
 
 Apply a LibCST transformer to a file.

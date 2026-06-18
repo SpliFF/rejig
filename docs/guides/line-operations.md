@@ -77,28 +77,6 @@ line.add_no_cover()     # pragma: no cover
 line.remove_no_cover()
 ```
 
-## TODO Comments
-
-### Adding TODOs
-
-```python
-line.add_todo("Refactor this")
-line.add_todo("Fix bug", type="FIXME")
-line.add_todo("Needs review", type="TODO", author="jane")
-```
-
-### Removing TODOs
-
-```python
-line.remove_todo()
-```
-
-### Linking to Issues
-
-```python
-line.link_to_issue("#123")
-```
-
 ## Line Block Operations
 
 ### Content Access
@@ -117,8 +95,8 @@ if result:
 # Move to another position in the same file
 block.move_to(100)
 
-# Move to another file
-block.move_to_file("other.py", after_line=10)
+# Move to another file (insert at the given line in the destination)
+block.move_to_file("other.py", line_number=10)
 ```
 
 ### Rewriting
@@ -133,8 +111,8 @@ def new_function():
 ### Inserting
 
 ```python
-block.prepend("# Section start\n")
-block.append("# Section end\n")
+block.insert_before("# Section start")
+block.insert_after("# Section end")
 ```
 
 ### Deleting
@@ -195,9 +173,9 @@ rj.find_bare_type_ignores()
 
 # Other directive types
 rj.find_noqa_comments()
+rj.find_bare_noqa()
 rj.find_pylint_disables()
-rj.find_fmt_off_regions()
-rj.find_no_cover_comments()
+rj.find_no_cover()
 
 # Everything
 rj.find_all_directives()
@@ -206,26 +184,19 @@ rj.find_all_directives()
 ### Cleaning Up
 
 ```python
-# Remove directives that are no longer needed
-rj.remove_unused_type_ignores()
-rj.remove_unused_noqa()
-rj.remove_unused_pylint_disables()
+# Remove all directives of a given kind across the project
+rj.remove_all_type_ignores()
+rj.remove_all_noqa()
 
-# Upgrade bare ignores to specific codes
-rj.add_error_codes_to_type_ignores()
-
-# Normalize formatting
-rj.normalize_directive_style()
+# Remove every linting directive
+rj.remove_all_directives()
 ```
 
 ### Auditing
 
 ```python
-# Get statistics
+# Counts by directive type
 stats = rj.count_directives_by_type()
-
-# Find potentially stale directives
-rj.find_stale_directives()
 
 # Full audit report
 rj.audit_directives()

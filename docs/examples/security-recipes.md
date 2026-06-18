@@ -70,14 +70,7 @@ def scan_secrets(path: str = "src/") -> None:
     rj = Rejig(path)
     scanner = SecretsScanner(rj)
 
-    # Add custom patterns for your organization
-    scanner.add_pattern(
-        name="internal_api_key",
-        pattern=r"INTERNAL_[A-Z_]+_KEY\s*=\s*['\"][^'\"]{20,}['\"]",
-        severity="high",
-    )
-
-    secrets = scanner.find_all()
+    secrets = scanner.find_hardcoded_secrets()
 
     print("SECRETS SCAN")
     print("=" * 60)
@@ -89,20 +82,18 @@ def scan_secrets(path: str = "src/") -> None:
 
     print(f"Found {len(secrets)} potential secrets:\n")
 
-    # Group by type
+    # Group by type (SecurityType enum)
     by_type = {}
     for secret in secrets:
-        if secret.type not in by_type:
-            by_type[secret.type] = []
-        by_type[secret.type].append(secret)
+        by_type.setdefault(secret.type, []).append(secret)
 
-    for secret_type, items in sorted(by_type.items()):
-        print(f"{secret_type} ({len(items)}):")
+    for secret_type, items in sorted(by_type.items(), key=lambda x: x[0].name):
+        print(f"{secret_type.name} ({len(items)}):")
         for item in items[:5]:
             print(f"  {item.file_path}:{item.line_number}")
-            print(f"    Confidence: {item.confidence}")
+            print(f"    Severity: {item.severity}")
             # Don't print the actual secret value!
-            print(f"    Pattern matched: {item.pattern_name}")
+            print(f"    Pattern matched: {item.name}")
         if len(items) > 5:
             print(f"  ... and {len(items) - 5} more")
         print()
@@ -129,7 +120,7 @@ def find_sql_injection(path: str = "src/") -> None:
     rj = Rejig(path)
     scanner = VulnerabilityScanner(rj)
 
-    issues = scanner.find_sql_injection()
+    issues = scanner.find_sql_injection_risks()
 
     print("SQL INJECTION SCAN")
     print("=" * 60)
@@ -173,7 +164,7 @@ def find_command_injection(path: str = "src/") -> None:
     rj = Rejig(path)
     scanner = VulnerabilityScanner(rj)
 
-    issues = scanner.find_command_injection()
+    issues = scanner.find_shell_injection_risks()
 
     print("COMMAND INJECTION SCAN")
     print("=" * 60)
@@ -217,7 +208,7 @@ def find_unsafe_deserialize(path: str = "src/") -> None:
     rj = Rejig(path)
     scanner = VulnerabilityScanner(rj)
 
-    yaml_issues = scanner.find_unsafe_yaml()
+    yaml_issues = scanner.find_unsafe_yaml_load()
     pickle_issues = scanner.find_unsafe_pickle()
 
     print("UNSAFE DESERIALIZATION SCAN")
@@ -259,50 +250,38 @@ if __name__ == "__main__":
 ```python
 #!/usr/bin/env python
 """Generate comprehensive security report."""
-import json
-from pathlib import Path
-from rejig import Rejig, SecurityReporter
+from rejig import Rejig
 
 def generate_security_report(
     path: str = "src/",
-    output_format: str = "html",
+    output_format: str = "json",
     output_file: str = "security-report",
 ) -> None:
     rj = Rejig(path)
-    security = rj.find_security_issues()
-    reporter = SecurityReporter(security)
 
     print("Generating security report...")
 
-    if output_format == "html":
-        report = reporter.to_html(include_code=True, syntax_highlight=True)
-        filename = f"{output_file}.html"
-    elif output_format == "json":
-        report = reporter.to_json()
-        filename = f"{output_file}.json"
-    elif output_format == "markdown":
-        report = reporter.to_markdown()
-        filename = f"{output_file}.md"
-    elif output_format == "sarif":
-        report = reporter.to_sarif()
-        filename = f"{output_file}.sarif"
-    else:
-        report = reporter.to_text()
-        filename = f"{output_file}.txt"
+    # Supported formats: "json", "markdown", "sarif"
+    extensions = {"json": "json", "markdown": "md", "sarif": "sarif"}
+    ext = extensions.get(output_format, "json")
+    filename = f"{output_file}.{ext}"
 
-    Path(filename).write_text(report)
-    print(f"Report saved to: {filename}")
+    result = rj.generate_security_report(filename, format=output_format)
+    if result.success:
+        print(f"Report saved to: {filename}")
+    else:
+        print(f"Failed: {result.message}")
 
     # Print summary
     print()
     print("SUMMARY")
     print("=" * 40)
-    print(security.summary())
+    print(rj.find_security_issues().summary())
 
 if __name__ == "__main__":
     import sys
     path = sys.argv[1] if len(sys.argv) > 1 else "src/"
-    fmt = sys.argv[2] if len(sys.argv) > 2 else "html"
+    fmt = sys.argv[2] if len(sys.argv) > 2 else "json"
     generate_security_report(path, fmt)
 ```
 
@@ -341,7 +320,7 @@ def check_staged_files() -> int:
         rj = Rejig(file_path)
         security = rj.find_security_issues()
 
-        critical_high = security.critical() + security.high()
+        critical_high = list(security.critical()) + list(security.high())
         if critical_high:
             issues_found.extend(critical_high)
 
@@ -369,7 +348,7 @@ if __name__ == "__main__":
 ```python
 #!/usr/bin/env python
 """Auto-fix common security issues where safe to do so."""
-from rejig import Rejig
+from rejig import Rejig, SecurityType
 
 def auto_fix_security(path: str = "src/", dry_run: bool = True) -> None:
     rj = Rejig(path, dry_run=dry_run)
@@ -384,11 +363,12 @@ def auto_fix_security(path: str = "src/", dry_run: bool = True) -> None:
     skipped = 0
 
     for issue in security:
-        if issue.type == "UNSAFE_YAML_LOAD":
+        # issue.type is a SecurityType enum member.
+        if issue.type == SecurityType.UNSAFE_YAML_LOAD:
             # Safe to auto-fix: yaml.load -> yaml.safe_load
             file_target = issue.to_file_target()
-            result = file_target.replace(
-                "yaml.load(",
+            result = file_target.replace_pattern(
+                r"yaml\.load\(",
                 "yaml.safe_load(",
             )
             if result.success:
@@ -397,12 +377,12 @@ def auto_fix_security(path: str = "src/", dry_run: bool = True) -> None:
                 fixed += 1
             continue
 
-        if issue.type == "INSECURE_RANDOM":
+        if issue.type == SecurityType.INSECURE_RANDOM:
             # Safe to auto-fix: random -> secrets for specific patterns
             # This is more complex, skip for now
             pass
 
-        if issue.type == "DEBUG_CODE":
+        if issue.type == SecurityType.DEBUG_CODE:
             # Can remove debug statements
             line = issue.to_line_target()
             result = line.delete()
@@ -462,16 +442,14 @@ jobs:
         id: security
         run: |
           python -c "
-          from rejig import Rejig, SecurityReporter
+          from rejig import Rejig
           rj = Rejig('src/')
-          security = rj.find_security_issues()
 
           # Generate SARIF for GitHub
-          reporter = SecurityReporter(security)
-          with open('security.sarif', 'w') as f:
-              f.write(reporter.to_sarif())
+          rj.generate_security_report('security.sarif', format='sarif')
 
           # Check for critical/high issues
+          security = rj.find_security_issues()
           critical_high = len(security.critical()) + len(security.high())
           print(f'::set-output name=critical_high::{critical_high}')
 

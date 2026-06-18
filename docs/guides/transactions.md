@@ -9,25 +9,28 @@ from rejig import Rejig
 
 rj = Rejig("src/")
 
-# Use context manager for automatic commit/rollback
+# Use the context manager to collect changes, then commit explicitly
 with rj.transaction() as tx:
     rj.find_class("OldClass").rename("NewClass")
     rj.find_function("old_func").rename("new_func")
-    rj.find_method("process").add_parameter("timeout", "int", "30")
+    rj.find_class("Job").find_method("process").add_parameter("timeout", "int", "30")
 
-# All changes applied atomically when exiting the context
+    # Apply all changes atomically
+    tx.commit()
 ```
 
 ## How Transactions Work
 
 1. **Collection Phase**: All modifications are collected but not written
-2. **Commit Phase**: On successful exit, all changes are written atomically
-3. **Rollback Phase**: On exception, no changes are written
+2. **Commit Phase**: Calling `tx.commit()` writes all changes atomically
+3. **Rollback Phase**: If the context exits without committing (e.g. on an
+   exception, or if you simply never call `commit()`), the transaction is
+   automatically rolled back and no changes are written
 
 ```python
 rj = Rejig("src/")
 
-with rj.transaction():
+with rj.transaction() as tx:
     # These changes are collected, not immediately written
     rj.find_class("A").rename("B")
     rj.find_class("C").rename("D")
@@ -39,18 +42,16 @@ with rj.transaction():
     # More changes...
     rj.find_function("x").rename("y")
 
-# Only here are all changes written together
+    # Write all changes together
+    tx.commit()
 ```
 
 ## Manual Transaction Control
 
-For more control, use explicit commit/rollback:
+For more control, decide whether to commit or roll back inside the context:
 
 ```python
-tx = rj.transaction()
-tx.begin()
-
-try:
+with rj.transaction() as tx:
     rj.find_class("A").rename("B")
     rj.find_class("C").rename("D")
 
@@ -59,9 +60,9 @@ try:
         tx.commit()
     else:
         tx.rollback()
-except Exception:
-    tx.rollback()
-    raise
+
+# If neither commit() nor rollback() is called (e.g. an exception
+# propagates), the transaction is auto-rolled back on exit.
 ```
 
 ## Preview Changes
@@ -73,18 +74,16 @@ with rj.transaction() as tx:
     rj.find_class("OldName").rename("NewName")
     rj.find_function("helper").add_decorator("cache")
 
-    # Preview changes
-    preview = tx.preview()
-
-    print(f"Files to modify: {preview.files_changed}")
-    print(f"Diff:\n{preview.diff}")
+    # preview() returns a combined unified diff string
+    print(f"Files to modify: {tx.pending_files}")
+    print(f"Diff:\n{tx.preview()}")
 
     # Optionally abort
     if not confirm("Apply changes?"):
         tx.rollback()
         return
 
-# Changes applied on exit (if not rolled back)
+    tx.commit()
 ```
 
 ## Transaction Status
@@ -106,8 +105,8 @@ with rj.transaction() as tx:
 
     # Transaction has pending changes
     rj.find_class("A").rename("B")
-    print(tx.has_changes)  # True
-    print(len(tx.pending_changes))  # 1
+    print(tx.pending_count)        # 1 (files with pending changes)
+    print(tx.pending_files)        # [Path("models.py")]
 ```
 
 ## Nested Transactions
@@ -116,40 +115,23 @@ Transactions cannot be nested. Starting a new transaction inside an existing one
 
 ```python
 with rj.transaction():
-    # This will raise an error
-    with rj.transaction():  # Error: Already in transaction
+    # This raises RuntimeError: Nested transactions are not supported
+    with rj.transaction():
         pass
-```
-
-If you need nested behavior, use savepoints (manual approach):
-
-```python
-with rj.transaction() as tx:
-    rj.find_class("A").rename("B")
-
-    # Save current state
-    savepoint = tx.create_savepoint()
-
-    try:
-        rj.find_class("C").rename("D")
-        rj.find_class("E").rename("F")
-    except Exception:
-        # Rollback to savepoint, keeping earlier changes
-        tx.rollback_to_savepoint(savepoint)
 ```
 
 ## Batch Result from Transaction
 
-Get a combined result for all operations:
+`tx.commit()` returns a `BatchResult` covering every applied change:
 
 ```python
 with rj.transaction() as tx:
-    result1 = rj.find_class("A").rename("B")
-    result2 = rj.find_function("x").rename("y")
-    result3 = rj.find_method("m").add_decorator("cache")
+    rj.find_class("A").rename("B")
+    rj.find_function("x").rename("y")
+    rj.find_class("Worker").find_method("run").add_decorator("cache")
 
-# Get combined result
-batch_result = tx.result
+    # commit() returns the combined result
+    batch_result = tx.commit()
 
 print(f"Success: {batch_result.success}")
 print(f"Files changed: {batch_result.files_changed}")
@@ -191,8 +173,8 @@ with rj.transaction() as tx:
     # This still runs
     result3 = rj.find_function("helper").rename("utility")
 
-# Transaction commits with partial success
-# Only successful operations are applied
+    # Commit applies only the successful operations
+    tx.commit()
 ```
 
 To abort on any failure:
@@ -211,6 +193,8 @@ with rj.transaction() as tx:
         for r in failed:
             print(f"Failed: {r.message}")
         tx.rollback()
+    else:
+        tx.commit()
 ```
 
 ## Use Cases
@@ -218,7 +202,7 @@ with rj.transaction() as tx:
 ### Coordinated Renames
 
 ```python
-with rj.transaction():
+with rj.transaction() as tx:
     # Rename class and update all method references
     cls = rj.find_class("UserManager")
     cls.rename("UserService")
@@ -226,10 +210,11 @@ with rj.transaction():
     # Update factory function
     rj.find_function("get_user_manager").rename("get_user_service")
 
-    # Update type hints referencing the old name
-    for func in rj.find_functions():
-        if "UserManager" in func.get_type_hints():
-            func.replace_type_hint("UserManager", "UserService")
+    # Update remaining textual references (e.g. type hints) across files
+    for file in rj.find_files():
+        file.replace_pattern(r"\bUserManager\b", "UserService")
+
+    tx.commit()
 ```
 
 ### Safe Migration
@@ -240,17 +225,21 @@ def migrate_api_version():
 
     with rj.transaction() as tx:
         # Update version constant
-        rj.find_module("myapp.version").find_assignment("API_VERSION").rewrite("API_VERSION = '2.0'")
+        rj.file("myapp/version.py").replace_pattern(
+            r"API_VERSION = '1\.0'", "API_VERSION = '2.0'"
+        )
 
-        # Update all endpoint decorators
-        for method in rj.find_methods(pattern="^(get|post|put|delete)_"):
-            method.replace_decorator_arg("api_version", "'1.0'", "'2.0'")
+        # Update the api_version argument wherever it appears
+        for file in rj.find_files():
+            file.replace_pattern(r"api_version='1\.0'", "api_version='2.0'")
 
-        # Preview and confirm
-        print(tx.preview().diff)
+        # Preview and confirm (preview() returns a unified diff string)
+        print(tx.preview())
         if not confirm("Apply migration?"):
             tx.rollback()
             return False
+
+        tx.commit()
 
     return True
 ```
@@ -258,16 +247,21 @@ def migrate_api_version():
 ### Batch Refactoring
 
 ```python
-with rj.transaction():
+with rj.transaction() as tx:
     # Add logging to all API endpoints
     for cls in rj.find_classes(pattern=".*View$"):
         for method in cls.find_methods():
             if method.name in ["get", "post", "put", "delete"]:
                 method.insert_statement("logger.info(f'API call: {request.path}')")
 
-    # Add timing decorator
-    for func in rj.find_functions().in_directory("src/api/"):
+    # Add timing decorator to functions under src/api/
+    api_funcs = rj.find_functions().filter(
+        lambda f: "src/api/" in str(f.file_path)
+    )
+    for func in api_funcs:
         func.add_decorator("timing")
+
+    tx.commit()
 ```
 
 ### Conditional Commit
@@ -277,16 +271,13 @@ with rj.transaction() as tx:
     # Collect all changes
     rj.find_classes().add_decorator("dataclass")
 
-    # Run tests to verify changes work
-    preview = tx.preview()
-    preview.write_to_temp()  # Write to temp files
-
-    test_result = run_tests_on_temp()
-
-    if not test_result.passed:
-        print("Tests failed, rolling back")
+    # Inspect the combined diff before deciding
+    diff = tx.preview()  # unified diff string
+    if not changes_look_safe(diff):  # your validation function
+        print("Changes failed validation, rolling back")
         tx.rollback()
-    # else: auto-commit on exit
+    else:
+        tx.commit()
 ```
 
 ## Dry Run with Transactions
@@ -301,7 +292,7 @@ with rj.transaction() as tx:
     rj.find_function("x").rename("y")
 
     # Even in dry run, preview shows what would happen
-    print(tx.preview().diff)
+    print(tx.preview())
 
 # Nothing is written (dry run mode)
 # But you can see the complete diff of all changes

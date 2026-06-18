@@ -21,21 +21,24 @@ file.add_import("from typing import Optional, List")
 # Add with alias
 file.add_import("import numpy as np")
 
-# Add to TYPE_CHECKING block
-file.add_import("from myapp.models import User", type_checking=True)
+file.add_import("from myapp.models import User")
 ```
 
 ### Remove Imports
 
+Imports are removed through targets. Find them with `find_imports()` or
+`find_unused_imports()`, then call `delete()` on a target (or the list).
+
 ```python
-# Remove by exact match
-file.remove_import("import os")
+# Remove all unused imports in one step
+file.remove_unused_imports()
 
-# Remove by pattern (regex)
-file.remove_import(r"from deprecated import.*")
+# Or operate on targets
+file.find_unused_imports().delete()
 
-# Remove specific names from a from import
-file.remove_import_name("typing", "Optional")  # Keeps List if imported
+# Delete a single import target
+imp = file.find_imports().filter_relative().to_list()[0]
+imp.delete()
 ```
 
 ## Finding Imports
@@ -46,55 +49,62 @@ file.remove_import_name("typing", "Optional")  # Keeps List if imported
 imports = file.find_imports()
 
 for imp in imports:
-    print(f"{imp.line_number}: {imp.import_statement}")
-    print(f"  Module: {imp.module}")
-    print(f"  Names: {imp.get_imported_names()}")
-    print(f"  Is from import: {imp.is_from_import}")
+    print(f"{imp.line_number}: {imp.module}")
+    print(f"  Names: {imp.names}")
     print(f"  Is relative: {imp.is_relative}")
+    print(f"  Is unused: {imp.is_unused}")
 ```
 
-### Find Specific Imports
+### Filter Imports
+
+`find_imports()` takes no arguments and returns an `ImportTargetList`. Narrow
+results with the built-in filters:
 
 ```python
-# Find imports of a specific module
-typing_imports = file.find_imports("typing")
-
-# Find imports matching a pattern
-test_imports = file.find_imports(pattern=r"^test_")
-
 # Find relative imports
-relative = file.find_imports().filter(lambda i: i.is_relative)
+relative = file.find_imports().filter_relative()
 
-# Find TYPE_CHECKING imports
-type_checking = file.find_imports().filter(lambda i: i.is_type_checking)
+# Find absolute imports
+absolute = file.find_imports().filter_absolute()
+
+# Find unused imports
+unused = file.find_imports().filter_unused()
+
+# Restrict to a specific file
+in_file = file.find_imports().in_file("module.py")
 ```
 
 ## Import Analysis
 
-### ImportInfo Properties
+### ImportTarget Properties
 
-Each import has detailed information:
+Each `ImportTarget` returned by `find_imports()` exposes:
 
 ```python
-imp = file.find_imports("typing").first()
+imp = file.find_imports().to_list()[0]
 
-# Basic info
-imp.module           # "typing"
-imp.names            # ["Optional", "List"]
-imp.aliases          # {"List": "L"} if aliased
 imp.line_number      # 5
-imp.import_statement # "from typing import Optional, List"
-
-# Type info
-imp.is_from_import   # True
+imp.module           # "typing" (None for "import os" style)
+imp.names            # ["Optional", "List"]
 imp.is_relative      # False
-imp.relative_level   # 0 (1 for ".", 2 for "..", etc.)
-imp.is_future        # True for __future__ imports
-imp.is_type_checking # True if inside TYPE_CHECKING block
+imp.is_unused        # True if the import is never used
+```
 
-# Methods
-imp.get_imported_names()    # ["Optional", "List"]
-imp.get_original_name("L")  # "List" (resolve alias)
+The full underlying `ImportInfo` (with extra detail) is available via
+`imp.import_info`:
+
+```python
+info = imp.import_info
+
+info.import_statement # "from typing import Optional, List"
+info.aliases          # {"L": "List"} if aliased
+info.is_from_import   # True
+info.relative_level   # 0 (1 for ".", 2 for "..", etc.)
+info.is_future        # True for __future__ imports
+info.is_type_checking # True if inside TYPE_CHECKING block
+
+info.get_imported_names()    # ["Optional", "List"]
+info.get_original_name("L")  # "List" (resolve alias)
 ```
 
 ### Detect Unused Imports
@@ -104,76 +114,56 @@ from rejig import ImportAnalyzer
 
 analyzer = ImportAnalyzer(rj)
 
-# Find unused imports in a file
+# Find unused imports in a file (returns ImportInfo objects)
 unused = analyzer.find_unused_imports(file.path)
-for imp in unused:
-    print(f"Unused: {imp.import_statement} at line {imp.line_number}")
+for info in unused:
+    print(f"Unused: {info.import_statement} at line {info.line_number}")
 
 # Remove all unused imports
-for imp in unused:
-    file.remove_import(imp.import_statement)
+file.remove_unused_imports()
 
-# Or use the batch operation
-file.find_unused_imports().delete_all()
+# Or use the target-based batch operation
+file.find_unused_imports().delete()
 ```
 
-### Detect Missing Imports
+### Detect Potentially Missing Imports
 
 ```python
-# Find names used but not imported
-missing = analyzer.find_missing_imports(file.path)
+# Find names that are used but appear to have no definition or import
+missing = analyzer.find_potentially_missing_imports(file.path)
 for name in missing:
-    print(f"Missing import for: {name}")
-
-# Suggest imports for missing names
-suggestions = analyzer.suggest_imports(file.path)
-for name, possible_imports in suggestions.items():
-    print(f"{name} could be imported from: {possible_imports}")
+    print(f"Possibly missing import for: {name}")
 ```
 
 ## Import Organization
 
-Rejig can organize imports similar to isort:
+Rejig can organize imports similar to isort. The organizer sorts imports into
+sections (future, standard library, third-party, first-party, local) and orders
+them within each section.
 
 ```python
 from rejig import ImportOrganizer
 
 organizer = ImportOrganizer(rj)
 
-# Organize imports in a single file
+# Organize imports in a single file (takes a Path)
 organizer.organize(file.path)
 
-# Organize all files in the project
-organizer.organize_all()
-
-# Preview changes (dry run)
-rj_dry = Rejig("src/", dry_run=True)
-organizer = ImportOrganizer(rj_dry)
-result = organizer.organize_all()
-print(result.diff)
+# Organize every Python file in the project
+for f in rj.find_files():
+    organizer.organize(f.path)
 ```
 
-### Organization Options
+### First-Party Packages
+
+First-party packages are auto-detected, but you can specify them explicitly when
+constructing the organizer:
 
 ```python
-organizer = ImportOrganizer(rj)
+organizer = ImportOrganizer(rj, first_party_packages={"mypackage"})
 
-# Set grouping order
-organizer.configure(
-    sections=[
-        "FUTURE",      # __future__ imports
-        "STDLIB",      # Standard library
-        "THIRDPARTY",  # Third-party packages
-        "FIRSTPARTY",  # Your project's packages
-        "LOCALFOLDER", # Relative imports
-    ],
-    lines_between_sections=2,
-    lines_between_types=1,  # Between import and from import
-    force_sort_within_sections=True,
-    combine_as_imports=True,
-)
-
-organizer.organize_all()
+for f in rj.find_files():
+    organizer.organize(f.path)
 ```
 
 ## Circular Import Detection
@@ -192,40 +182,36 @@ graph.build()
 cycles = graph.find_circular_imports()
 for cycle in cycles:
     print(f"Circular import chain:")
-    print(f"  {' -> '.join(cycle.modules)}")
-
-# Check if a specific import would create a cycle
-would_cycle = graph.would_create_cycle("module_a", "module_b")
+    print(f"  {' -> '.join(cycle.cycle)}")
+    # Or simply: print(str(cycle))
 ```
 
 ### Import Graph Analysis
 
 ```python
-# Get all modules that import a specific module
-importers = graph.get_importers("myapp.models")
-print(f"Modules importing myapp.models: {importers}")
+# Get all modules that import a specific module (direct dependents)
+dependents = graph.get_dependents("myapp.models")
+print(f"Modules importing myapp.models: {dependents}")
 
-# Get all modules imported by a specific module
-imports = graph.get_imports("myapp.views")
-print(f"Modules imported by myapp.views: {imports}")
+# Get all modules imported by a specific module (direct dependencies)
+deps = graph.get_dependencies("myapp.views")
+print(f"Modules imported by myapp.views: {deps}")
 
-# Find the shortest import path between two modules
-path = graph.find_path("module_a", "module_z")
-if path:
-    print(f"Import path: {' -> '.join(path)}")
-
-# Get dependency depth (how many levels deep)
-depth = graph.get_depth("myapp.views")
-print(f"Import depth: {depth}")
+# Get all transitive dependencies of a module
+all_deps = graph.get_all_dependencies("myapp.views")
+print(f"All (transitive) dependencies: {all_deps}")
 ```
 
 ## Relative/Absolute Conversion
+
+Conversion is done per import target.
 
 ### Convert to Relative Imports
 
 ```python
 # Convert absolute imports to relative within the same package
-file.convert_imports_to_relative()
+for imp in file.find_imports().filter_absolute():
+    imp.convert_to_relative()
 
 # Example:
 # Before: from myapp.models import User
@@ -236,7 +222,8 @@ file.convert_imports_to_relative()
 
 ```python
 # Convert relative imports to absolute
-file.convert_imports_to_absolute(package_name="myapp")
+for imp in file.find_imports().filter_relative():
+    imp.convert_to_absolute(package_name="myapp")
 
 # Example:
 # Before: from .models import User
@@ -252,17 +239,16 @@ Work with imports as targets for batch operations:
 imports = file.find_imports()
 
 # Filter imports
-stdlib = imports.filter(lambda i: i.is_stdlib)
-third_party = imports.filter(lambda i: not i.is_stdlib and not i.is_first_party)
+relative = imports.filter_relative()
+absolute = imports.filter_absolute()
+unused = imports.filter_unused()
 
-# Batch operations
-imports.matching(r"deprecated").delete_all()
+# Batch delete (e.g. remove all unused imports)
+imports.filter_unused().delete()
 
-# Add names to existing imports
-typing_import = imports.matching("typing").first()
-if typing_import:
-    typing_import.add_name("Any")
-    typing_import.add_name("Dict")
+# Inspect individual targets
+for imp in imports:
+    print(imp.line_number, imp.module, imp.names)
 ```
 
 ## Common Patterns
@@ -276,74 +262,56 @@ rj = Rejig("src/")
 for file in rj.find_files():
     unused = file.find_unused_imports()
     if unused:
-        unused.delete_all()
-        print(f"Removed {len(unused)} unused imports from {file.path}")
+        print(f"Removing {len(unused)} unused imports from {file.path}")
+        unused.delete()
 ```
 
-### Migrate Import Style
+### Modernize typing Imports
 
 ```python
-# Convert all typing imports to Python 3.10+ style
+# Modernize type hints to Python 3.10+ syntax, then drop now-unused imports
 for file in rj.find_files():
-    # Remove typing imports that are now builtins
-    file.remove_import_name("typing", "List")
-    file.remove_import_name("typing", "Dict")
-    file.remove_import_name("typing", "Set")
-    file.remove_import_name("typing", "Tuple")
-    file.remove_import_name("typing", "Optional")
+    file.modernize_type_hints()
 
-    # Clean up empty typing imports
-    typing_import = file.find_imports("typing").first()
-    if typing_import and not typing_import.names:
-        typing_import.delete()
+# Clean up imports that are no longer referenced
+# (e.g. "from typing import List, Dict" once List/Dict are gone)
+for file in rj.find_files():
+    file.find_unused_imports().delete()
 ```
 
-### Consolidate Imports
+### Reorganize Imports
 
 ```python
-# Combine multiple imports from the same module
+# Sort and group imports across the project
 from rejig import ImportOrganizer
 
 organizer = ImportOrganizer(rj)
-organizer.configure(
-    combine_star_imports=False,
-    combine_as_imports=True,
-    force_single_line=False,
-)
-organizer.organize_all()
+for file in rj.find_files():
+    organizer.organize(file.path)
 
 # Before:
 # from typing import Optional
+# import os
 # from typing import List
-# from typing import Dict
 
 # After:
-# from typing import Dict, List, Optional
-```
-
-### Add TYPE_CHECKING Imports
-
-```python
-# Move runtime-only type imports to TYPE_CHECKING block
-file = rj.file("module.py")
-
-# Add the TYPE_CHECKING import if needed
-file.add_import("from typing import TYPE_CHECKING")
-
-# Move heavy imports to TYPE_CHECKING
-file.move_import_to_type_checking("from myapp.heavy_module import HeavyClass")
+# import os
+#
+# from typing import List, Optional
 ```
 
 ## Integration with Other Features
 
-### With Code Analysis
+### With Circular Import Detection
 
 ```python
-# Find files with circular imports
-issues = rj.find_analysis_issues()
-circular = issues.by_type("CIRCULAR_IMPORT")
-for issue in circular:
-    print(f"Circular import in {issue.file_path}: {issue.message}")
+# Find circular imports across the project
+from rejig import ImportGraph
+
+graph = ImportGraph(rj)
+graph.build()
+for cycle in graph.find_circular_imports():
+    print(f"Circular import: {cycle}")
 ```
 
 ### With Modernization
@@ -359,5 +327,5 @@ rj.find_functions().modernize_type_hints()
 
 # Then clean up now-unused typing imports
 for file in rj.find_files():
-    file.find_unused_imports().delete_all()
+    file.find_unused_imports().delete()
 ```

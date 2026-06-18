@@ -74,11 +74,12 @@ Dataclass representing a security finding.
 | `type` | `SecurityType` | Type of issue |
 | `file_path` | `Path` | File containing the issue |
 | `line_number` | `int` | Line number (1-indexed) |
-| `name` | `str` | Name of the pattern matched |
+| `name` | `str \| None` | Name of the pattern matched |
 | `message` | `str` | Human-readable description |
 | `severity` | `str` | "critical", "high", "medium", or "low" |
-| `code_snippet` | `str` | The problematic code |
+| `code_snippet` | `str \| None` | The problematic code |
 | `context` | `dict` | Additional context |
+| `recommendation` | `str \| None` | Suggested remediation |
 
 ## SecurityTarget
 
@@ -111,6 +112,7 @@ List of security findings with filtering and aggregation.
 | `high()` | `SecurityTargetList` | High severity only |
 | `medium()` | `SecurityTargetList` | Medium severity only |
 | `low()` | `SecurityTargetList` | Low severity only |
+| `at_least(min_severity)` | `SecurityTargetList` | Findings at or above `min_severity` |
 
 ### Filtering
 
@@ -142,7 +144,7 @@ List of security findings with filtering and aggregation.
 
 ### SecretsScanner
 
-Scan for hardcoded secrets.
+Scan for hardcoded secrets. Constructed with a `Rejig` instance.
 
 ```python
 from rejig import Rejig, SecretsScanner
@@ -150,23 +152,13 @@ from rejig import Rejig, SecretsScanner
 rj = Rejig("src/")
 scanner = SecretsScanner(rj)
 
-# Find all secrets
-secrets = scanner.find_all()
-
-# Add custom pattern
-scanner.add_pattern(
-    name="internal_key",
-    pattern=r"INTERNAL_[A-Z]+_KEY\s*=\s*['\"][^'\"]+['\"]",
-    severity="high",
-)
-
-# Scan again
-secrets = scanner.find_all()
+# Find all hardcoded secrets (SecurityTargetList)
+secrets = scanner.find_hardcoded_secrets()
 ```
 
 ### VulnerabilityScanner
 
-Scan for vulnerability patterns.
+Scan for vulnerability patterns. Each method returns a `SecurityTargetList`.
 
 ```python
 from rejig import Rejig, VulnerabilityScanner
@@ -175,74 +167,66 @@ rj = Rejig("src/")
 scanner = VulnerabilityScanner(rj)
 
 # Find specific vulnerability types
-sql = scanner.find_sql_injection()
-cmd = scanner.find_command_injection()
-yaml = scanner.find_unsafe_yaml()
+sql = scanner.find_sql_injection_risks()
+shell = scanner.find_shell_injection_risks()
+yaml_load = scanner.find_unsafe_yaml_load()
 pickle = scanner.find_unsafe_pickle()
+deserialize = scanner.find_unsafe_deserialization()
 eval_exec = scanner.find_unsafe_eval()
+path_traversal = scanner.find_path_traversal_risks()
+insecure_random = scanner.find_insecure_random()
+weak_crypto = scanner.find_weak_crypto()
+insecure_ssl = scanner.find_insecure_ssl()
 
-# Find all unsafe operations
-unsafe = scanner.find_unsafe_operations()
+# Find every vulnerability type at once
+unsafe = scanner.find_all_vulnerabilities()
 ```
 
-## SecurityConfig
+## Running a Scan
 
-Configuration for security scanning.
-
-### Properties
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `ignore_files` | `list[str]` | `[]` | Glob patterns to ignore |
-| `ignore_patterns` | `list[str]` | `[]` | Regex patterns to ignore |
-| `ignore_line_patterns` | `list[str]` | `["# nosec"]` | Line-level ignores |
-| `min_severity` | `str` | `"low"` | Minimum severity to report |
-| `severity_overrides` | `dict` | `{}` | Override default severities |
-
-### Usage
+Use `Rejig.find_security_issues()` to combine all scanners and return a single
+`SecurityTargetList`. It takes no arguments.
 
 ```python
-from rejig import Rejig, SecurityConfig
-
-config = SecurityConfig(
-    ignore_files=["**/test_*.py", "**/conftest.py"],
-    ignore_patterns=[r"EXAMPLE_.*", r"TEST_.*"],
-    min_severity="medium",
-    severity_overrides={
-        "DEBUG_CODE": "low",
-        "HARDCODED_TOKEN": "critical",
-    },
-)
+from rejig import Rejig
 
 rj = Rejig("src/")
-security = rj.find_security_issues(config=config)
+security = rj.find_security_issues()
+critical = security.critical()
 ```
+
+Related convenience methods on `Rejig`:
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `find_security_issues()` | `SecurityTargetList` | All findings combined |
+| `quick_security_scan()` | `SecurityTargetList` | Critical + high findings only |
+| `analyze_security()` | `SecurityReport` | Full report object |
+| `generate_security_report(output_path=None, format="json")` | `Result` | Write a report ("json", "markdown", or "sarif") |
 
 ## SecurityReporter
 
-Generate security reports.
+Generate security reports. The reporter is constructed with a `Rejig` instance
+(it runs the scanners itself).
 
 ```python
 from rejig import Rejig, SecurityReporter
 
 rj = Rejig("src/")
-security = rj.find_security_issues()
-reporter = SecurityReporter(security)
+reporter = SecurityReporter(rj)
 
-# Text report
-print(reporter.to_text())
+# Full SecurityReport object (same as rj.analyze_security())
+report = reporter.generate_full_report()
+print(f"Total: {report.total_findings}")
+print(f"Critical: {report.critical_count}")
 
-# JSON report
-json_report = reporter.to_json()
+# Quick scan (critical + high findings)
+critical = reporter.quick_scan()
 
-# Markdown report
-md_report = reporter.to_markdown()
-
-# HTML report
-html_report = reporter.to_html(include_code=True)
-
-# SARIF format (for GitHub Code Scanning)
-sarif_report = reporter.to_sarif()
+# Write a report to disk in a chosen format
+reporter.generate_security_report("reports/security.json", format="json")
+reporter.generate_security_report("reports/security.md", format="markdown")
+reporter.generate_security_report("reports/security.sarif", format="sarif")
 ```
 
 ## Severity Levels

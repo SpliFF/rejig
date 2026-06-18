@@ -13,8 +13,8 @@ project = PythonProject(".")  # or path to project root
 
 # Check if pyproject.toml exists
 if project.exists:
-    print(f"Project: {project.project().get_name()}")
-    print(f"Version: {project.project().get_version()}")
+    print(f"Project: {project.project().name}")
+    print(f"Version: {project.project().version}")
 ```
 
 ## Project Metadata
@@ -27,12 +27,12 @@ project = PythonProject(".")
 # Get the [project] section target
 proj = project.project()
 
-# Read metadata
-name = proj.get_name()
-version = proj.get_version()
-description = proj.get_description()
-license_ = proj.get_license()
-python_requires = proj.get_requires_python()
+# Read metadata (properties, not methods)
+name = proj.name
+version = proj.version
+description = proj.description
+license_ = proj.license
+python_requires = proj.python_requires
 ```
 
 ### Modify Metadata
@@ -45,7 +45,7 @@ proj.set_name("my-package")
 proj.set_version("2.0.0")
 proj.set_description("A fantastic Python package")
 proj.set_license("MIT")
-proj.set_requires_python(">=3.10")
+proj.set_python_requires(">=3.10")
 ```
 
 ### Version Bumping
@@ -54,20 +54,17 @@ proj.set_requires_python(">=3.10")
 proj = project.project()
 
 # Current version: 1.2.3
+# bump_version(part="patch") accepts "major", "minor", or "patch".
 proj.bump_version("patch")   # -> 1.2.4
 proj.bump_version("minor")   # -> 1.3.0
 proj.bump_version("major")   # -> 2.0.0
-
-# With pre-release
-proj.bump_version("minor", prerelease="alpha")  # -> 1.3.0a1
-proj.bump_version("prerelease")                 # -> 1.3.0a2
 ```
 
 ### Authors
 
 ```python
 # Get authors
-authors = proj.get_authors()
+authors = proj.authors
 for author in authors:
     print(f"{author['name']} <{author['email']}>")
 
@@ -85,12 +82,12 @@ proj.set_authors([
 
 ```python
 # Keywords
-keywords = proj.get_keywords()
+keywords = proj.keywords
 proj.add_keyword("automation")
 proj.add_keyword("refactoring")
 
 # Classifiers
-classifiers = proj.get_classifiers()
+classifiers = proj.classifiers
 proj.add_classifier("Development Status :: 4 - Beta")
 proj.add_classifier("Programming Language :: Python :: 3.11")
 ```
@@ -99,7 +96,7 @@ proj.add_classifier("Programming Language :: Python :: 3.11")
 
 ```python
 # Get URLs
-urls = proj.get_urls()
+urls = proj.urls
 # {"Homepage": "https://...", "Repository": "https://..."}
 
 # Set URLs
@@ -121,8 +118,8 @@ deps = project.dependencies()
 # Dev dependencies
 dev_deps = project.dev_dependencies()
 
-# Optional dependency group
-test_deps = project.optional_dependencies("test")
+# Optional dependency group (via the pyproject target)
+test_deps = project.pyproject.optional_dependencies("test")
 ```
 
 ### List Dependencies
@@ -130,13 +127,13 @@ test_deps = project.optional_dependencies("test")
 ```python
 deps = project.dependencies()
 
-# List all
-for dep in deps.list():
-    print(f"{dep.name}: {dep.version_spec}")
+# List all (returns a list of requirement strings)
+for spec in deps.list():
+    print(spec)  # e.g. "requests>=2.28.0"
 
 # Check if dependency exists
 if deps.has("requests"):
-    print(f"requests version: {deps.get('requests')}")
+    print(f"requests version: {deps.get_version('requests')}")
 ```
 
 ### Add Dependencies
@@ -186,16 +183,11 @@ dev.add("ruff", "^0.1.0")
 ### Optional Dependency Groups
 
 ```python
-# Create a new group
-project.dependencies().add_group("docs")
-
-# Add to specific group
-docs = project.optional_dependencies("docs")
+# Access an optional-dependency group (created on first add)
+docs = project.pyproject.optional_dependencies("docs")
 docs.add("sphinx", "^6.0.0")
 docs.add("sphinx-rtd-theme", "^1.0.0")
-
-# Or add directly
-project.dependencies().add_to_group("docs", "myst-parser", "^1.0.0")
+docs.add("myst-parser", "^1.0.0")
 ```
 
 ## Entry Points / Scripts
@@ -221,7 +213,7 @@ scripts.remove("old-command")
 
 # Check if script exists
 if scripts.has("mycli"):
-    print(f"mycli command: {scripts.get('mycli')}")
+    print(f"mycli command: {scripts.get_entry_point('mycli')}")
 ```
 
 ## Tool Configuration
@@ -233,16 +225,14 @@ black = project.black()
 
 # Configure
 black.set_line_length(110)
-black.set_target_versions(["py310", "py311"])
-black.set_include_pattern(r"\.pyi?$")
-black.set_exclude_pattern(r"/(\.git|\.venv|migrations)/")
+black.set_target_version(["py310", "py311"])
+black.set_extend_exclude(r"/(\.git|\.venv|migrations)/")
 
 # Results in pyproject.toml:
 # [tool.black]
 # line-length = 110
 # target-version = ["py310", "py311"]
-# include = '\.pyi?$'
-# exclude = '/(\.git|\.venv|migrations)/'
+# extend-exclude = '/(\.git|\.venv|migrations)/'
 ```
 
 ### Ruff
@@ -255,20 +245,13 @@ ruff.set_line_length(110)
 ruff.set_target_version("py310")
 
 # Select rules
-ruff.select_rules(["E", "F", "W", "I", "UP"])
+ruff.select(["E", "F", "W", "I", "UP"])
 
 # Ignore specific rules
-ruff.ignore_rules(["E501", "F401"])
-
-# Per-file ignores
-ruff.add_per_file_ignores("tests/*", ["S101", "PLR2004"])
-ruff.add_per_file_ignores("__init__.py", ["F401"])
+ruff.ignore(["E501", "F401"])
 
 # isort settings (via ruff)
-ruff.set_isort_section_order([
-    "future", "standard-library", "third-party", "first-party", "local-folder"
-])
-ruff.set_isort_known_first_party(["mypackage"])
+ruff.configure_isort(known_first_party=["mypackage"])
 ```
 
 ### mypy
@@ -278,19 +261,16 @@ mypy = project.mypy()
 
 # Basic settings
 mypy.set_python_version("3.10")
-mypy.set_strict(True)
+mypy.enable_strict()
 
 # Import handling
-mypy.set_ignore_missing_imports(True)
+mypy.enable_ignore_missing_imports()
 
 # Warning settings
-mypy.set_warn_unused_ignores(True)
-mypy.set_warn_return_any(True)
+mypy.enable_warn_return_any()
 
 # Per-module overrides
-mypy.add_module_override("mypackage.legacy", {
-    "ignore_errors": True,
-})
+mypy.configure_module("mypackage.legacy", ignore_errors=True)
 ```
 
 ### pytest
@@ -299,22 +279,18 @@ mypy.add_module_override("mypackage.legacy", {
 pytest_cfg = project.pytest()
 
 # Basic settings
-pytest_cfg.set_test_paths(["tests"])
+pytest_cfg.set_testpaths(["tests"])
 pytest_cfg.set_python_files(["test_*.py", "*_test.py"])
 pytest_cfg.set_python_classes(["Test*"])
 pytest_cfg.set_python_functions(["test_*"])
 
-# Add markers
-pytest_cfg.set_markers([
-    "slow: marks tests as slow",
-    "integration: marks integration tests",
-])
+# Add markers (one at a time: name, description)
+pytest_cfg.add_marker("slow", "marks tests as slow")
+pytest_cfg.add_marker("integration", "marks integration tests")
 
 # Add options
-pytest_cfg.add_ini_option("addopts", "-v --tb=short")
-pytest_cfg.add_ini_option("filterwarnings", [
-    "ignore::DeprecationWarning",
-])
+pytest_cfg.set_addopts("-v --tb=short")
+pytest_cfg.add_filterwarning("ignore::DeprecationWarning")
 ```
 
 ### isort
@@ -327,7 +303,6 @@ isort.set_profile("black")
 
 # Custom settings
 isort.set_line_length(110)
-isort.set_multi_line_mode(3)
 isort.set_known_first_party(["mypackage"])
 isort.set_known_third_party(["django", "rest_framework"])
 ```
@@ -338,22 +313,20 @@ isort.set_known_third_party(["django", "rest_framework"])
 coverage = project.coverage()
 
 # Source paths
-coverage.set_source_paths(["src/mypackage"])
+coverage.set_source(["src/mypackage"])
 
 # Omit patterns
-coverage.set_omit_patterns([
+coverage.set_omit([
     "*/tests/*",
     "*/__init__.py",
     "*/migrations/*",
 ])
 
 # Minimum coverage
-coverage.set_min_percentage(80)
 coverage.set_fail_under(80)
 
 # Report settings
-coverage.set_show_missing(True)
-coverage.set_skip_covered(True)
+coverage.enable_show_missing()
 ```
 
 ## Direct pyproject.toml Access
@@ -390,7 +363,7 @@ proj = project.project()
 proj.set_name("my-new-project")
 proj.set_version("0.1.0")
 proj.set_description("A new Python project")
-proj.set_requires_python(">=3.10")
+proj.set_python_requires(">=3.10")
 proj.add_author("Your Name", "you@example.com")
 proj.set_license("MIT")
 
@@ -411,9 +384,9 @@ project.scripts().add("mycli", "my_new_project.cli:main")
 
 # Configure tools
 project.black().set_line_length(110)
-project.ruff().select_rules(["E", "F", "W", "I", "UP"])
-project.mypy().set_strict(True)
-project.pytest().set_test_paths(["tests"])
+project.ruff().select(["E", "F", "W", "I", "UP"])
+project.mypy().enable_strict()
+project.pytest().set_testpaths(["tests"])
 ```
 
 ### Sync Tool Configurations
@@ -469,9 +442,9 @@ def setup_dev_environment(project: PythonProject):
 
     # Configure tools
     project.black().set_line_length(110)
-    project.ruff().select_rules(["E", "F", "W", "I", "UP", "B", "C4"])
-    project.mypy().set_strict(True)
-    project.pytest().set_test_paths(["tests"])
+    project.ruff().select(["E", "F", "W", "I", "UP", "B", "C4"])
+    project.mypy().enable_strict()
+    project.pytest().set_testpaths(["tests"])
     project.coverage().set_fail_under(80)
 ```
 
@@ -484,12 +457,12 @@ from rejig import PythonProject
 project = PythonProject(".")
 deps = project.dependencies()
 
-# Get current versions
-current = {dep.name: dep.version_spec for dep in deps.list()}
+# Get current requirement specs (deps.list() returns strings like "requests>=2.28.0")
+current = deps.list()
 
 # Check against PyPI (using pip)
 result = subprocess.run(
-    ["pip", "index", "versions", *current.keys()],
+    ["pip", "index", "versions", *current],
     capture_output=True, text=True
 )
 # ... parse output to find outdated packages ...
@@ -502,11 +475,11 @@ Preview changes without modifying files:
 ```python
 project = PythonProject(".", dry_run=True)
 
-# Make changes
-project.project().set_version("2.0.0")
-project.dependencies().add("new-package", "^1.0.0")
+# In dry-run mode each operation returns a Result with the proposed diff
+# instead of writing to disk.
+result = project.project().set_version("2.0.0")
+print(result.diff)
 
-# See what would change
-result = project.save()
+result = project.dependencies().add("new-package", "^1.0.0")
 print(result.diff)
 ```

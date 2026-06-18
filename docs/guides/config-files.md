@@ -19,7 +19,7 @@ toml.set("tool.black.line-length", 110)
 toml.set("tool.ruff.select", ["E", "F", "W"])
 
 # Delete keys
-toml.delete_key("tool.deprecated-tool")
+toml.delete("tool.deprecated-tool")
 
 # Get entire sections
 black_config = toml.get_section("tool.black")
@@ -62,7 +62,7 @@ yaml.set("app.version", "2.0.0")
 yaml.set("database.pool_size", 10)
 
 # Delete keys
-yaml.delete_key("deprecated_setting")
+yaml.delete("deprecated_setting")
 ```
 
 ### Nested Structures
@@ -93,7 +93,7 @@ json_file.set("version", "2.0.0")
 json_file.set("scripts.test", "pytest")
 
 # Delete keys
-json_file.delete_key("devDependencies.old-package")
+json_file.delete("devDependencies.old-package")
 ```
 
 ## INI Files
@@ -133,11 +133,11 @@ if result:
     print(result.data)
 
 # Line operations
-text.line(1).get_content()  # First line
+text.get_line(1)  # First line content (str | None)
 
 # Pattern operations
-matches = text.find_pattern(r"## .*")  # Find markdown headers
-text.replace_pattern(r"v\d+\.\d+\.\d+", "v2.0.0")  # Update version strings
+matches = text.find_lines(r"## .*")  # List of (line_number, line) tuples
+text.replace(r"v\d+\.\d+\.\d+", "v2.0.0")  # Update version strings
 ```
 
 ## Checking Existence

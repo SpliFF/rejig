@@ -35,14 +35,18 @@ classes.to_list()  # Convert to plain list
 ### By Predicate
 
 ```python
-# Keep only classes with docstrings
-classes.filter(lambda c: c.has_docstring())
-
-# Keep only functions with type hints
-funcs.filter(lambda f: f.has_type_hints())
+# Keep only classes with docstrings (has_docstring is a property)
+classes.filter(lambda c: c.has_docstring)
 
 # Keep only targets that exist
 targets.filter(lambda t: t.exists())
+```
+
+There are also convenience filters for docstrings:
+
+```python
+classes.with_docstrings()     # only targets that have a docstring
+classes.without_docstrings()  # only targets that lack one
 ```
 
 ### By File
@@ -65,7 +69,7 @@ classes.matching("Handler$")   # Name ends with "Handler"
 ```python
 targets = (
     rj.find_classes()
-    .filter(lambda c: not c.has_docstring())
+    .filter(lambda c: not c.has_docstring)
     .in_file("models.py")
     .matching("^User")
 )
@@ -167,7 +171,7 @@ results = rj.find_classes(pattern="^Test").add_decorator("pytest.mark.integratio
 ```python
 results = (
     rj.find_functions()
-    .filter(lambda f: not f.has_docstring())
+    .without_docstrings()
     .generate_docstrings(style="google")
 )
 ```
@@ -176,9 +180,8 @@ results = (
 
 ```python
 results = (
-    rj.find_functions()
+    rj.find_functions_without_type_hints()
     .filter(lambda f: not f.name.startswith("_"))
-    .filter(lambda f: not f.has_type_hints())
     .infer_type_hints()
 )
 ```
@@ -193,12 +196,11 @@ for cls in rj.find_classes(pattern=".*Repository"):
 ### Delete All Deprecated Methods
 
 ```python
-results = (
-    rj.find_classes()
-    .find_methods(pattern=".*")
-    .filter(lambda m: "@deprecated" in str(m.get_content().data or ""))
-    .delete()
-)
+for cls in rj.find_classes():
+    deprecated = cls.find_methods().filter(
+        lambda m: "@deprecated" in str(m.get_content().data or "")
+    )
+    deprecated.delete()
 ```
 
 ### Bulk Add Type Ignore

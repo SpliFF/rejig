@@ -119,77 +119,55 @@ rj.find_class("MyClass").find_methods().without_docstrings().generate_docstrings
 # Generate for all public functions
 rj.find_functions().filter(lambda f: not f.name.startswith("_")).generate_docstrings()
 
-# Generate for entire codebase
-rj.find_functions().generate_all_docstrings()
-rj.find_methods().generate_all_docstrings()
+# Generate for entire codebase (all functions/methods in every file)
+rj.find_files().generate_all_docstrings()
 ```
 
 ### Generation Options
 
 ```python
 func.generate_docstring(
-    style="google",
-    include_types=True,       # Include type info in docstring
-    include_defaults=True,    # Document default values
-    include_raises=True,      # Include Raises section
-    include_examples=False,   # Don't add Example section
-    summary_from_name=True,   # Generate summary from function name
+    style="google",   # "google", "numpy", or "sphinx"
+    summary="",       # Custom summary line; auto-generated from the name if empty
+    overwrite=False,  # Replace an existing docstring when True
 )
 ```
 
 ## Updating Docstrings
 
-When function signatures change, update docstrings to match:
+When a parameter changes, update or add its description in the docstring:
 
 ```python
-# Update docstring to match current signature
-func.update_docstring()
-
-# This will:
-# - Add documentation for new parameters
-# - Remove documentation for removed parameters
-# - Update types if they changed
-# - Preserve existing descriptions
-```
-
-### Batch Updates
-
-```python
-# Update all docstrings in a file
-rj.file("module.py").find_functions().update_docstrings()
-
-# Update after a refactoring
-cls = rj.find_class("MyClass")
-cls.add_parameter_to_all_methods("context", "Context")
-cls.find_methods().update_docstrings()
+# Update or add a single parameter's description
+func.update_docstring_param("timeout", "Maximum wait time in seconds")
 ```
 
 ## Converting Docstring Styles
 
-Convert between docstring formats:
+Convert between docstring formats. `convert_docstring_style` operates on files
+and takes a `from_style` (or `None` to auto-detect) and a required `to_style`.
 
 ```python
-# Convert a single function
-func = rj.find_function("process")
-func.convert_docstring_style("numpy")  # Convert to NumPy style
+# Convert all docstrings in a file to Google style (auto-detect source)
+rj.file("module.py").convert_docstring_style(None, "google")
 
-# Convert from one style to another
-func.convert_docstring_style(from_style="sphinx", to_style="google")
+# Convert from a known style to another
+rj.file("module.py").convert_docstring_style("sphinx", "google")
 
-# Batch conversion
-rj.find_functions().convert_docstring_style("google")
-rj.find_methods().convert_docstring_style("google")
+# Convert across the whole codebase
+rj.find_files().convert_docstring_style(None, "google")
 ```
 
 ### Style Detection
 
 ```python
 # Detect current docstring style
-from rejig import DocstringParser
+from rejig.docstrings import DocstringParser
 
 parser = DocstringParser()
-style = parser.detect_style(func.docstring)
-print(f"Current style: {style}")  # "google", "numpy", "sphinx", or "unknown"
+docstring = func.get_docstring().data
+style = parser.detect_style(docstring)
+print(f"Current style: {style}")  # DocstringStyle enum value
 ```
 
 ## Parsing Docstrings
@@ -197,24 +175,23 @@ print(f"Current style: {style}")  # "google", "numpy", "sphinx", or "unknown"
 Extract structured information from docstrings:
 
 ```python
-from rejig import DocstringParser
+from rejig.docstrings import DocstringParser
 
 parser = DocstringParser()
-doc = parser.parse(func.docstring)
+doc = parser.parse(func.get_docstring().data)
 
 # Access components
 print(doc.summary)           # Short description
 print(doc.description)       # Extended description
-print(doc.parameters)        # List of parameters
+print(doc.params)            # List of parameters
 print(doc.returns)           # Return documentation
 print(doc.raises)            # List of exceptions
 print(doc.examples)          # Example code blocks
 
 # Parameter details
-for param in doc.parameters:
-    print(f"  {param.name}: {param.type}")
+for param in doc.params:
+    print(f"  {param.name}: {param.type_hint}")
     print(f"    {param.description}")
-    print(f"    Default: {param.default}")
 ```
 
 ## Filtering by Docstrings
@@ -239,71 +216,37 @@ public_no_docs = (
 ### Find Incomplete Docstrings
 
 ```python
-# Functions with docstrings missing parameter documentation
-from rejig import DocstringParser
+# Functions whose docstring has no documented parameters
+from rejig.docstrings import DocstringParser
 
 parser = DocstringParser()
 
-def has_incomplete_docstring(func):
-    if not func.docstring:
+def has_undocumented_params(func):
+    if not func.has_docstring:
         return False
-    doc = parser.parse(func.docstring)
-    # Check if all parameters are documented
-    param_names = {p.name for p in doc.parameters}
-    func_params = {p.name for p in func.parameters if p.name not in ("self", "cls")}
-    return func_params - param_names
+    doc = parser.parse(func.get_docstring().data)
+    return len(doc.params) == 0
 
-incomplete = rj.find_functions().filter(has_incomplete_docstring)
+incomplete = rj.find_functions().with_docstrings().filter(has_undocumented_params)
 ```
 
-## Class and Module Docstrings
+## Class Docstrings
 
-### Class Docstrings
+`ClassTarget.generate_docstrings()` generates docstrings for every method in the
+class (it does not synthesize the class-level docstring).
 
 ```python
 cls = rj.find_class("MyClass")
 
-# Generate class docstring
-cls.generate_docstring()
+# Generate docstrings for all methods in the class
+cls.generate_docstrings()
 
-# This documents:
-# - Class purpose
-# - Class attributes
-# - Example usage (optional)
+# Choose a style, and overwrite existing docstrings if desired
+cls.generate_docstrings(style="numpy", overwrite=False)
 
-# Before:
-# class MyClass:
-#     name: str
-#     count: int
-
-# After:
-# class MyClass:
-#     """Container for named items with count tracking.
-#
-#     Attributes:
-#         name: The name identifier.
-#         count: Number of items.
-#     """
-#     name: str
-#     count: int
-```
-
-### Module Docstrings
-
-```python
-file = rj.file("utils.py")
-
-# Add module docstring
-file.set_module_docstring("""
-Utility functions for data processing.
-
-This module provides helper functions for common data
-manipulation tasks including validation, transformation,
-and formatting.
-""")
-
-# Get existing module docstring
-print(file.module_docstring)
+# Inspect the class's own docstring
+if cls.has_docstring:
+    print(cls.get_docstring().data)
 ```
 
 ## Common Patterns
@@ -315,15 +258,13 @@ rj = Rejig("src/")
 
 # Generate docstrings for public API only
 for func in rj.find_functions():
-    if not func.name.startswith("_") and not func.docstring:
+    if not func.name.startswith("_") and not func.has_docstring:
         func.generate_docstring(style="google")
 
 for cls in rj.find_classes():
     if not cls.name.startswith("_"):
-        if not cls.docstring:
-            cls.generate_docstring(style="google")
         for method in cls.find_methods():
-            if not method.name.startswith("_") and not method.docstring:
+            if not method.name.startswith("_") and not method.has_docstring:
                 method.generate_docstring(style="google")
 ```
 
@@ -333,20 +274,8 @@ for cls in rj.find_classes():
 # Convert entire codebase from Sphinx to Google style
 rj = Rejig("src/")
 
-rj.find_functions().with_docstrings().convert_docstring_style("google")
-rj.find_methods().with_docstrings().convert_docstring_style("google")
-rj.find_classes().with_docstrings().convert_docstring_style("google")
-```
-
-### Sync Docstrings After Refactoring
-
-```python
-# After changing function signatures, update all docstrings
-rj = Rejig("src/")
-
-# Update docstrings to match current signatures
-rj.find_functions().with_docstrings().update_docstrings()
-rj.find_methods().with_docstrings().update_docstrings()
+# Conversion operates on files (auto-detect the source style with None)
+rj.find_files().convert_docstring_style(None, "google")
 ```
 
 ### Validate Docstring Coverage
@@ -356,10 +285,14 @@ rj.find_methods().with_docstrings().update_docstrings()
 rj = Rejig("src/")
 
 public_functions = rj.find_functions().filter(lambda f: not f.name.startswith("_"))
-public_methods = rj.find_methods().filter(lambda m: not m.name.startswith("_"))
-
 missing_funcs = public_functions.without_docstrings()
-missing_methods = public_methods.without_docstrings()
+
+# Methods are checked per class
+missing_methods = []
+for cls in rj.find_classes():
+    for method in cls.find_methods_without_docstrings():
+        if not method.name.startswith("_"):
+            missing_methods.append(method)
 
 if missing_funcs or missing_methods:
     print("Missing docstrings:")
@@ -370,67 +303,40 @@ if missing_funcs or missing_methods:
     exit(1)
 ```
 
-### Generate Docstrings from Type Hints
+### Generate Docstrings from Signatures
 
 ```python
-# If type hints exist, use them for docstring generation
-func.generate_docstring(
-    include_types=True,   # Include types from annotations
-    style="google",
-)
+# generate_docstring builds the docstring from the function signature,
+# including parameters, return type, and raised exceptions.
+func.generate_docstring(style="google")
 
-# This produces:
+# For a function like:
 # def process(data: dict[str, Any], limit: int = 10) -> list[str]:
-#     """Process data with limit.
+# it produces:
+#     """Process data.
 #
 #     Args:
-#         data (dict[str, Any]): Input data to process.
-#         limit (int): Maximum items. Defaults to 10.
+#         data: ...
+#         limit: ... Defaults to 10.
 #
 #     Returns:
-#         list[str]: Processed results.
+#         ...
 #     """
 ```
 
 ## Integration with Analysis
 
-### Find Documentation Issues
+### Find Missing Docstrings
 
 ```python
-issues = rj.find_analysis_issues()
+rj = Rejig("src/")
 
-# Find missing docstrings
-missing = issues.by_type("MISSING_DOCSTRING")
+# Functions and methods lacking docstrings
+missing = rj.find_functions_without_docstrings()
 for issue in missing:
-    print(f"{issue.file_path}:{issue.line_number} - {issue.name}")
+    print(f"{issue.location} - {issue.name}")
 
-# Auto-fix by generating
-for issue in missing:
-    if issue.target_type == "function":
-        rj.find_function(issue.name).generate_docstring()
-    elif issue.target_type == "method":
-        # Parse class.method format
-        cls_name, method_name = issue.name.rsplit(".", 1)
-        rj.find_class(cls_name).find_method(method_name).generate_docstring()
-```
-
-### Docstring Quality Report
-
-```python
-from rejig import DocstringAnalyzer
-
-analyzer = DocstringAnalyzer(rj)
-report = analyzer.analyze()
-
-print(f"Total functions: {report.total_functions}")
-print(f"With docstrings: {report.with_docstrings}")
-print(f"Coverage: {report.coverage_percent:.1f}%")
-print()
-print(f"Style breakdown:")
-for style, count in report.styles.items():
-    print(f"  {style}: {count}")
-print()
-print(f"Quality issues:")
-for issue in report.quality_issues:
-    print(f"  {issue.file_path}:{issue.name}: {issue.message}")
+# Classes lacking docstrings
+for issue in rj.find_classes_without_docstrings():
+    print(f"{issue.location} - {issue.name}")
 ```

@@ -70,32 +70,21 @@ cls.generate_hash()
 ### Generate All Common Dunders
 
 ```python
-# Generate all at once
-cls.generate_dunders(["__init__", "__repr__", "__eq__", "__hash__"])
-
-# Or use the shorthand
-cls.generate_common_dunders()
+# Generate __init__, __repr__, __eq__, and __hash__ at once
+cls.generate_all_dunders()
 ```
 
-### Customization Options
+### Overwriting Existing Dunders
+
+By default, generation skips a dunder that already exists. Pass
+`overwrite=True` to replace it:
 
 ```python
-cls.generate_init(
-    include_super=True,           # Call super().__init__()
-    include_defaults=True,        # Include default values
-    optional_last=True,           # Put optional params last
-    use_dataclass_style=False,    # Don't use field()
-)
-
-cls.generate_repr(
-    include_private=False,        # Exclude _private attrs
-    max_attrs=5,                  # Limit shown attributes
-)
-
-cls.generate_eq(
-    compare_type=True,            # Include isinstance check
-    use_slots=False,              # Don't assume __slots__
-)
+cls.generate_init(overwrite=True)
+cls.generate_repr(overwrite=True)
+cls.generate_eq(overwrite=True)
+cls.generate_hash(overwrite=True)
+cls.generate_all_dunders(overwrite=True)
 ```
 
 ## Property Generation
@@ -127,16 +116,19 @@ cls.convert_attribute_to_property("email")
 
 ### Add Property with Validation
 
+`add_property` takes the getter body as a string, an optional setter body, and
+an optional return type:
+
 ```python
 cls.add_property(
-    name="age",
-    type_hint="int",
-    getter_body="return self._age",
-    setter_body="""
+    "age",
+    getter="self._age",
+    setter="""
         if value < 0:
             raise ValueError("Age cannot be negative")
         self._age = value
     """,
+    return_type="int",
 )
 ```
 
@@ -144,26 +136,10 @@ cls.add_property(
 
 ```python
 cls.add_property(
-    name="full_name",
-    type_hint="str",
-    getter_body="return f'{self.first_name} {self.last_name}'",
-    setter=False,  # No setter, read-only
-)
-```
-
-### Cached Property
-
-```python
-cls.add_cached_property(
-    name="computed_value",
-    type_hint="int",
-    body="return expensive_computation(self.data)",
-)
-
-# Generates:
-# @functools.cached_property
-# def computed_value(self) -> int:
-#     return expensive_computation(self.data)
+    "full_name",
+    getter="f'{self.first_name} {self.last_name}'",
+    return_type="str",
+)  # No setter argument means the property is read-only
 ```
 
 ## Class Conversions
@@ -199,12 +175,8 @@ cls.convert_to_dataclass()
 
 ```python
 cls.convert_to_dataclass(
-    frozen=True,         # Immutable
-    slots=True,          # Use __slots__
-    kw_only=True,        # Keyword-only args
-    order=True,          # Generate comparison methods
-    eq=True,             # Generate __eq__
-    repr_=True,          # Generate __repr__
+    frozen=True,         # Immutable (frozen=True)
+    slots=True,          # Use __slots__ (Python 3.10+)
 )
 ```
 
@@ -275,7 +247,7 @@ protocol = cls.extract_protocol("DatabaseProtocol")
 ### Extract Abstract Base Class
 
 ```python
-abc = cls.extract_abc("AbstractDatabase")
+result = cls.extract_abstract_base("AbstractDatabase")
 
 # Creates:
 # from abc import ABC, abstractmethod
@@ -326,123 +298,103 @@ cls.remove_base_class("DeprecatedMixin")
 
 ## Test Generation
 
-### Generate Test Stubs
+Test stubs are generated through the target API. Each method returns a
+`Result`; the generated code is also available in `result.data`.
+
+### Generate a Test Stub for a Function
 
 ```python
-from rejig import TestGenerator
-
-generator = TestGenerator(rj)
-
-# Generate tests for a function
 func = rj.find_function("process_data")
-test_code = generator.generate_test(func)
 
-print(test_code)
+# Writes tests/test_<module>.py with a stub for the function
+result = func.generate_test_stub()
+print(result.data)
 # def test_process_data():
 #     # Arrange
-#     items = ...  # TODO: provide test data
-#     limit = ...  # TODO: provide test data
+#     items = []
 #
 #     # Act
-#     result = process_data(items, limit)
+#     result = process_data(items)
 #
 #     # Assert
-#     assert result is not None  # TODO: add assertions
+#     assert result is not None  # TODO: add specific assertions
 ```
 
-### Generate Test File
-
-```python
-# Generate a complete test file for a module
-test_file = generator.generate_test_file("src/utils.py")
-
-with open("tests/test_utils.py", "w") as f:
-    f.write(test_file)
-```
-
-### Generate Tests for Class
+### Generate a Test File for a Class
 
 ```python
 cls = rj.find_class("UserService")
-test_code = generator.generate_class_tests(cls)
 
-# Generates:
-# import pytest
-# from myapp.services import UserService
-#
-# class TestUserService:
-#     @pytest.fixture
-#     def service(self):
-#         return UserService()
-#
-#     def test_create_user(self, service):
-#         # Arrange
-#         name = ...
-#         email = ...
-#
-#         # Act
-#         result = service.create_user(name, email)
-#
-#         # Assert
-#         assert result is not None
+# Write a complete pytest test file with stubs for all public methods
+result = cls.generate_test_file("tests/test_user_service.py")
+
+# Or write into the default tests/ directory mirroring the source layout
+cls.generate_test_stub()
 ```
 
-### Test Generation Options
+### Generate a Test for a Single Method
 
 ```python
-generator.generate_test(func,
-    style="pytest",           # or "unittest"
-    include_docstring=True,   # Add docstring to test
-    include_arrange=True,     # Add Arrange section
-    parametrize=True,         # Use @pytest.mark.parametrize
+method = rj.find_class("UserService").find_method("create_user")
+
+# Simple stub
+method.generate_test()
+
+# Parameterized test from explicit cases
+method.generate_test(
+    test_cases=[
+        {"input": {"data": "valid"}, "expected": True},
+        {"input": {"data": ""}, "expected": False},
+    ]
 )
+```
+
+### Generate a Test Class Scaffold
+
+```python
+# Create a standalone test class (no source class required)
+rj.generate_test_class("MyClass", include_setup=True)
+```
+
+### Low-Level Generator
+
+For finer control, use `TestGenerator` from `rejig.generation` directly. It
+works on `FunctionSignature` objects (extracted via `SignatureExtractor`)
+rather than targets:
+
+```python
+from rejig.generation import TestGenerator
+
+generator = TestGenerator()
+# generator.generate_function_test_stub(signature)
+# generator.generate_class_test_file(class_name, method_signatures)
+# generator.generate_parameterized_test(signature, test_cases)
 ```
 
 ## unittest to pytest Conversion
 
-### Convert Test Class
+`UnittestToPytestConverter` is a LibCST transformer that rewrites
+`self.assertX(...)` calls into plain `assert` statements. Apply it with
+`Rejig.transform_file`:
 
 ```python
-from rejig import UnittestToPytestConverter
+from rejig.generation import UnittestToPytestConverter
 
-converter = UnittestToPytestConverter(rj)
+rj.transform_file(
+    rj.root / "tests/test_utils.py",
+    UnittestToPytestConverter(),
+)
 
-# Convert a single test file
-converter.convert_file("tests/test_utils.py")
-
-# Before:
-# import unittest
-#
-# class TestUtils(unittest.TestCase):
-#     def setUp(self):
-#         self.data = [1, 2, 3]
-#
-#     def test_sum(self):
-#         self.assertEqual(sum(self.data), 6)
-#
-#     def test_len(self):
-#         self.assertTrue(len(self.data) == 3)
-
-# After:
-# import pytest
-#
-# class TestUtils:
-#     @pytest.fixture(autouse=True)
-#     def setup(self):
-#         self.data = [1, 2, 3]
-#
-#     def test_sum(self):
-#         assert sum(self.data) == 6
-#
-#     def test_len(self):
-#         assert len(self.data) == 3
+# Before:  self.assertEqual(sum(self.data), 6)
+# After:   assert sum(self.data) == 6
 ```
 
 ### Batch Conversion
 
 ```python
-# Convert all test files
-converter.convert_all("tests/")
+# Convert every test file in the working set
+for file in rj.find_files("**/test_*.py"):
+    rj.transform_file(file.path, UnittestToPytestConverter())
 ```
 
 ### Assertion Conversions
@@ -465,105 +417,70 @@ The converter handles these assertion patterns:
 
 ### Extract Doctests to pytest
 
+Convert the doctest examples in a function's docstring into pytest tests:
+
 ```python
-from rejig import DoctestExtractor
+func = rj.find_function("add")
 
-extractor = DoctestExtractor(rj)
-
-# Extract doctests from a module
-tests = extractor.extract("src/utils.py")
-
-# Generate pytest test file
-test_code = extractor.to_pytest(tests)
-
-print(test_code)
+result = func.generate_tests_from_doctest()
+print(result.data)
 # def test_add_doctest_1():
-#     \"\"\"From utils.add docstring.\"\"\"
-#     assert add(2, 3) == 5
+#     """Test from doctest example."""
+#     result = add(2, 3)
+#     assert result == 5
 #
 # def test_add_doctest_2():
-#     assert add(-1, 1) == 0
+#     """Test from doctest example."""
+#     result = add(-1, 1)
+#     assert result == 0
+
+# Or write to a specific file
+func.generate_tests_from_doctest("tests/test_doctests.py")
 ```
 
 ## Batch Generation
 
 ### Generate for Multiple Classes
 
-```python
-# Generate dunders for all classes
-for cls in rj.find_classes():
-    if not cls.has_method("__repr__"):
-        cls.generate_repr()
+Generation methods skip elements that already exist (unless `overwrite=True`),
+so they are safe to call across every class:
 
-# Generate tests for all functions
-generator = TestGenerator(rj)
+```python
+# Generate __repr__ for all classes that lack one
+for cls in rj.find_classes():
+    cls.generate_repr()
+
+# Generate test stubs for all public functions
 for func in rj.find_functions():
     if not func.name.startswith("_"):
-        test = generator.generate_test(func)
-        # ... save to file
-```
-
-### Convert All Classes to Dataclasses
-
-```python
-# Find classes that look like data classes
-for cls in rj.find_classes():
-    # Has typed attributes but no complex methods
-    if cls.has_typed_attributes() and not cls.has_complex_methods():
-        cls.convert_to_dataclass()
-```
-
-## Common Patterns
-
-### Modernize Data Classes
-
-```python
-rj = Rejig("src/")
-
-# Find classes that should be dataclasses
-for cls in rj.find_classes():
-    methods = cls.find_methods()
-    method_names = {m.name for m in methods}
-
-    # Has __init__ that just assigns attributes
-    if "__init__" in method_names:
-        init = cls.find_method("__init__")
-        if init.is_simple_assignment():
-            cls.convert_to_dataclass()
+        func.generate_test_stub()
 ```
 
 ### Add Missing Dunders
 
 ```python
+# generate_* is a no-op when the dunder already exists
 for cls in rj.find_classes():
-    # Add __repr__ if missing
-    if not cls.has_method("__repr__"):
-        cls.generate_repr()
+    cls.generate_repr()
+    cls.generate_eq()
+    cls.generate_hash()
 
-    # Add __eq__ and __hash__ for value objects
-    if cls.has_decorator("dataclass") or cls.has_typed_attributes():
-        if not cls.has_method("__eq__"):
-            cls.generate_eq()
-        if not cls.has_method("__hash__"):
-            cls.generate_hash()
+    # Or all at once
+    cls.generate_all_dunders()
 ```
 
-### Generate Test Suite Skeleton
+## Common Patterns
+
+### Generate a Test Suite Skeleton
 
 ```python
-from rejig import TestGenerator
-
 rj = Rejig("src/myapp/")
-generator = TestGenerator(rj)
 
-# Generate tests for entire package
-for file in rj.find_files():
-    relative_path = file.path.relative_to(rj.root)
-    test_path = Path("tests") / f"test_{relative_path}"
+# One test file per class, in the default tests/ directory
+for cls in rj.find_classes():
+    cls.generate_test_stub()
 
-    if not test_path.exists():
-        test_code = generator.generate_test_file(file.path)
-        test_path.parent.mkdir(parents=True, exist_ok=True)
-        test_path.write_text(test_code)
-        print(f"Generated: {test_path}")
+# Only for classes that don't yet have a test class
+for cls in rj.find_classes_without_tests():
+    cls.generate_test_file(f"tests/test_{cls.name.lower()}.py")
 ```

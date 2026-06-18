@@ -20,9 +20,10 @@ cls = rj.file("models.py").find_class("User")
 cls.add_method("validate", body="return True")
 
 # With parameters and return type
+# `params` lists the parameters after `self` (which is added automatically)
 cls.add_method(
     "get_display_name",
-    parameters="self, include_title: bool = False",
+    params="include_title: bool = False",
     return_type="str",
     body="return f'{self.first_name} {self.last_name}'"
 )
@@ -111,7 +112,7 @@ method.insert_statement("self.log_action()", position="end")
 
 ```python
 # Add a parameter
-method.add_parameter("timeout", type="int", default="30")
+method.add_parameter("timeout", type_annotation="int", default_value="30")
 
 # Remove a parameter
 method.remove_parameter("deprecated_arg")
@@ -151,7 +152,7 @@ func = rj.file("utils.py").find_function("process")
 func.rename("process_data")
 func.add_decorator("lru_cache")
 func.insert_statement("logger.debug('Starting')", position="start")
-func.add_parameter("verbose", type="bool", default="False")
+func.add_parameter("verbose", type_annotation="bool", default_value="False")
 func.set_return_type("ProcessResult")
 func.delete()
 ```
@@ -248,7 +249,6 @@ cls.convert_to_dataclass()
 cls.convert_from_dataclass()
 
 # Other conversions
-cls.convert_to_pydantic_model()
 cls.convert_to_typed_dict()
 cls.convert_to_named_tuple()
 ```
@@ -256,7 +256,7 @@ cls.convert_to_named_tuple()
 ## Generating Dunder Methods
 
 ```python
-cls.generate_init_from_attributes()
+cls.generate_init()
 cls.generate_repr()
 cls.generate_eq()
 cls.generate_hash()
@@ -273,98 +273,18 @@ cls.convert_attribute_to_property("_name", getter=True, setter=True)
 cls.add_property("full_name", getter="return f'{self.first} {self.last}'")
 ```
 
-## Comment Operations
+## Converting Format Strings
 
-### Rewriting Comments
-
-```python
-# Find and rewrite a comment
-comments = file.find_comments(pattern="TODO")
-for comment in comments:
-    comment.rewrite(f"DONE: {comment.text}")
-```
-
-### Deleting Comments
+File-level helpers convert old-style string formatting to f-strings:
 
 ```python
-# Remove all TODO comments
-for comment in file.find_comments(pattern="TODO"):
-    comment.delete()
+file = rj.file("legacy_module.py")
 
-# Remove a specific comment
-comment = file.find_comments(pattern="temporary hack").first()
-comment.delete()
-```
+# "Hello {}".format(name) → f"Hello {name}"
+file.convert_format_strings_to_fstrings()
 
-### Converting to Docstrings
-
-```python
-# Convert a comment preceding a function to a docstring
-# Before: # Processes the input data
-#         def process(): ...
-# After:  def process():
-#             """Processes the input data."""
-comment = file.find_comments(pattern="Processes the").first()
-comment.convert_to_docstring()
-```
-
-## String Literal Operations
-
-### Rewriting String Content
-
-```python
-# Replace string content (preserves quote style)
-strings = file.find_strings(pattern="old_value")
-for s in strings:
-    s.rewrite("new_value")
-```
-
-### Converting to F-Strings
-
-```python
-# Convert .format() calls to f-strings
-# Before: "Hello {}".format(name)
-# After:  f"Hello {name}"
-for s in file.find_strings(pattern="\\.format\\("):
-    s.convert_to_fstring()
-```
-
-### Converting to Raw Strings
-
-```python
-# Add r prefix for regex patterns
-for s in file.find_strings(pattern="\\\\d\\+"):
-    s.convert_to_raw()
-# Before: "\\d+"
-# After:  r"\d+"
-```
-
-### Converting to Multiline
-
-```python
-# Convert long strings to triple-quoted
-for s in file.find_strings():
-    if len(s.value) > 80:
-        s.convert_to_multiline()
-```
-
-### Changing Quote Style
-
-```python
-# Standardize to double quotes
-for s in file.find_strings():
-    if s.quote_style == "single":
-        s.change_quote_style("double")
-
-# Quote style options: "single", "double", "triple_single", "triple_double"
-```
-
-### Deleting Strings
-
-```python
-# Remove debug strings
-for s in file.find_strings(pattern="DEBUG:"):
-    s.delete()
+# "Hello %s" % name → f"Hello {name}"
+file.convert_percent_format_to_fstrings()
 ```
 
 ## Result Handling

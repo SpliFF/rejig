@@ -20,19 +20,10 @@ def rename_django_model(rj: Rejig, old_name: str, new_name: str):
 
     model.rename(new_name)
 
-    # Update Meta.db_table if it exists
-    meta = model.find_class("Meta")
-    if meta.exists():
-        # Keep the old table name to avoid migration
-        content = meta.get_content()
-        if "db_table" not in str(content.data):
-            meta.add_attribute("db_table", type_hint="str",
-                             default=f'"{old_name.lower()}"')
-
     # Update ForeignKey references in other models
     for cls in rj.find_classes():
         content = cls.get_content()
-        if content and old_name in str(content.data):
+        if content.success and content.data and old_name in str(content.data):
             # This is simplified - real impl would use CST
             pass
 
@@ -150,26 +141,12 @@ add_integration_markers(rj)
 def add_type_hints_from_defaults(rj: Rejig):
     """Infer type hints from default parameter values."""
 
-    type_map = {
-        "None": "None",
-        "True": "bool",
-        "False": "bool",
-        "[]": "list",
-        "{}": "dict",
-        '""': "str",
-        "''": "str",
-        "0": "int",
-        "0.0": "float",
-    }
-
+    # infer_type_hints() inspects default values to add annotations.
+    # Pass overwrite=False (the default) to leave existing hints untouched.
     for func in rj.find_functions():
-        if func.has_type_hints():
-            continue
-
-        # This would need actual parameter inspection
-        # Simplified example
-        func.infer_type_hints()
-        print(f"Added hints to {func.name}")
+        result = func.infer_type_hints(overwrite=False)
+        if result.success and result.files_changed:
+            print(f"Added hints to {func.name}")
 
 
 rj = Rejig("src/")
@@ -294,13 +271,13 @@ rj = Rejig("src/")
 remove_debug_statements(rj)
 ```
 
-### Remove Unused Type Ignores
+### Remove Type Ignores
 
 ```python
 def cleanup_type_ignores(rj: Rejig):
-    """Remove type: ignore comments that are no longer needed."""
+    """Remove all type: ignore comments from the codebase."""
 
-    result = rj.remove_unused_type_ignores()
+    result = rj.remove_all_type_ignores()
 
     if result.files_changed:
         print(f"Cleaned {len(result.files_changed)} files")
@@ -311,6 +288,9 @@ def cleanup_type_ignores(rj: Rejig):
 rj = Rejig("src/")
 cleanup_type_ignores(rj)
 ```
+
+> Tip: to audit before removing, use `rj.find_type_ignores()` (or
+> `rj.find_bare_type_ignores()` for those missing an error code).
 
 ### Standardize String Quotes
 
@@ -380,11 +360,9 @@ def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "src/"
     rj = Rejig(path)
 
-    results = (
-        rj.find_functions()
-        .filter(lambda f: not f.has_type_hints())
-        .infer_type_hints()
-    )
+    # infer_type_hints() is a batch operation on the TargetList and returns a
+    # BatchResult. With overwrite=False, already-annotated functions are skipped.
+    results = rj.find_functions().infer_type_hints(overwrite=False)
 
     print(f"Updated {len(results.succeeded)} functions")
     if results.failed:

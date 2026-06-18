@@ -128,7 +128,7 @@ for cls in classes:
 
 ```python
 # By predicate
-classes.filter(lambda c: c.has_docstring())
+classes.filter(lambda c: c.has_docstring)
 
 # By file
 classes.in_file(Path("tests/test_user.py"))

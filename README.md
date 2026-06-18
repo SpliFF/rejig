@@ -78,9 +78,9 @@ func = rj.find_function("process_data")
 method = rj.find_class("MyClass").find_method("save")
 
 # Find multiple with patterns
-classes = rj.find_classes(pattern="^Test")      # All test classes
-methods = rj.find_methods(pattern="^get_")      # All getter methods
-funcs = rj.find_functions(pattern=".*_handler$") # All handlers
+classes = rj.find_classes(pattern="^Test")              # All test classes
+methods = rj.find_class("MyClass").find_methods(pattern="^get_")  # Getter methods
+funcs = rj.find_functions(pattern=".*_handler$")        # All handlers
 
 # Find in specific files
 file_target = rj.file("models.py")
@@ -88,9 +88,8 @@ module_target = rj.module("myapp.models")
 
 # Find other elements
 todos = rj.find_todos()
-imports = rj.find_imports("typing")
-strings = rj.find_strings()
-comments = rj.find_comments(pattern="TODO")
+imports = rj.file("models.py").find_imports()
+strings = rj.find_hardcoded_strings(min_length=10)
 ```
 
 ### Class Operations
@@ -103,7 +102,7 @@ cls.add_attribute("cache", "dict[str, Any] | None", "None")
 cls.remove_attribute("old_attr")
 
 # Methods
-cls.add_method("validate", "def validate(self):\n    pass")
+cls.add_method("validate", "return self.is_valid()")
 cls.find_method("process").rename("handle")
 
 # Decorators
@@ -145,7 +144,7 @@ method.generate_docstring(style="google")
 
 # Conversions
 method.convert_to_async()
-method.wrap_with_try_except("ValueError", "logger.error(e)")
+method.wrap_with_try_except(["ValueError"], "logger.error(e)")
 ```
 
 ### Batch Operations
@@ -157,11 +156,11 @@ classes.add_decorator("pytest.mark.slow")
 
 # Filter and operate
 rj.find_functions().in_file("utils.py").add_decorator("timer")
-rj.find_methods(pattern="^test_").first(10).add_decorator("skip")
+rj.find_class("TestSuite").find_methods(pattern="^test_").add_decorator("skip")
 
 # Type hints for all functions
 rj.find_functions().infer_type_hints()
-rj.find_methods().modernize_type_hints()
+rj.find_functions().modernize_type_hints()
 
 # Generate docstrings
 rj.find_functions().without_docstrings().generate_docstrings(style="google")
@@ -173,36 +172,38 @@ rj.find_functions().without_docstrings().generate_docstrings(style="google")
 file = rj.file("config.py")
 
 # Single lines
-line = file.find_line(42)
+line = file.line(42)
 line.insert_before("# Important:")
 line.insert_after("logger.info('done')")
 line.rewrite("new_content = True")
 
 # Line ranges
-block = file.line_range(10, 20)
-block.indent(4)
+block = file.lines(10, 20)
+block.indent(1)
 block.delete()
 
 # Code blocks
-for_block = file.find_code_block("for")
-for_block.insert_statement("total += 1")
+for_block = file.block_at_line(15)
+for_block.insert_after("total += 1")
 ```
 
 ### Import Management
 
 ```python
 from rejig import Rejig, ImportOrganizer, ImportGraph
+from pathlib import Path
 
 rj = Rejig("src/")
 
-# Add/remove imports
+# Add imports
 file = rj.file("module.py")
 file.add_import("from typing import Optional, List")
-file.remove_import(r"from deprecated import.*")
 
 # Organize imports (isort-like)
+file.organize_imports()
+# ...or organize a file via the ImportOrganizer directly
 organizer = ImportOrganizer(rj)
-organizer.organize_all()
+organizer.organize(Path("src/module.py"))
 
 # Find unused imports
 unused = file.find_unused_imports()
@@ -212,7 +213,7 @@ unused.delete_all()
 graph = ImportGraph(rj)
 cycles = graph.find_circular_imports()
 for cycle in cycles:
-    print(f"Circular: {' -> '.join(cycle.modules)}")
+    print(f"Circular: {' -> '.join(cycle.cycle)}")
 ```
 
 ### Type Hints
@@ -235,8 +236,9 @@ func.set_parameter_type("data", "dict[str, Any]")
 func.set_return_type("list[str]")
 
 # Generate stub files
-from rejig import StubGenerator
-StubGenerator(rj).generate_stubs("src/", "stubs/")
+from rejig.typehints import StubGenerator
+from pathlib import Path
+StubGenerator(rj).generate_for_package(Path("src/"), Path("stubs/"))
 ```
 
 ### Docstrings
@@ -254,33 +256,36 @@ rj.find_functions().without_docstrings().generate_docstrings()
 # Convert between styles
 rj.find_functions().convert_docstring_style("google", "numpy")
 
-# Update existing docstrings when signatures change
-func.update_docstring()
+# Update individual sections of an existing docstring
+func.update_docstring_param("timeout", "Maximum wait time in seconds")
+func.add_docstring_returns("The processed result")
 ```
 
 ### Code Analysis
 
 ```python
-from rejig import Rejig
+from rejig import Rejig, AnalysisType
 
 rj = Rejig("src/")
 
-# Find complexity issues
-issues = rj.find_analysis_issues()
-high_complexity = issues.by_type("HIGH_CYCLOMATIC_COMPLEXITY")
-long_functions = issues.by_type("LONG_FUNCTION")
+# Run a full analysis (returns an AnalysisReport)
+report = rj.analyze_code()
+print(f"Total issues: {report.total_issues}")
+print(report)  # human-readable summary
+
+# Drill into the finding lists (each is an AnalysisTargetList)
+high_complexity = report.complexity_issues.by_type(AnalysisType.HIGH_CYCLOMATIC_COMPLEXITY)
+long_functions = report.complexity_issues.by_type(AnalysisType.LONG_FUNCTION)
 
 # Group by file
-by_file = issues.group_by_file()
+by_file = report.pattern_issues.group_by_file()
 for file_path, file_issues in by_file.items():
     print(f"{file_path}: {len(file_issues)} issues")
 
-# Find dead code
-dead = issues.by_types(["UNUSED_FUNCTION", "UNUSED_CLASS", "UNUSED_VARIABLE"])
-
-# Get summary
-print(issues.summary())
-# Total: 42 issues (3 high, 15 medium, 24 low)
+# Find dead code with dedicated finders
+unused_functions = rj.find_unused_functions()
+unused_classes = rj.find_unused_classes()
+unused_variables = rj.find_unused_variables()
 ```
 
 ### Security Scanning
@@ -297,16 +302,9 @@ security = rj.find_security_issues()
 critical = security.critical()
 high = security.high()
 
-# Filter by type
-secrets = security.by_types([
-    "HARDCODED_SECRET",
-    "HARDCODED_API_KEY",
-    "HARDCODED_PASSWORD"
-])
-injection = security.by_types([
-    "SQL_INJECTION",
-    "COMMAND_INJECTION"
-])
+# Filter by category
+secrets = security.secrets()
+injection = security.injection_risks()
 
 # Get detailed report
 for issue in security:
@@ -317,29 +315,23 @@ for issue in security:
 ### Optimization Detection
 
 ```python
-from rejig import Rejig
+from rejig import Rejig, OptimizeType
+from rejig.optimize import DRYAnalyzer, LoopOptimizer
 
 rj = Rejig("src/")
 
-# Find optimization opportunities
-opts = rj.find_optimization_opportunities()
-
-# Duplicate code detection
-duplicates = opts.by_type("DUPLICATE_CODE")
+# Duplicate code detection (DRY analysis)
+dry = DRYAnalyzer(rj)
+duplicates = dry.find_all_issues().by_type(OptimizeType.DUPLICATE_CODE_BLOCK)
 for dup in duplicates:
-    print(f"Duplicate code at {dup.locations}")
+    print(f"Duplicate code at {dup.location}")
 
 # Loop optimization suggestions
-loops = opts.by_types([
-    "LOOP_TO_COMPREHENSION",
-    "LOOP_TO_BUILTIN"
-])
-for loop in loops:
+loops = LoopOptimizer(rj)
+optimizations = loops.find_all_issues()
+for loop in optimizations:
     print(f"{loop.message}")
-    print(f"Suggestion: {loop.suggestion}")
-
-# Quick wins (low-risk optimizations)
-quick = opts.quick_wins()
+    print(f"Suggestion:\n{loop.suggested_code}")
 ```
 
 ### Config Files
@@ -391,9 +383,9 @@ project.scripts().add("mycli", "myapp.cli:main")
 
 # Tool configuration
 project.black().set_line_length(110)
-project.ruff().select_rules(["E", "F", "W"])
-project.mypy().set_strict(True)
-project.pytest().set_test_paths(["tests/"])
+project.ruff().select(["E", "F", "W"])
+project.mypy().enable_strict()
+project.pytest().set_testpaths(["tests/"])
 ```
 
 ### Transactions
@@ -405,7 +397,7 @@ rj = Rejig("src/")
 with rj.transaction() as tx:
     rj.find_class("OldName").rename("NewName")
     rj.find_function("old_func").rename("new_func")
-    rj.find_methods(pattern="^_old").rename(lambda m: m.name.replace("_old", "_new"))
+    rj.find_class("Service").find_methods(pattern="^_old").rename("^_old", "_new")
 
     # Preview before commit
     print(tx.preview())
@@ -423,16 +415,17 @@ todos = rj.find_todos()
 
 # Filter
 fixmes = todos.by_type("FIXME")
-high_priority = todos.by_priority(1)
+high_priority = todos.high_priority()
 my_todos = todos.by_author("john")
-with_issues = todos.with_issue_refs()
+with_issues = todos.with_issues()
 
 # Operations
-for todo in todos.without_issue_refs():
+for todo in todos.without_issues():
     todo.link_to_issue("GH-123")
 
 # Report
-print(todos.summary())
+from rejig.todos.reporter import TodoReporter
+print(TodoReporter(rj, todos).summary())
 ```
 
 ### Linting Directives
@@ -442,18 +435,18 @@ rj = Rejig("src/")
 
 # Find type: ignore comments
 type_ignores = rj.find_type_ignores()
-bare_ignores = type_ignores.filter(lambda t: t.is_bare)
+bare_ignores = type_ignores.bare()
 for ignore in bare_ignores:
-    ignore.update_codes(["type-arg"])  # Make specific
+    ignore.add_code("type-arg")  # Make specific
 
 # Find noqa comments
 noqas = rj.find_noqa_comments()
-noqas.by_codes(["E501"]).remove_all()  # Remove line-length ignores
+noqas.with_code("E501").remove_all()  # Remove line-length ignores
 
 # Find all directives
-from rejig import DirectiveFinder
+from rejig.directives import DirectiveFinder
 directives = DirectiveFinder(rj).find_all()
-print(directives.summary())
+print(directives.count_by_type())
 ```
 
 ### Framework Support
@@ -461,7 +454,7 @@ print(directives.summary())
 #### Django
 
 ```python
-from rejig.frameworks.django import DjangoProject
+from rejig.django import DjangoProject
 
 with DjangoProject("/path/to/project") as project:
     # Settings

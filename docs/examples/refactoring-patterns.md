@@ -62,7 +62,7 @@ rj.find_classes(pattern="^Test").add_decorator("pytest.mark.integration")
 ```python
 # Add return type to all public functions
 for func in rj.find_functions():
-    if not func.name.startswith("_") and not func.has_type_hints():
+    if not func.name.startswith("_"):
         func.set_return_type("None")  # Or infer: func.infer_type_hints()
 ```
 
@@ -121,8 +121,8 @@ file = rj.file("utils.py")
 # Move a block of code to a different position
 file.lines(50, 75).move_to(10)
 
-# Move to another file
-file.lines(100, 150).move_to_file("helpers.py", after_line=20)
+# Move to another file (inserted at the given line number)
+file.lines(100, 150).move_to_file("helpers.py", line_number=20)
 ```
 
 ## Converting Code

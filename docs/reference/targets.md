@@ -107,7 +107,9 @@ pkg.path         # Path to directory
 pkg.exists()     # True if __init__.py exists
 
 # Navigation
-pkg.find_modules()             # TargetList[ModuleTarget]
+pkg.get_modules()              # list[Path] of module files
+pkg.find_module("models")      # FileTarget for a named module
+pkg.find_subpackage("api")     # PackageTarget for a subpackage
 pkg.find_classes()             # TargetList[ClassTarget]
 pkg.find_functions()           # TargetList[FunctionTarget]
 
@@ -128,7 +130,6 @@ cls.name                      # "User"
 cls.file_path                 # Path to containing file
 cls.exists()                  # True if found
 cls.has_docstring()           # True if has docstring
-cls.get_lines()               # (start, end) line numbers
 cls.get_content()             # Result with source code
 
 # Navigation
@@ -148,7 +149,6 @@ cls.duplicate("UserCopy")
 
 # Conversions
 cls.convert_to_dataclass()
-cls.convert_to_pydantic_model()
 cls.generate_all_dunders()
 ```
 
@@ -164,15 +164,14 @@ func.name                     # "process"
 func.file_path                # Path to file
 func.exists()                 # True if found
 func.has_docstring()          # True if has docstring
-func.has_type_hints()         # True if has annotations
-cls.get_lines()               # (start, end) line numbers
+func.get_content()            # Result with source code
 
 # Operations
 func.rename("process_data")
 func.add_decorator("lru_cache")
 func.remove_decorator("deprecated")
 func.insert_statement("log('start')", position="start")
-func.add_parameter("timeout", type="int", default="30")
+func.add_parameter("timeout", type_annotation="int", default_value="30")
 func.remove_parameter("old_param")
 func.set_return_type("list[str]")
 func.set_parameter_type("data", "dict[str, Any]")
@@ -197,7 +196,6 @@ method.class_name             # Name of containing class
 method.file_path
 method.exists()
 method.has_docstring()
-method.has_type_hints()
 
 # Operations (same as FunctionTarget)
 method.rename("save_data")
@@ -231,11 +229,6 @@ line.remove_noqa()
 line.add_pylint_disable("line-too-long")
 line.add_fmt_skip()
 line.add_no_cover()
-
-# TODO operations
-line.add_todo("Fix this")
-line.remove_todo()
-line.link_to_issue("#123")
 ```
 
 ### LineBlockTarget
@@ -252,11 +245,12 @@ block.file_path               # Path to file
 block.get_content()           # Result with content
 
 # Operations
-block.move_to(100)            # Move to line 100
-block.move_to_file("other.py", after_line=5)
+block.move_to(100)                      # Move to line 100
+block.move_to_file("other.py", 5)       # (file_path, line_number)
 block.rewrite("new content")
-block.prepend("# Start\n")
-block.append("# End\n")
+block.insert_before("# Start\n")
+block.insert_after("# End\n")
+block.replace("old", "new")             # Regex replace within the block
 block.delete()
 block.indent(2)
 block.dedent()
@@ -291,25 +285,25 @@ block.to_line_block()         # Convert to LineBlockTarget
 A Python comment (standalone or inline).
 
 ```python
-# Find comments
-comments = file.find_comments()
-todos = file.find_comments(pattern="TODO|FIXME")
-
-# Access comment properties
-for comment in comments:
-    comment.line_number           # Line number
-    comment.text                  # Comment text (without #)
-    comment.is_inline             # True if code precedes comment
-    comment.file_path             # Path to file
+# Properties
+comment.line_number           # Line number
+comment.text                  # Comment text (without #)
+comment.name                  # Alias for text (used by filtering)
+comment.file_path             # Path to file
+comment.exists()              # True if the comment still exists
 
 # Operations
+comment.get_content()         # Result with the raw comment (incl. #)
 comment.rewrite("New comment text")
 comment.delete()
-comment.convert_to_docstring()    # If preceding a function/class
 
-# Check type
-comment.is_todo()                 # True for TODO/FIXME/XXX/HACK
-comment.to_line_target()          # Get LineTarget for this line
+# Type checks (properties, not methods)
+comment.is_todo               # True for TODO comments
+comment.is_fixme              # True for FIXME comments
+comment.is_hack               # True for HACK comments
+comment.is_xxx                # True for XXX comments
+comment.is_type_ignore        # True for "type: ignore" comments
+comment.is_noqa               # True for noqa comments
 ```
 
 ### StringLiteralTarget
@@ -317,37 +311,29 @@ comment.to_line_target()          # Get LineTarget for this line
 A string literal in Python code.
 
 ```python
-# Find strings
-strings = file.find_strings()
-sql_strings = file.find_strings(pattern="SELECT.*FROM")
-multiline = file.find_multiline_strings()
-fstrings = file.find_fstrings()
-docstrings = file.find_docstrings()
-
-# Access string properties
-for s in strings:
-    s.value                       # String content (unquoted)
-    s.kind                        # "simple", "multiline", "fstring", "raw", "bytes"
-    s.quote_style                 # "single", "double", "triple_single", "triple_double"
-    s.line_number                 # Start line
-    s.end_line_number             # End line (for multiline)
-    s.is_multiline                # True for triple-quoted
-    s.is_docstring                # True if it's a docstring
+# Properties
+s.value                       # String content (decoded, without quotes)
+s.raw_content                 # Raw source text (with quotes)
+s.name                        # Alias for value (used by filtering)
+s.line_number                 # Start line
+s.file_path                   # Path to file
+s.is_docstring                # True if it's a docstring
+s.is_multiline                # True for triple-quoted
+s.is_fstring                  # True for f-strings
+s.is_raw_string               # True for raw (r"...") strings
+s.exists()                    # True if the string still exists
 
 # Operations
-s.rewrite("new content")          # Replace content (keeps quotes)
-s.rewrite(new_content="...")      # Alias for API consistency
-s.convert_to_fstring()            # Convert .format() to f-string
-s.convert_to_raw()                # Add r prefix
-s.convert_to_multiline()          # Convert to triple-quoted
-s.change_quote_style("double")    # Change quote type
+s.get_content()               # Result with the string value
+s.rewrite("new content")      # Replace content (keeps quotes)
+s.rewrite(new_content="...")  # Alias for API consistency
 s.delete()
 
-# Analysis helpers
-s.contains_sql()                  # True if looks like SQL
-s.contains_url()                  # True if contains URL
-s.contains_path()                 # True if looks like file path
-s.to_line_block()                 # Get LineBlockTarget
+# Analysis helpers (properties)
+s.looks_like_sql              # True if looks like SQL
+s.looks_like_url              # True if contains a URL
+s.looks_like_path            # True if looks like a file path
+s.looks_like_regex            # True if looks like a regex
 ```
 
 ## Config Targets
@@ -363,7 +349,7 @@ toml.exists()                 # True if file exists
 toml.get("tool.black.line-length")
 toml.get("missing.key", default=None)
 toml.set("project.version", "2.0.0")
-toml.delete_key("tool.old-tool")
+toml.delete("tool.old-tool")
 toml.get_section("tool.black")
 toml.rewrite(new_content)     # Replace entire file content (validates TOML)
 ```
@@ -378,7 +364,7 @@ yaml = rj.yaml("config.yml")
 yaml.exists()
 yaml.get("database.host")
 yaml.set("database.port", 5432)
-yaml.delete_key("deprecated")
+yaml.delete("deprecated")
 ```
 
 ### JsonTarget
@@ -391,7 +377,7 @@ json = rj.json("package.json")
 json.exists()
 json.get("version")
 json.set("scripts.test", "pytest")
-json.delete_key("devDependencies.old")
+json.delete("devDependencies.old")
 ```
 
 ### IniTarget
@@ -418,10 +404,16 @@ text = rj.text_file("README.md")
 
 text.exists()
 text.get_content()
-text.line(1)                  # First line
-text.lines(1, 10)             # First 10 lines
-text.find_pattern(r"## .*")   # Find headers
-text.replace_pattern(r"v\d+", "v2")
+text.get_line(1)              # First line (str or None)
+text.line_count()            # Number of lines
+text.find_lines(r"## .*")    # Find matching (line_number, text) pairs
+text.replace(r"v\d+", "v2")  # Regex replace across the file
+text.append("...")
+text.prepend("...")
+text.insert_at_line(5, "...")
+text.delete_line(3)
+text.delete_lines(10, 20)
+text.rewrite("...")
 ```
 
 ---

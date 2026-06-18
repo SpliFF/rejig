@@ -55,11 +55,11 @@ Dataclass representing an analysis finding.
 | `type` | `AnalysisType` | Type of issue |
 | `file_path` | `Path` | File containing the issue |
 | `line_number` | `int` | Line number (1-indexed) |
-| `name` | `str` | Name of the element |
+| `name` | `str \| None` | Name of the element |
 | `message` | `str` | Human-readable description |
-| `severity` | `str` | "high", "medium", or "low" |
-| `value` | `Any` | Actual value (e.g., complexity score) |
-| `threshold` | `Any` | Threshold that was exceeded |
+| `severity` | `str` | "info", "warning", or "error" |
+| `value` | `int \| float \| str \| None` | Actual value (e.g., complexity score) |
+| `threshold` | `int \| float \| None` | Threshold that was exceeded |
 | `context` | `dict` | Additional context |
 
 ## AnalysisTarget
@@ -80,6 +80,8 @@ All properties from `AnalysisFinding` plus:
 |--------|---------|-------------|
 | `to_file_target()` | `FileTarget` | Get file containing issue |
 | `to_line_target()` | `LineTarget` | Get line with issue |
+| `to_function_target()` | `Target` | Get the function the finding refers to |
+| `to_class_target()` | `Target` | Get the class the finding refers to |
 | `exists()` | `bool` | Always True for valid findings |
 
 ## AnalysisTargetList
@@ -91,11 +93,19 @@ List of analysis findings with filtering and aggregation.
 | Method | Description |
 |--------|-------------|
 | `by_type(type)` | Filter by single type |
-| `by_types(types)` | Filter by multiple types |
+| `by_types(*types)` | Filter by multiple types |
 | `by_severity(severity)` | Filter by severity level |
 | `in_file(path)` | Filter by file path |
 | `in_directory(path)` | Filter by directory |
 | `filter(predicate)` | Filter by callable |
+| `errors()` | Findings with `"error"` severity |
+| `warnings()` | Findings with `"warning"` severity |
+| `info()` | Findings with `"info"` severity |
+| `complexity_issues()` | Complexity-related findings only |
+| `dead_code()` | Dead-code findings only |
+| `pattern_issues()` | Pattern/quality findings only |
+| `above_threshold(threshold)` | Findings whose value exceeds `threshold` |
+| `below_threshold(threshold)` | Findings whose value is under `threshold` |
 
 ### Aggregation
 
@@ -113,6 +123,7 @@ List of analysis findings with filtering and aggregation.
 |--------|---------|-------------|
 | `sorted_by_severity()` | `AnalysisTargetList` | Sort by severity |
 | `sorted_by_location()` | `AnalysisTargetList` | Sort by file/line |
+| `sorted_by_value()` | `AnalysisTargetList` | Sort by finding value (e.g. complexity) |
 
 ### Output
 
@@ -121,42 +132,59 @@ List of analysis findings with filtering and aggregation.
 | `summary()` | `str` | Summary string |
 | `to_list_of_dicts()` | `list[dict]` | Export as dicts |
 
-## AnalysisConfig
+## Running Analysis
 
-Configuration for analysis.
+Use `Rejig.analyze_code()` to run a full analysis. It returns an `AnalysisReport`
+object aggregating complexity, pattern, dead-code, and coverage findings.
 
-### Properties
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `max_complexity` | `int` | 10 | Cyclomatic complexity threshold |
-| `max_nesting_depth` | `int` | 4 | Maximum nesting levels |
-| `max_function_lines` | `int` | 50 | Maximum function length |
-| `max_class_lines` | `int` | 300 | Maximum class length |
-| `max_parameters` | `int` | 5 | Maximum parameters |
-| `max_branches` | `int` | 8 | Maximum if/elif branches |
-| `max_returns` | `int` | 4 | Maximum return statements |
-| `ignore_files` | `list[str]` | `[]` | Glob patterns to ignore |
-| `ignore_functions` | `list[str]` | `[]` | Function names to ignore |
-| `ignore_types` | `list[str]` | `[]` | Issue types to ignore |
+```python
+rj.analyze_code(
+    include_complexity: bool = True,
+    include_patterns: bool = True,
+    include_dead_code: bool = True,
+    include_coverage: bool = True,
+) -> AnalysisReport
+```
 
 ### Usage
 
 ```python
-from rejig import Rejig, AnalysisConfig
-
-config = AnalysisConfig(
-    max_complexity=15,
-    max_function_lines=100,
-    ignore_files=["**/test_*.py"],
-    ignore_types=["TODO_COMMENT"],
-)
+from rejig import Rejig
 
 rj = Rejig("src/")
-issues = rj.find_analysis_issues(config=config)
+report = rj.analyze_code()
+
+print(report)                       # Formatted summary
+print(f"Total issues: {report.total_issues}")
+
+# Each category is an AnalysisTargetList (or None if disabled)
+for finding in report.complexity_issues:
+    print(f"{finding.location}: {finding.message}")
 ```
 
+To skip a category, pass the corresponding flag as `False`:
+
+```python
+report = rj.analyze_code(include_coverage=False)
+```
+
+### AnalysisReport
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `generated_at` | `datetime` | When the report was generated |
+| `project_root` | `Path` | Analyzed root directory |
+| `summary` | `dict` | Project-level metrics |
+| `complexity_issues` | `AnalysisTargetList \| None` | Complexity findings |
+| `pattern_issues` | `AnalysisTargetList \| None` | Pattern/quality findings |
+| `dead_code` | `AnalysisTargetList \| None` | Dead-code findings |
+| `coverage_gaps` | `list[Path]` | Files lacking tests |
+| `total_issues` | `int` | Total findings across categories (property) |
+
 ## Analyzers
+
+For finer control, the individual analyzers can be used directly. Each one is
+constructed with a `Rejig` instance and returns `AnalysisTargetList` results.
 
 ### ComplexityAnalyzer
 
@@ -168,16 +196,17 @@ from rejig import Rejig, ComplexityAnalyzer
 rj = Rejig("src/")
 analyzer = ComplexityAnalyzer(rj)
 
-# Analyze single function
-func = rj.find_function("process")
-complexity = analyzer.analyze_function(func)
-print(f"Cyclomatic: {complexity.cyclomatic}")
-print(f"Nesting: {complexity.max_nesting}")
+# Raw per-function complexity results
+results = analyzer.analyze_all()
+for result in results:
+    print(f"{result.full_name}: {result.cyclomatic_complexity}")
 
-# Find complex functions
-complex_funcs = analyzer.find_complex_functions(threshold=10)
-for func, c in complex_funcs:
-    print(f"{func.name}: {c.cyclomatic}")
+# Findings exceeding thresholds
+complex_funcs = analyzer.find_complex_functions(max_complexity=10)
+long_funcs = analyzer.find_long_functions(max_lines=50)
+long_classes = analyzer.find_long_classes(max_lines=500)
+deeply_nested = analyzer.find_deeply_nested(max_depth=4)
+many_params = analyzer.find_functions_with_many_parameters(max_params=5)
 ```
 
 ### DeadCodeAnalyzer
@@ -193,7 +222,6 @@ analyzer = DeadCodeAnalyzer(rj)
 # Find unused elements
 unused_funcs = analyzer.find_unused_functions()
 unused_classes = analyzer.find_unused_classes()
-unused_imports = analyzer.find_unused_imports()
 unused_vars = analyzer.find_unused_variables()
 ```
 
@@ -210,32 +238,28 @@ finder = PatternFinder(rj)
 magic_numbers = finder.find_magic_numbers()
 hardcoded_strings = finder.find_hardcoded_strings()
 bare_excepts = finder.find_bare_excepts()
-todos = finder.find_todos()
+no_type_hints = finder.find_functions_without_type_hints()
+no_docstrings = finder.find_functions_without_docstrings()
+all_patterns = finder.find_all_patterns()
 ```
 
 ## AnalysisReporter
 
-Generate reports from findings.
+Generate reports from a project. The reporter is constructed with a `Rejig`
+instance (it runs the analyzers itself).
 
 ```python
 from rejig import Rejig, AnalysisReporter
 
 rj = Rejig("src/")
-issues = rj.find_analysis_issues()
-reporter = AnalysisReporter(issues)
+reporter = AnalysisReporter(rj)
 
-# Text report
-print(reporter.to_text())
+# Full AnalysisReport object (same as rj.analyze_code())
+report = reporter.generate_full_report()
 
-# JSON report
-json_report = reporter.to_json()
-
-# Markdown report
-md_report = reporter.to_markdown()
-
-# HTML report
-html_report = reporter.to_html(
-    include_code_snippets=True,
-    syntax_highlight=True,
-)
+# Write specific reports to disk (or return data when output_path is None)
+reporter.generate_api_summary("reports/api.md")
+reporter.generate_module_structure("reports/structure.md")
+reporter.generate_complexity_report("reports/complexity.md")
+reporter.generate_coverage_gaps_report("reports/coverage.md")
 ```

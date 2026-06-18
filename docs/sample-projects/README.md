@@ -81,8 +81,8 @@ from rejig import Rejig
 rj = Rejig("docs/sample-projects/legacy-flask-app/")
 
 # Run analysis
-issues = rj.find_analysis_issues()
-print(issues.summary())
+report = rj.analyze_code()
+print(report)
 
 # Try transformations
 rj.find_functions().infer_type_hints()
@@ -90,15 +90,8 @@ rj.find_functions().infer_type_hints()
 
 ## Testing Recipes
 
-Use these projects to test the recipes in `docs/examples/`:
+Work through the recipe guides in `docs/examples/` against these projects:
 
-```bash
-# Run analysis recipes
-python docs/examples/analysis-recipes.py docs/sample-projects/cli-tool/
-
-# Run security recipes
-python docs/examples/security-recipes.py docs/sample-projects/legacy-flask-app/
-
-# Run optimization recipes
-python docs/examples/optimization-recipes.py docs/sample-projects/data-processor/
-```
+- [`analysis-recipes.md`](../examples/analysis-recipes.md) — try against `cli-tool/`
+- [`security-recipes.md`](../examples/security-recipes.md) — try against `legacy-flask-app/`
+- [`optimization-recipes.md`](../examples/optimization-recipes.md) — try against `data-processor/`

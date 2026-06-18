@@ -258,7 +258,12 @@ print(patch.summary())
 
 ### From a Transaction
 
+`rj.generate_patch()` accepts a `Result` or `BatchResult`. To build a patch
+directly from a transaction's pending changes, use `PatchGenerator`:
+
 ```python
+from rejig.patching import PatchGenerator, PatchTarget
+
 rj = Rejig("src/", dry_run=True)
 
 with rj.transaction() as tx:
@@ -266,10 +271,13 @@ with rj.transaction() as tx:
     rj.find_function("helper").add_decorator("cache")
     rj.find_method("process").add_parameter("timeout", "int", "30")
 
-    # Generate patch from transaction (before commit)
-    patch = rj.generate_patch(tx)
+    # Generate a patch from the transaction (before commit)
+    patch = PatchTarget(rj, PatchGenerator().from_transaction(tx))
     patch.save("refactoring.patch")
 ```
+
+Alternatively, capture the `BatchResult` from `tx.commit()` and pass that to
+`rj.generate_patch()`.
 
 ### Saving Patches
 
@@ -556,14 +564,16 @@ def review_and_apply(patch_path: str):
 ### Create Undo Patches for Safety
 
 ```python
+from rejig.patching import PatchGenerator, PatchTarget
+
 def safe_refactor(rj: Rejig):
     with rj.transaction() as tx:
         # Perform changes
         rj.find_class("OldAPI").rename("NewAPI")
         rj.find_function("deprecated_helper").delete()
 
-        # Generate both forward and reverse patches
-        forward_patch = rj.generate_patch(tx)
+        # Generate both forward and reverse patches from the transaction
+        forward_patch = PatchTarget(rj, PatchGenerator().from_transaction(tx))
         undo_patch = forward_patch.reverse()
 
         # Save undo patch BEFORE committing
@@ -618,6 +628,8 @@ def check_patch_applicability(patch_path: str):
 ### Generate Patches for CI/CD
 
 ```python
+from rejig.patching import PatchGenerator, PatchTarget
+
 def generate_migration_patch():
     """Generate a patch for code migration, suitable for CI review."""
     rj = Rejig("src/", dry_run=True)
@@ -631,8 +643,8 @@ def generate_migration_patch():
             if "oldapi" in func.name.lower():
                 func.rename(func.name.replace("oldapi", "newapi"))
 
-        # Generate patch
-        patch = rj.generate_patch(tx)
+        # Generate patch from the transaction
+        patch = PatchTarget(rj, PatchGenerator().from_transaction(tx))
 
         # Add metadata
         header = f"""# Auto-generated migration patch

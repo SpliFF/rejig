@@ -1,6 +1,6 @@
 # Django Support
 
-Rejig provides specialized tools for refactoring Django projects: managing settings, URLs, apps, models, and views.
+Rejig provides specialized tools for refactoring Django projects: managing settings, URLs, apps, and dependencies.
 
 ## Installation
 
@@ -12,12 +12,19 @@ pip install rejig[django]
 
 The `DjangoProject` class provides Django-specific operations.
 
+`DjangoProject` expects the project root to contain a Django root directory
+(named `django-root` by default; override with `django_root_name`).
+
 ```python
-from rejig.frameworks.django import DjangoProject
+from rejig.django import DjangoProject
 
 # Use context manager for automatic cleanup
 with DjangoProject("/path/to/project") as project:
     # Django-specific operations
+    project.add_installed_app("myapp")
+
+# Customize the Django root directory name
+with DjangoProject("/path/to/project", django_root_name="src") as project:
     project.add_installed_app("myapp")
 ```
 
@@ -32,24 +39,12 @@ with DjangoProject(".") as project:
 
     # Add after a specific app
     project.add_installed_app("myapp", after_app="django.contrib.auth")
-
-    # Add before a specific app
-    project.add_installed_app("myapp", before_app="django.contrib.staticfiles")
-
-    # Add at the beginning (after django apps)
-    project.add_installed_app("myapp", position="first")
-```
-
-### Remove from INSTALLED_APPS
-
-```python
-project.remove_installed_app("deprecated_app")
 ```
 
 ### Add Middleware
 
 ```python
-# Add at the end
+# Add at the beginning (default position is "first")
 project.add_middleware("myapp.middleware.CustomMiddleware")
 
 # Add at specific position
@@ -58,16 +53,27 @@ project.add_middleware(
     position="first"  # Before all other middleware
 )
 
+# Add at the end
 project.add_middleware(
     "myapp.middleware.LoggingMiddleware",
+    position="last"
+)
+
+# Add after a specific middleware
+project.add_middleware(
+    "myapp.middleware.LoggingMiddleware",
+    position="after",
     after="django.middleware.common.CommonMiddleware"
 )
 ```
 
-### Remove Middleware
+### Update Middleware Path
 
 ```python
-project.remove_middleware("deprecated.middleware.OldMiddleware")
+project.update_middleware_path(
+    "deprecated.middleware.OldMiddleware",
+    "myapp.middleware.NewMiddleware",
+)
 ```
 
 ### Manage Settings Variables
@@ -93,18 +99,6 @@ project.update_setting("ALLOWED_HOSTS", '["*"]')
 project.delete_setting("DEPRECATED_SETTING")
 ```
 
-### Read Settings
-
-```python
-# Get setting value
-debug = project.get_setting("DEBUG")
-allowed_hosts = project.get_setting("ALLOWED_HOSTS")
-
-# Check if setting exists
-if project.has_setting("MY_CUSTOM_SETTING"):
-    value = project.get_setting("MY_CUSTOM_SETTING")
-```
-
 ## URL Configuration
 
 ### Add URL Patterns
@@ -113,14 +107,14 @@ if project.has_setting("MY_CUSTOM_SETTING"):
 with DjangoProject(".") as project:
     # Add a simple URL pattern
     project.add_url_pattern(
-        path="api/users/",
+        path_str="api/users/",
         view="UserListView.as_view()",
         name="user-list"
     )
 
-    # Add with regex (for path with parameters)
+    # Add a path with parameters
     project.add_url_pattern(
-        path="api/users/<int:pk>/",
+        path_str="api/users/<int:pk>/",
         view="UserDetailView.as_view()",
         name="user-detail"
     )
@@ -132,13 +126,6 @@ with DjangoProject(".") as project:
 # Include another URLconf
 project.add_url_include("api.urls", path_prefix="api/")
 project.add_url_include("myapp.urls", path_prefix="myapp/")
-
-# Include with namespace
-project.add_url_include(
-    "myapp.urls",
-    path_prefix="myapp/",
-    namespace="myapp"
-)
 ```
 
 ### Remove URL Patterns
@@ -147,21 +134,25 @@ project.add_url_include(
 # Remove by view name
 project.remove_url_pattern_by_view("OldView")
 
-# Remove by path
-project.remove_url_pattern_by_path("deprecated/")
-
-# Remove by name
-project.remove_url_pattern_by_name("old-endpoint")
+# Remove by matching a regex against the path() line
+project.remove_url_pattern(r'.*deprecated.*')
 ```
 
-### Modify URL Patterns
+### Find and Move URL Patterns
 
 ```python
-# Update path
-project.update_url_path("user-list", "api/v2/users/")
+# Find a URL pattern line (searches all urls.py via include() if no file given)
+match = project.find_url_pattern(view_name="UserListView")
+if match:
+    line, file_path = match
+    print(f"Found in {file_path}: {line}")
 
-# Update view
-project.update_url_view("user-list", "UserListViewV2.as_view()")
+# Move a URL pattern (and its view import) from one urls.py to another
+project.move_url_pattern(
+    "UserListView",
+    source_urls=project.root_urls_path,
+    dest_urls=project.django_root / "api" / "urls.py",
+)
 ```
 
 ## App Discovery
@@ -178,8 +169,10 @@ with DjangoProject(".") as project:
     file_path = project.find_file_containing_class("MyModel")
     print(f"MyModel is in: {file_path}")
 
-    # Find app by model
-    app_name = project.find_app_containing_model("User")
+    # Find which app matches an arbitrary regex pattern
+    app_name = project.find_app_containing_pattern(
+        r"class\s+User\b", filename="models.py"
+    )
 ```
 
 ## Dependency Management
@@ -202,65 +195,42 @@ with DjangoProject(".") as project:
     project.remove_dependency("django-deprecated-package")
 ```
 
-## Model Operations
+## App Creation
 
-Work with Django models:
+Create a new Django app directory with starter files:
 
 ```python
 with DjangoProject(".") as project:
-    # Find a model
-    model = project.find_model("User")
+    project.create_app(
+        "newapp",
+        files={
+            "views.py": "from django.shortcuts import render\n",
+            "urls.py": "from django.urls import path\n\nurlpatterns = []\n",
+        },
+    )
 
-    # Add field to model
-    model.add_field("email_verified", "models.BooleanField(default=False)")
-
-    # Remove field
-    model.remove_field("deprecated_field")
-
-    # Add method to model
-    model.add_method("get_full_name", """
-    def get_full_name(self):
-        return f"{self.first_name} {self.last_name}"
-    """)
-
-    # Add Meta option
-    model.add_meta_option("ordering", '["-created_at"]')
+    # Check whether an app exists / get its path
+    if project.app_exists("newapp"):
+        print(project.get_app_path("newapp"))
 ```
 
-## View Operations
+## Moving Code (rope)
 
-Work with Django views:
-
-```python
-with DjangoProject(".") as project:
-    # Find a view class
-    view = project.find_view("UserListView")
-
-    # Change base class
-    view.change_base_class("ListView", "CustomListView")
-
-    # Add mixin
-    view.add_mixin("LoginRequiredMixin")
-
-    # Add attribute
-    view.add_attribute("paginate_by", "25")
-
-    # Add method
-    view.add_method("get_queryset", """
-    def get_queryset(self):
-        return super().get_queryset().filter(active=True)
-    """)
-```
-
-## Migration Helpers
+`DjangoProject` delegates rope-based moves to the internal Rejig instance.
+These update imports across the project automatically:
 
 ```python
 with DjangoProject(".") as project:
-    # Generate migration name suggestion
-    migration_name = project.suggest_migration_name("myapp")
-
-    # Find migrations that need squashing
-    migrations = project.find_migrations_to_squash("myapp", threshold=20)
+    project.move_class(
+        project.django_root / "myapp" / "views.py",
+        "UserListView",
+        "myapp.api.views",
+    )
+    project.move_function(
+        project.django_root / "myapp" / "utils.py",
+        "helper",
+        "myapp.common",
+    )
 ```
 
 ## Common Patterns
@@ -313,9 +283,11 @@ with DjangoProject(".") as project:
     # Update deprecated settings
     project.delete_setting("USE_L10N")  # Removed in Django 4.0
 
-    # Update middleware (if using old names)
-    project.remove_middleware("django.middleware.csrf.CsrfViewMiddleware")
-    project.add_middleware("django.middleware.csrf.CsrfViewMiddleware")
+    # Rename a middleware path (if a class moved between versions)
+    project.update_middleware_path(
+        "django.middleware.csrf.OldCsrfViewMiddleware",
+        "django.middleware.csrf.CsrfViewMiddleware",
+    )
 ```
 
 ### Add Authentication App
@@ -347,36 +319,45 @@ with DjangoProject(".") as project:
 
 ## Integration with Core Rejig
 
-DjangoProject extends the core Rejig functionality:
+For CST-level operations (renaming, editing classes/functions), use a `Rejig`
+instance scoped at the Django root alongside the Django-specific operations:
 
 ```python
-with DjangoProject(".") as project:
-    # All core Rejig operations work
-    project.find_class("MyModel").add_method("__str__", ...)
-    project.find_function("helper").rename("utility")
+from rejig import Rejig
+from rejig.django import DjangoProject
 
-    # Plus Django-specific operations
+with DjangoProject(".") as project:
+    # Django-specific operations
     project.add_installed_app("newapp")
     project.add_middleware("myapp.middleware.Custom")
+
+    # Core Rejig operations on the same tree
+    rj = Rejig(project.django_root)
+    rj.find_class("MyModel").add_method("__str__")
 ```
 
-## Settings File Detection
+## Settings and Path Resolution
 
-DjangoProject automatically finds your settings file:
+`DjangoProject` resolves key paths relative to the Django root. The default
+settings file is `django_site/settings/base.py`:
 
 ```python
 with DjangoProject(".") as project:
-    # Automatically detects settings from:
-    # - DJANGO_SETTINGS_MODULE environment variable
-    # - config/settings.py, config/settings/base.py
-    # - project_name/settings.py
-    # - settings.py
-
-    print(f"Settings file: {project.settings_file}")
+    print(f"Project root:  {project.project_root}")
+    print(f"Django root:   {project.django_root}")
+    print(f"Settings file: {project.settings_path}")
+    print(f"Root urls.py:  {project.root_urls_path}")
+    print(f"pyproject:     {project.pyproject_path}")
 ```
 
-You can also specify explicitly:
+Settings operations accept an explicit `settings_file` argument to target a
+different settings module:
 
 ```python
-project = DjangoProject(".", settings_module="config.settings.production")
+from pathlib import Path
+
+project.add_setting(
+    "DEBUG", "False",
+    settings_file=Path("django-root/django_site/settings/production.py"),
+)
 ```

@@ -14,10 +14,16 @@ security = rj.find_security_issues()
 
 # Print summary
 print(security.summary())
-# Output: Total: 12 issues (2 critical, 4 high, 3 medium, 3 low)
+# Output (multi-line):
+#   Total: 12 security findings
+#     CRITICAL: 2
+#     HIGH: 4
+#     MEDIUM: 3
+#     LOW: 3
+#   ...per-type counts...
 
 # List critical and high issues
-for issue in security.critical() + security.high():
+for issue in security.at_least("high"):
     print(f"{issue.severity}: {issue.message}")
     print(f"  {issue.file_path}:{issue.line_number}")
     print(f"  Code: {issue.code_snippet}")
@@ -95,31 +101,41 @@ high = security.high()
 medium = security.medium()
 low = security.low()
 
-# Combined
-urgent = security.by_severity(["critical", "high"])
+# Findings at or above a severity level (critical + high)
+urgent = security.at_least("high")
 ```
 
 ### By Type
 
+Type filters take `SecurityType` enum members:
+
 ```python
+from rejig import SecurityType
+
 # Single type
-secrets = security.by_type("HARDCODED_SECRET")
+secrets = security.by_type(SecurityType.HARDCODED_SECRET)
 
-# Multiple types
-injection = security.by_types([
-    "SQL_INJECTION",
-    "COMMAND_INJECTION",
-    "SHELL_INJECTION"
-])
+# Multiple types (variadic)
+injection = security.by_types(
+    SecurityType.SQL_INJECTION,
+    SecurityType.SHELL_INJECTION,
+    SecurityType.COMMAND_INJECTION,
+)
 
-# All secret-related
-all_secrets = security.by_types([
-    "HARDCODED_SECRET",
-    "HARDCODED_API_KEY",
-    "HARDCODED_PASSWORD",
-    "HARDCODED_TOKEN",
-    "HARDCODED_CRYPTO_KEY"
-])
+# All secret-related (or use the secrets() shortcut)
+all_secrets = security.by_types(
+    SecurityType.HARDCODED_SECRET,
+    SecurityType.HARDCODED_API_KEY,
+    SecurityType.HARDCODED_PASSWORD,
+    SecurityType.HARDCODED_TOKEN,
+    SecurityType.HARDCODED_CRYPTO_KEY,
+)
+
+# Category shortcuts
+all_secrets = security.secrets()
+all_injection = security.injection_risks()
+unsafe = security.unsafe_operations()
+crypto = security.crypto_issues()
 ```
 
 ### By Location
@@ -142,12 +158,17 @@ from rejig import SecretsScanner
 scanner = SecretsScanner(rj)
 
 # Find all secrets
-secrets = scanner.find_all()
+secrets = scanner.find_hardcoded_secrets()
 
 for secret in secrets:
-    print(f"Found {secret.type} at {secret.file_path}:{secret.line_number}")
-    print(f"  Pattern: {secret.pattern_name}")
-    print(f"  Confidence: {secret.confidence}")
+    print(f"Found {secret.type.name} at {secret.file_path}:{secret.line_number}")
+    print(f"  Name: {secret.name}")
+    print(f"  Code: {secret.code_snippet}")
+
+# Or filter to specific kinds
+api_keys = scanner.find_api_keys()
+passwords = scanner.find_passwords()
+tokens = scanner.find_tokens()
 ```
 
 ### Supported Secret Patterns
@@ -174,27 +195,6 @@ password = "admin123"                  # Detected
 api_key = "abc123def456"               # Detected
 ```
 
-### Custom Secret Patterns
-
-```python
-scanner = SecretsScanner(rj)
-
-# Add custom patterns
-scanner.add_pattern(
-    name="internal_api_key",
-    pattern=r"INTERNAL_[A-Z]+_KEY\s*=\s*['\"][^'\"]+['\"]",
-    severity="high",
-)
-
-scanner.add_pattern(
-    name="slack_webhook",
-    pattern=r"https://hooks\.slack\.com/services/[A-Z0-9]+/[A-Z0-9]+/[a-zA-Z0-9]+",
-    severity="high",
-)
-
-secrets = scanner.find_all()
-```
-
 ## Vulnerability Detection
 
 ### Find SQL Injection
@@ -205,13 +205,16 @@ from rejig import VulnerabilityScanner
 scanner = VulnerabilityScanner(rj)
 
 # Find SQL injection patterns
-sql_issues = scanner.find_sql_injection()
+sql_issues = scanner.find_sql_injection_risks()
 
 for issue in sql_issues:
     print(f"SQL Injection risk: {issue.file_path}:{issue.line_number}")
     print(f"  Code: {issue.code_snippet}")
     print(f"  Suggestion: Use parameterized queries")
 ```
+
+You can also call these directly on the Rejig instance, e.g.
+`rj.find_sql_injection_risks()`.
 
 ### Examples of Detected Patterns
 
@@ -225,19 +228,19 @@ cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
 User.objects.filter(id=user_id)  # Django ORM
 ```
 
-### Find Command Injection
+### Find Shell/Command Injection
 
 ```python
-cmd_issues = scanner.find_command_injection()
+cmd_issues = scanner.find_shell_injection_risks()
 
 for issue in cmd_issues:
-    print(f"Command Injection: {issue.file_path}:{issue.line_number}")
+    print(f"Shell Injection: {issue.file_path}:{issue.line_number}")
 ```
 
 ### Examples of Detected Patterns
 
 ```python
-# Command Injection - DETECTED
+# Shell Injection - DETECTED
 os.system("ls " + user_input)
 subprocess.call(f"echo {message}", shell=True)
 subprocess.Popen(command, shell=True)
@@ -250,11 +253,11 @@ subprocess.run(["echo", message])
 ### Find Unsafe Operations
 
 ```python
-# Find all unsafe operations
-unsafe = scanner.find_unsafe_operations()
+# Find all unsafe deserialization operations
+unsafe = scanner.find_unsafe_deserialization()
 
 # Or specific types
-yaml_issues = scanner.find_unsafe_yaml()
+yaml_issues = scanner.find_unsafe_yaml_load()
 pickle_issues = scanner.find_unsafe_pickle()
 eval_issues = scanner.find_unsafe_eval()
 ```
@@ -297,18 +300,18 @@ for file_path, issues in by_file.items():
 by_type = security.group_by_type()
 
 for issue_type, issues in by_type.items():
-    print(f"\n{issue_type}: {len(issues)} occurrences")
-    for issue in issues[:3]:  # Show first 3
+    print(f"\n{issue_type.name}: {len(issues)} occurrences")
+    for issue in issues.to_list()[:3]:  # Show first 3
         print(f"  {issue.file_path}:{issue.line_number}")
 ```
 
 ### Statistics
 
 ```python
-# Count by type
+# Count by type (keys are SecurityType enum members)
 type_counts = security.count_by_type()
 print(type_counts)
-# {"HARDCODED_SECRET": 5, "SQL_INJECTION": 2, ...}
+# {<SecurityType.HARDCODED_SECRET>: 5, <SecurityType.SQL_INJECTION>: 2, ...}
 
 # Count by severity
 severity_counts = security.count_by_severity()
@@ -328,11 +331,12 @@ for issue in security:
     # Get line target for direct manipulation
     line_target = issue.to_line_target()
 
-    # Read surrounding context
-    print(file_target.get_lines(
+    # Read surrounding context (get_content() returns a Result; text is in .data)
+    context = file_target.lines(
         issue.line_number - 2,
-        issue.line_number + 2
-    ))
+        issue.line_number + 2,
+    ).get_content()
+    print(context.data)
 ```
 
 ### Export Findings
@@ -351,35 +355,47 @@ with open("security-report.json", "w") as f:
 
 ### Security Reporter
 
+The simplest way to produce a report is `rj.generate_security_report()`, which
+writes a file (or returns the data) in JSON, Markdown, or SARIF format:
+
+```python
+# Write reports to files
+rj.generate_security_report("reports/security.json", format="json")
+rj.generate_security_report("reports/security.md", format="markdown")
+
+# Or get the data back in the Result instead of writing a file
+result = rj.generate_security_report(format="json")
+report_data = result.data
+```
+
+For more control, construct a `SecurityReporter` directly (it takes the Rejig
+instance) and build a `SecurityReport` object:
+
 ```python
 from rejig import SecurityReporter
 
-reporter = SecurityReporter(security)
+reporter = SecurityReporter(rj)
 
-# Text report
-print(reporter.to_text())
+# A SecurityReport object with summary properties
+report = reporter.generate_full_report()
+print(report)                     # human-readable summary
+print(report.total_findings)
+print(report.critical_count)
 
-# JSON report
-json_report = reporter.to_json()
+# Write a report file in a chosen format
+reporter.generate_security_report("reports/security.md", format="markdown")
 
-# Markdown report
-md_report = reporter.to_markdown()
-
-# HTML report with code snippets
-html_report = reporter.to_html(
-    include_code=True,
-    syntax_highlight=True,
-)
+# Quick scan: only critical and high severity findings
+urgent = reporter.quick_scan()
 ```
+
+The same `SecurityReport` object is also available via `rj.analyze_security()`.
 
 ### SARIF Output
 
 ```python
 # SARIF format for GitHub Code Scanning
-sarif_report = reporter.to_sarif()
-
-with open("security.sarif", "w") as f:
-    f.write(sarif_report)
+rj.generate_security_report("security.sarif", format="sarif")
 ```
 
 ## CI Integration
@@ -396,7 +412,7 @@ rj = Rejig("src/")
 security = rj.find_security_issues()
 
 # Fail on critical or high severity
-critical_high = security.critical() + security.high()
+critical_high = security.at_least("high")
 
 if critical_high:
     print("Security issues found!")
@@ -436,12 +452,10 @@ jobs:
       - name: Run security scan
         run: |
           python -c "
-          from rejig import Rejig, SecurityReporter
+          from rejig import Rejig
           rj = Rejig('src/')
+          rj.generate_security_report('security.sarif', format='sarif')
           security = rj.find_security_issues()
-          reporter = SecurityReporter(security)
-          with open('security.sarif', 'w') as f:
-              f.write(reporter.to_sarif())
           if security.critical() or security.high():
               exit(1)
           "
@@ -452,46 +466,29 @@ jobs:
           sarif_file: security.sarif
 ```
 
-## Configuration
+## Filtering Results
 
-### Ignore Patterns
-
-```python
-from rejig import SecurityConfig
-
-config = SecurityConfig(
-    # Ignore specific files
-    ignore_files=["**/test_*.py", "**/conftest.py"],
-
-    # Ignore specific patterns
-    ignore_patterns=[
-        r"EXAMPLE_.*",  # Example values
-        r"TEST_.*",     # Test values
-    ],
-
-    # Ignore specific line patterns
-    ignore_line_patterns=[
-        r"# nosec",           # Bandit-style ignore
-        r"# security: ignore",
-    ],
-
-    # Minimum severity to report
-    min_severity="medium",
-)
-
-security = rj.find_security_issues(config=config)
-```
-
-### Custom Severity Mappings
+`find_security_issues()` takes no configuration arguments. Instead, filter the
+returned `SecurityTargetList` after scanning:
 
 ```python
-config = SecurityConfig(
-    severity_overrides={
-        "DEBUG_CODE": "low",          # Downgrade
-        "HARDCODED_TOKEN": "critical", # Upgrade
-    }
+security = rj.find_security_issues()
+
+# Only report medium severity and above
+reportable = security.at_least("medium")
+
+# Exclude findings in test files
+reportable = security.filter(
+    lambda issue: "test" not in issue.file_path.name
 )
 ```
+
+The secret and vulnerability scanners also apply built-in false-positive
+filtering automatically. For secrets, this skips:
+
+- Test, example, sample, mock, and fixture files (by filename)
+- Findings inside comments
+- Obvious placeholders (e.g. `your_`, `example`, `placeholder`, `changeme`)
 
 ## Common Patterns
 
@@ -533,8 +530,8 @@ print(f"Medium:   {by_severity.get('medium', 0)}")
 print(f"Low:      {by_severity.get('low', 0)}")
 print()
 print("By Type:")
-for type_name, count in sorted(by_type.items(), key=lambda x: -x[1]):
-    print(f"  {type_name}: {count}")
+for issue_type, count in sorted(by_type.items(), key=lambda x: -x[1]):
+    print(f"  {issue_type.name}: {count}")
 ```
 
 ### Remediation Guidance
@@ -550,7 +547,7 @@ REMEDIATION = {
 }
 
 for issue in security:
-    print(f"{issue.type}: {issue.message}")
-    if issue.type in REMEDIATION:
-        print(f"  Fix: {REMEDIATION[issue.type]}")
+    print(f"{issue.type.name}: {issue.message}")
+    if issue.type.name in REMEDIATION:
+        print(f"  Fix: {REMEDIATION[issue.type.name]}")
 ```

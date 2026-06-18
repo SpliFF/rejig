@@ -152,7 +152,7 @@ targets = (
 cls = rj.file("models.py").find_class("User")
 
 if cls.exists():
-    print(f"Found User class at line {cls.get_lines()[0]}")
+    print(f"Found User class at line {cls.start_line}")
 else:
     print("User class not found")
 ```
@@ -168,7 +168,8 @@ cls.name                  # "User"
 cls.file_path             # Path to the file
 cls.exists()              # True if found
 cls.has_docstring()       # True if has docstring
-cls.get_lines()           # (start_line, end_line)
+cls.start_line            # First line of the class definition
+cls.end_line              # Last line of the class definition
 cls.get_content()         # Result with source code
 ```
 
@@ -181,8 +182,8 @@ func.name                 # "process"
 func.file_path            # Path to the file
 func.exists()             # True if found
 func.has_docstring()      # True if has docstring
-func.has_type_hints()     # True if has type annotations
-func.get_lines()          # (start_line, end_line)
+func.start_line           # First line of the function definition
+func.end_line             # Last line of the function definition
 func.get_content()        # Result with source code
 ```
 
@@ -239,102 +240,45 @@ rj.find_functions(pattern="^(get|set|delete)_")
 rj.find_classes(pattern="(?i)^test")
 ```
 
-## Finding Comments
+## Finding TODO Comments
 
-### All Comments
+TODO/FIXME/XXX/HACK/NOTE/BUG comments are found project-wide:
 
 ```python
-file = rj.file("mymodule.py")
+# All TODO-style comments across the working set
+todos = rj.find_todos()
 
-# All comments in a file
-comments = file.find_comments()
+print(f"Found {len(todos)} TODOs")
 
-# Filter by content
-todos = file.find_comments(pattern="TODO|FIXME")
+# Filter by type
+fixmes = todos.by_type("FIXME")
+
+# Filter to high priority
+urgent = todos.high_priority()
+
+# Find TODOs not linked to an issue
+unlinked = todos.without_issues()
+
+for todo in todos:
+    print(f"{todo.todo_type}: {todo.todo_text}")
+    print(f"  {todo.location}")
 ```
 
-### Across the Project
+## Finding Hardcoded Strings
+
+Find hardcoded string literals that might need externalization (for example,
+for i18n):
 
 ```python
-# All comments
-comments = rj.find_comments()
-
-# TODO/FIXME comments
-todos = rj.find_comments(pattern="TODO|FIXME|XXX|HACK")
-
-# Comments mentioning a specific topic
-auth_comments = rj.find_comments(pattern="(?i)auth|login|password")
-```
-
-### Comment Properties
-
-```python
-for comment in comments:
-    print(comment.text)         # Comment text (without #)
-    print(comment.line_number)  # Line number
-    print(comment.is_inline)    # True if code precedes comment
-    print(comment.is_todo())    # True if TODO/FIXME/etc.
-```
-
-## Finding Strings
-
-### All Strings
-
-```python
-file = rj.file("mymodule.py")
-
-# All string literals
-strings = file.find_strings()
-
-# By content pattern
-urls = file.find_strings(pattern="https?://")
-sql = file.find_strings(pattern="SELECT.*FROM")
-```
-
-### Specific String Types
-
-```python
-# Multiline/triple-quoted strings
-multiline = file.find_multiline_strings()
-
-# F-strings
-fstrings = file.find_fstrings()
-
-# Docstrings only
-docstrings = file.find_docstrings()
-```
-
-### Across the Project
-
-```python
-# Find all SQL queries
-sql_strings = rj.find_sql_strings()
-
-# Find hardcoded user-facing strings (for i18n)
+# Strings at least `min_length` characters long
 hardcoded = rj.find_hardcoded_strings(min_length=10)
 
-# Find all multiline strings
-multiline = rj.find_multiline_strings()
-
-# Find all docstrings
-docstrings = rj.find_docstrings()
+for match in hardcoded:
+    print(f"{match.file_path}:{match.line_number}: {match.message}")
 ```
 
-### String Properties
-
-```python
-for s in strings:
-    print(s.value)              # Content (unquoted)
-    print(s.kind)               # "simple", "fstring", "raw", etc.
-    print(s.quote_style)        # "single", "double", "triple_*"
-    print(s.is_multiline)       # True for triple-quoted
-    print(s.is_docstring)       # True if it's a docstring
-
-    # Analysis helpers
-    print(s.contains_sql())     # Looks like SQL?
-    print(s.contains_url())     # Contains URL?
-    print(s.contains_path())    # Looks like file path?
-```
+This returns an `AnalysisTargetList`. See [Code Analysis](code-analysis.md) for
+the full set of pattern finders and how to work with findings.
 
 ## Next Steps
 

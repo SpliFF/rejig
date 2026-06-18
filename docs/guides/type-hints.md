@@ -60,21 +60,20 @@ rj.find_functions().infer_type_hints()
 # Infer types for all methods in a class
 rj.find_class("MyClass").find_methods().infer_type_hints()
 
-# Infer types for functions without any type hints
-rj.find_functions().filter(lambda f: not f.has_type_hints).infer_type_hints()
+# Infer types for functions that lack type hints
+rj.find_functions_without_type_hints().infer_type_hints()
 ```
 
 ### Inference Options
 
+By default, existing hints are preserved. Pass `overwrite=True` to replace them:
+
 ```python
-func.infer_type_hints(
-    infer_return=True,           # Infer return type
-    infer_parameters=True,       # Infer parameter types
-    use_names=True,              # Use parameter name heuristics
-    use_defaults=True,           # Use default value types
-    use_docstring=True,          # Parse docstring for types
-    preserve_existing=True,      # Don't overwrite existing hints
-)
+# Keep existing hints (default)
+func.infer_type_hints()
+
+# Re-infer and overwrite existing hints
+func.infer_type_hints(overwrite=True)
 ```
 
 ## Modernizing Type Hints
@@ -84,15 +83,14 @@ Convert older typing syntax to Python 3.10+ style:
 ### Basic Modernization
 
 ```python
-# Modernize a single function
-func = rj.find_function("process")
-func.modernize_type_hints()
-
-# Modernize all functions
+# Modernize all functions (batch operation on a TargetList)
 rj.find_functions().modernize_type_hints()
 
-# Modernize all methods
-rj.find_methods().modernize_type_hints()
+# Modernize all methods in a class
+rj.find_class("MyClass").find_methods().modernize_type_hints()
+
+# Modernize an entire file
+rj.file("module.py").modernize_type_hints()
 ```
 
 ### What Gets Modernized
@@ -149,8 +147,9 @@ func.set_parameter_type("data", "dict[str, Any]")
 func.set_parameter_type("items", "list[Item]")
 func.set_parameter_type("callback", "Callable[[str], bool]")
 
-# Set with import (automatically adds the import)
-func.set_parameter_type("user", "User", import_from="myapp.models")
+# For types from another module, add the import separately
+func.set_parameter_type("user", "User")
+rj.file(func.file_path).add_import("from myapp.models import User")
 ```
 
 ### Return Types
@@ -158,12 +157,6 @@ func.set_parameter_type("user", "User", import_from="myapp.models")
 ```python
 # Set return type
 func.set_return_type("list[str]")
-
-# Set return type with import
-func.set_return_type("Response", import_from="myapp.types")
-
-# Remove return type
-func.remove_return_type()
 ```
 
 ### Class Attributes
@@ -184,18 +177,12 @@ cls.add_attribute("items", "list[Item]", "[]")
 Sometimes you need to strip type hints (e.g., for compatibility):
 
 ```python
-# Remove all type hints from a function
+# Remove all type hints from a function (parameters and return type)
 func = rj.find_function("process")
 func.remove_type_hints()
 
 # Remove from all functions
 rj.find_functions().remove_type_hints()
-
-# Remove only parameter hints (keep return type)
-func.remove_parameter_types()
-
-# Remove only return type (keep parameter hints)
-func.remove_return_type()
 ```
 
 ## Converting Type Comments
@@ -203,8 +190,8 @@ func.remove_return_type()
 Convert Python 2 style type comments to annotations:
 
 ```python
-# Convert type comments to annotations
-func.convert_type_comments()
+# Convert type comments to annotations across all functions
+rj.find_functions().convert_type_comments()
 
 # Before:
 # def process(data):
@@ -215,8 +202,8 @@ func.convert_type_comments()
 # def process(data: dict) -> list:
 #     pass
 
-# Batch conversion
-rj.find_functions().convert_type_comments()
+# Methods in a class
+rj.find_class("MyClass").find_methods().convert_type_comments()
 ```
 
 ## Generating Stub Files
@@ -224,24 +211,19 @@ rj.find_functions().convert_type_comments()
 Create .pyi stub files for type checking:
 
 ```python
-from rejig import StubGenerator
+from pathlib import Path
+from rejig.typehints import StubGenerator
 
 generator = StubGenerator(rj)
 
-# Generate stubs for a single file
-generator.generate_stub("src/mymodule.py", "stubs/mymodule.pyi")
+# Generate the stub text for a single file (returns a string)
+stub_text = generator.generate_stub(Path("src/mymodule.py"))
 
-# Generate stubs for entire package
-generator.generate_stubs("src/", "stubs/")
+# Write a .pyi stub for a single file (output_dir defaults to a 'stubs/' dir)
+generator.generate_for_file(Path("src/mymodule.py"), Path("stubs/"))
 
-# Options
-generator.generate_stubs(
-    "src/",
-    "stubs/",
-    include_private=False,       # Exclude _private functions
-    include_docstrings=False,    # Don't include docstrings
-    infer_types=True,            # Infer missing types
-)
+# Generate stubs for an entire package
+generator.generate_for_package(Path("src/mypackage/"), Path("stubs/"))
 ```
 
 ### Stub Content Example
@@ -267,42 +249,20 @@ def helper(value: str) -> int: ...
 ### Check for Missing Type Hints
 
 ```python
-# Find functions without type hints
-issues = rj.find_analysis_issues()
-missing_hints = issues.by_type("MISSING_TYPE_HINT")
+# Find functions and methods that lack type hints
+missing_hints = rj.find_functions_without_type_hints()
 
 for issue in missing_hints:
-    print(f"{issue.file_path}:{issue.line_number} - {issue.name} missing type hints")
+    print(f"{issue.location} - {issue.name} missing type hints")
 ```
 
-### Type Hint Coverage
+The result is an `AnalysisTargetList`. Each item exposes `.location`, `.name`,
+`.message`, and `.line_number`, and can navigate back to the function:
 
 ```python
-from rejig import TypeHintAnalyzer
-
-analyzer = TypeHintAnalyzer(rj)
-
-# Get coverage statistics
-stats = analyzer.coverage_stats()
-print(f"Functions with type hints: {stats.typed_functions}/{stats.total_functions}")
-print(f"Methods with type hints: {stats.typed_methods}/{stats.total_methods}")
-print(f"Coverage: {stats.coverage_percent:.1f}%")
-
-# Get details by file
-for file_path, file_stats in stats.by_file.items():
-    print(f"{file_path}: {file_stats.coverage_percent:.1f}%")
-```
-
-### Find Inconsistent Types
-
-```python
-# Find places where the same parameter name has different types
-inconsistencies = analyzer.find_inconsistent_types()
-
-for name, types in inconsistencies.items():
-    print(f"Parameter '{name}' has multiple types:")
-    for type_hint, locations in types.items():
-        print(f"  {type_hint}: {locations}")
+for issue in rj.find_functions_without_type_hints():
+    func = issue.to_function_target()
+    func.infer_type_hints()
 ```
 
 ## Common Patterns
@@ -314,17 +274,10 @@ rj = Rejig("src/")
 
 # Step 1: Infer what we can
 rj.find_functions().infer_type_hints()
-rj.find_methods().infer_type_hints()
 
-# Step 2: Check coverage
-from rejig import TypeHintAnalyzer
-analyzer = TypeHintAnalyzer(rj)
-print(analyzer.coverage_stats())
-
-# Step 3: Find remaining untyped functions for manual review
-untyped = rj.find_functions().filter(lambda f: not f.has_type_hints)
-for func in untyped:
-    print(f"Needs manual types: {func.file_path}:{func.name}")
+# Step 2: Find remaining untyped functions for manual review
+for issue in rj.find_functions_without_type_hints():
+    print(f"Needs manual types: {issue.location} - {issue.name}")
 ```
 
 ### Modernize an Entire Codebase
@@ -334,11 +287,10 @@ rj = Rejig("src/")
 
 # Modernize type hints
 rj.find_functions().modernize_type_hints()
-rj.find_methods().modernize_type_hints()
 
 # Clean up imports
 for file in rj.find_files():
-    file.find_unused_imports().delete_all()
+    file.find_unused_imports().delete()
 
 # Add future annotations for forward references
 for file in rj.find_files():
@@ -351,29 +303,26 @@ for file in rj.find_files():
 # In CI/pre-commit, check that new code has type hints
 rj = Rejig("src/")
 
-# Find functions added since last commit
-# (you'd filter by changed files in practice)
-issues = rj.find_analysis_issues()
-missing = issues.by_type("MISSING_TYPE_HINT")
+missing = rj.find_functions_without_type_hints()
 
 if missing:
     print("Functions missing type hints:")
     for issue in missing:
-        print(f"  {issue.file_path}:{issue.line_number} - {issue.name}")
+        print(f"  {issue.location} - {issue.name}")
     exit(1)
 ```
 
 ### Generate Types for Third-Party Libraries
 
 ```python
-from rejig import StubGenerator
+from pathlib import Path
+from rejig.typehints import StubGenerator
 
 # Generate stubs for a vendored library
 generator = StubGenerator(Rejig("vendor/"))
-generator.generate_stubs(
-    "vendor/external_lib/",
-    "stubs/external_lib/",
-    infer_types=True,
+generator.generate_for_package(
+    Path("vendor/external_lib/"),
+    Path("stubs/external_lib/"),
 )
 ```
 
@@ -383,15 +332,14 @@ generator.generate_stubs(
 
 ```python
 # Add type: ignore to a specific line
-line = rj.file("module.py").find_line(42)
-line.add_type_ignore(["arg-type"])  # Specific error code
+line = rj.file("module.py").line(42)
+line.add_type_ignore("arg-type")  # Specific error code
 
 # Find and fix bare type: ignore comments
 type_ignores = rj.find_type_ignores()
-bare = type_ignores.filter(lambda t: t.is_bare)
-for ignore in bare:
-    # Make them specific
-    ignore.update_codes(["type-arg"])
+for ignore in type_ignores.bare():
+    # Make them specific by adding a code
+    ignore.add_code("type-arg")
 ```
 
 ### Remove Unnecessary Type Ignores
@@ -400,7 +348,7 @@ for ignore in bare:
 # After fixing type issues, remove unnecessary ignores
 # (This requires running mypy and parsing output)
 
-# Manually remove specific ignores
+# Manually remove ignores carrying a specific code
 type_ignores = rj.find_type_ignores()
-type_ignores.by_codes(["import"]).delete_all()  # Remove import ignores
+type_ignores.with_code("import").delete()  # Remove import ignores
 ```
