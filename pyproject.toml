@@ -16,7 +16,6 @@ keywords = ["refactoring", "cst", "libcst", "code-transformation", "ast"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -31,10 +30,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Semantic refactoring engine (move/rename with automatic import updates).
 rope = [
     "rope>=1.0.0",
 ]
+# Framework integrations. Rejig rewrites source files rather than importing the
+# frameworks themselves, so each extra only pulls in rope for semantic refactoring.
 django = [
+    "rope>=1.0.0",
+]
+flask = [
+    "rope>=1.0.0",
+]
+fastapi = [
+    "rope>=1.0.0",
+]
+sqlalchemy = [
+    "rope>=1.0.0",
+]
+# All runtime features.
+all = [
     "rope>=1.0.0",
 ]
 dev = [

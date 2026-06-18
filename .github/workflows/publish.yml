@@ -1,0 +1,76 @@
+name: Publish to PyPI
+
+# Publishes to PyPI via Trusted Publishing (OIDC) — no API token or secret needed.
+# One-time PyPI setup is required first; see notes at the bottom of this file.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Check distribution metadata
+        run: uvx twine check dist/*
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # The environment name must match the Trusted Publisher configured on PyPI.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/rejig
+    permissions:
+      id-token: write  # Required for OIDC Trusted Publishing
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+# ---------------------------------------------------------------------------
+# One-time PyPI configuration (required before the first release):
+#
+# Because "rejig" does not exist on PyPI yet, register a PENDING publisher at
+#   https://pypi.org/manage/account/publishing/
+# with these exact values:
+#   PyPI Project Name: rejig
+#   Owner:             SpliFF
+#   Repository name:   rejig
+#   Workflow name:     publish.yml
+#   Environment name:  pypi
+#
+# After the project's first successful publish, the pending publisher becomes a
+# normal Trusted Publisher automatically.
+#
+# To release: create a GitHub Release (tag e.g. v0.1.0) and publish it — this
+# workflow builds and uploads automatically. No secrets are stored in the repo.
+# ---------------------------------------------------------------------------
