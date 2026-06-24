@@ -1,0 +1,17 @@
+[project]
+name = "django-blog"
+version = "0.1.0"
+description = "Sample Django blog application"
+requires-python = ">=3.10"
+dependencies = [
+    "django>=4.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-django>=4.5.0",
+]
+
+[tool.django-stubs]
+django_settings_module = "blog.settings"

@@ -1,0 +1,14 @@
+[project]
+name = "data-processor"
+version = "0.1.0"
+description = "Data processing library"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[tool.ruff]
+line-length = 110
