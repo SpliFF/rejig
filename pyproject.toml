@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rejig"
-version = "0.1.3"
+version = "0.1.4"
 description = "A Python library for programmatic code refactoring and transformation."
 readme = "README.md"
 license = "MIT"
@@ -26,39 +26,32 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    # Core engine: CST manipulation and import sorting, used on every run.
     "libcst>=1.0.0",
     "isort>=5.0.0",
+    # Semantic refactoring (move/rename with automatic import updates). Imported
+    # by the rope-backed refactors in rejig.core, so it's a hard requirement, not
+    # an optional extra.
+    "rope>=1.0.0",
+    # YAML round-trip editing (rj.yaml()); ruamel.yaml preserves comments, quote
+    # styles and key order so writes produce minimal diffs.
+    "ruamel.yaml>=0.17.0",
+    # TOML round-trip editing (rj.toml(), pyproject manipulation). tomllib is
+    # stdlib on 3.11+, so tomli is only needed for the 3.10 read path; tomli-w
+    # has no stdlib equivalent and is always required to write TOML.
+    "tomli-w>=1.0.0",
+    "tomli>=2.0.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
-# Semantic refactoring engine (move/rename with automatic import updates).
-rope = [
-    "rope>=1.0.0",
-]
-# Framework integrations. Rejig rewrites source files rather than importing the
-# frameworks themselves, so each extra only pulls in rope for semantic refactoring.
-django = [
-    "rope>=1.0.0",
-]
-flask = [
-    "rope>=1.0.0",
-]
-fastapi = [
-    "rope>=1.0.0",
-]
-sqlalchemy = [
-    "rope>=1.0.0",
-]
-# YAML round-trip editing (rj.yaml()). ruamel.yaml preserves comments, quote
-# styles and key order so writes produce minimal diffs.
-yaml = [
-    "ruamel.yaml>=0.17.0",
-]
-# All runtime features.
-all = [
-    "rope>=1.0.0",
-    "ruamel.yaml>=0.17.0",
-]
+# Optional extras are reserved for heavy, framework-specific packages a user only
+# needs when targeting that framework. Rejig rewrites source rather than importing
+# frameworks, so there are none today; add one here only when a genuinely heavy,
+# framework-only dependency appears.
+
+# Tooling for developing rejig itself. rejig config-manages these (edits their
+# tool tables) and emits code that targets them (eg. pytest stubs), but does not
+# import or invoke them at runtime, so they stay dev-only.
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",

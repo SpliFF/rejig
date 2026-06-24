@@ -413,6 +413,7 @@ from .targets import (
     FunctionTarget,
     IniTarget,
     JsonTarget,
+    KeyPath,
     LineBlockTarget,
     LineTarget,
     MethodTarget,
@@ -428,7 +429,7 @@ from .targets import (
     YamlTarget,
 )
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 # Core essentials only. For all symbols, use: from rejig.all import *
 __all__ = [
@@ -450,4 +451,6 @@ __all__ = [
     "ClassTarget",
     "FunctionTarget",
     "MethodTarget",
+    # Config key-path builder
+    "KeyPath",
 ]

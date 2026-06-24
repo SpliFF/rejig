@@ -7,9 +7,10 @@ This package provides Target classes for working with configuration files:
 - JsonTarget: JSON files (package.json, etc.)
 - YamlTarget: YAML files (config.yaml, etc.)
 - IniTarget: INI/CFG files (setup.cfg, etc.)
+- KeyPath: pathlib-style key path builder for the targets above
 """
 
-from rejig.targets.config.base import ConfigTarget
+from rejig.targets.config.base import ConfigTarget, KeyPath, normalize_key_path
 from rejig.targets.config.ini import IniTarget
 from rejig.targets.config.json import JsonTarget
 from rejig.targets.config.toml import TomlTarget
@@ -17,6 +18,8 @@ from rejig.targets.config.yaml import YamlTarget
 
 __all__ = [
     "ConfigTarget",
+    "KeyPath",
+    "normalize_key_path",
     "TomlTarget",
     "JsonTarget",
     "YamlTarget",

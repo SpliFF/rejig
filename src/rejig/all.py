@@ -24,6 +24,7 @@ from rejig.targets import (  # noqa: F401
     FunctionTarget,
     IniTarget,
     JsonTarget,
+    KeyPath,
     LineBlockTarget,
     LineTarget,
     MethodTarget,
@@ -156,7 +157,7 @@ __all__ = [
     "FunctionTarget", "MethodTarget", "LineTarget", "LineBlockTarget",
     "CodeBlockTarget", "CommentTarget", "StringLiteralTarget",
     # Config targets
-    "TomlTarget", "YamlTarget", "JsonTarget", "IniTarget",
+    "TomlTarget", "YamlTarget", "JsonTarget", "IniTarget", "KeyPath",
     # Text targets
     "TextFileTarget", "TextBlock", "TextMatch",
     # Packaging

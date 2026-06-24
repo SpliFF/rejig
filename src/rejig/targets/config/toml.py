@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.targets.base import Result, Target
+from rejig.targets.config.base import normalize_key_path
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
@@ -147,13 +149,17 @@ class TomlTarget(Target):
 
         return Result(success=True, message="OK", data=data)
 
-    def get(self, key_path: str, default: Any = None) -> Any:
-        """Get a value by dotted key path.
+    def get(self, key_path: str | Sequence[str], default: Any = None) -> Any:
+        """Get a value by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key (e.g., "project.name", "tool.black.line-length").
+        key_path : str | Sequence[str]
+            Path to the key: a dotted string (``"project.name"``,
+            ``"tool.black.line-length"``), a list of literal segments
+            (``["tool", "black", "line-length"]``), or a :class:`KeyPath` built
+            with ``/`` (``KeyPath("tool") / "black" / "line-length"`` — use this
+            when a key contains a literal ``.``).
         default : Any
             Default value if key not found.
 
@@ -173,7 +179,7 @@ class TomlTarget(Target):
         if data is None:
             return default
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys:
             if isinstance(current, dict) and key in current:
@@ -182,13 +188,14 @@ class TomlTarget(Target):
                 return default
         return current
 
-    def set(self, key_path: str, value: Any) -> Result:
-        """Set a value by dotted key path.
+    def set(self, key_path: str | Sequence[str], value: Any) -> Result:
+        """Set a value by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key (e.g., "project.version").
+        key_path : str | Sequence[str]
+            Path to the key: a dotted string (``"project.version"``), a list of
+            literal segments, or a :class:`KeyPath` built with ``/``.
         value : Any
             Value to set.
 
@@ -206,7 +213,7 @@ class TomlTarget(Target):
         if data is None:
             data = {}
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:
@@ -216,13 +223,14 @@ class TomlTarget(Target):
 
         return self._save(data)
 
-    def delete(self, key_path: str) -> Result:
-        """Delete a key by dotted key path.
+    def delete(self, key_path: str | Sequence[str]) -> Result:
+        """Delete a key by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key to delete.
+        key_path : str | Sequence[str]
+            Path to the key to delete: a dotted string, a list of literal
+            segments, or a :class:`KeyPath` built with ``/``.
 
         Returns
         -------
@@ -233,7 +241,7 @@ class TomlTarget(Target):
         if data is None:
             return self._operation_failed("delete", f"Failed to load TOML from {self.path}")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:

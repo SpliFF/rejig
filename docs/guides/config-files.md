@@ -102,6 +102,36 @@ json_file.set("scripts.test", "pytest")
 json_file.delete("devDependencies.old-package")
 ```
 
+## Key Paths
+
+`get()`, `set()` and `delete()` on TOML, YAML and JSON targets accept the key
+path in three forms:
+
+```python
+# 1. Dotted string (the common case)
+toml.get("tool.black.line-length")
+
+# 2. List of literal segments
+toml.get(["tool", "black", "line-length"])
+
+# 3. KeyPath — a pathlib-style builder (from rejig import KeyPath)
+from rejig import KeyPath
+toml.get(KeyPath("tool") / "black" / "line-length")
+```
+
+The dotted string splits on every `.`, so it cannot address a key that
+*contains* a literal dot. Use a list or `KeyPath` (each segment is literal) for
+those:
+
+```python
+# A single key named "CVE-2026.0001" — the dotted string would split it
+yaml.set(KeyPath("security") / "ignore" / "CVE-2026.0001", "reviewed")
+yaml.get(["security", "ignore", "CVE-2026.0001"])
+```
+
+A `pathlib.PurePath` is accepted too, and a `KeyPath` is a sequence of its
+segments (it can be indexed, iterated and measured with `len()`).
+
 ## INI Files
 
 ```python

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Config key paths accept lists and a `KeyPath` builder**: `get()`, `set()`
+  and `delete()` on `TomlTarget`, `YamlTarget` and `JsonTarget` now accept, in
+  addition to a dotted string, a list/tuple of literal segments or a new
+  `KeyPath` object (a `pathlib`-style builder: `KeyPath("a") / "b"`). A
+  `pathlib.PurePath` is also accepted. This makes it possible to address a key
+  that itself contains a literal `.` (e.g. `KeyPath("security") / "ignore" /
+  "CVE-2026.0001"`), which the dotted-string form splits and cannot reach.
+  `KeyPath` is exported at the top level (`from rejig import KeyPath`).
+
 ## [0.1.3] - 2026-06-18
 
 ### Added

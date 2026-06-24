@@ -6,13 +6,111 @@ that share similar functionality like dotted-path access.
 from __future__ import annotations
 
 from abc import abstractmethod
-from pathlib import Path
+from collections.abc import Sequence
+from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any
 
 from rejig.targets.base import Result, Target
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
+
+
+class KeyPath(Sequence):
+    """A composable, ``pathlib``-style key path for config targets.
+
+    Build a path by joining segments with ``/``. Each operand is one *literal*
+    key segment, so a segment may itself contain ``.`` (or any other character)
+    and is never split apart:
+
+    >>> KeyPath("security") / "ignore-vulnerabilities" / "SFTY-2026.0616"
+    KeyPath('security', 'ignore-vulnerabilities', 'SFTY-2026.0616')
+
+    Pass the result anywhere a key path is accepted (``get`` / ``set`` /
+    ``delete`` on TOML/YAML/JSON targets). This is the unambiguous alternative
+    to the dotted-string form for keys that themselves contain dots::
+
+        cfg.set(KeyPath("security") / "ignore" / "CVE-2026.0001", "reviewed")
+
+    It is a :class:`collections.abc.Sequence` of its segments, so it can also be
+    indexed, iterated and measured with ``len()``.
+    """
+
+    __slots__ = ("_parts",)
+
+    def __init__(self, *parts: str | PurePath | "KeyPath") -> None:
+        flat: list[str] = []
+        for part in parts:
+            if isinstance(part, KeyPath):
+                flat.extend(part._parts)
+            elif isinstance(part, PurePath):
+                flat.extend(str(p) for p in part.parts)
+            else:
+                flat.append(str(part))
+        self._parts: tuple[str, ...] = tuple(flat)
+
+    @property
+    def parts(self) -> tuple[str, ...]:
+        """The path's literal segments."""
+        return self._parts
+
+    def __truediv__(self, other: str | PurePath | "KeyPath") -> "KeyPath":
+        return KeyPath(self, other)
+
+    def __rtruediv__(self, other: str | PurePath | "KeyPath") -> "KeyPath":
+        return KeyPath(other, self)
+
+    def __getitem__(self, index: int | slice) -> str | tuple[str, ...]:
+        return self._parts[index]
+
+    def __len__(self) -> int:
+        return len(self._parts)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, KeyPath):
+            return self._parts == other._parts
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self._parts)
+
+    def __repr__(self) -> str:
+        return "KeyPath(" + ", ".join(repr(p) for p in self._parts) + ")"
+
+    def __str__(self) -> str:
+        return "/".join(self._parts)
+
+
+def normalize_key_path(key_path: str | Sequence[str] | PurePath) -> list[str]:
+    """Normalize a config key path into a list of literal segments.
+
+    Accepted forms, so a key that itself contains a literal ``.`` can still be
+    addressed:
+
+    - **Dotted string** (the original form), e.g. ``"tool.black.line-length"``
+      — split on ``.``.
+    - **List/tuple of segments**, e.g. ``["tool", "my.plugin", "x"]`` — used
+      verbatim; each element is one literal key and may contain ``.``.
+    - **:class:`KeyPath`**, built ``pathlib``-style with ``/``, e.g.
+      ``KeyPath("tool") / "my.plugin" / "x"`` — each segment is literal.
+    - **:class:`pathlib.PurePath`** — its ``.parts`` are used as the segments.
+
+    Parameters
+    ----------
+    key_path : str | Sequence[str] | PurePath
+        The key path in any of the forms above.
+
+    Returns
+    -------
+    list[str]
+        The path as a list of literal string segments.
+    """
+    if isinstance(key_path, str):
+        return key_path.split(".")
+    if isinstance(key_path, PurePath):
+        return [str(part) for part in key_path.parts]
+    # KeyPath (a Sequence of its segments) or any other list/tuple of segments.
+    return [str(segment) for segment in key_path]
 
 
 class ConfigTarget(Target):
@@ -105,10 +203,12 @@ class ConfigTarget(Target):
             return self._operation_failed("get_data", f"Failed to load config from {self.path}")
         return Result(success=True, message="OK", data=data)
 
-    def get(self, key_path: str, default: Any = None) -> Any:
-        """Get a value by dotted key path.
+    def get(self, key_path: str | Sequence[str], default: Any = None) -> Any:
+        """Get a value by key path.
 
         Supports nested access using dots and list indexing with integers.
+        The key path may be a dotted string, a list of literal segments, or a
+        :class:`KeyPath` (see :func:`normalize_key_path`).
 
         Parameters
         ----------
@@ -140,7 +240,7 @@ class ConfigTarget(Target):
 
         return self._navigate_path(data, key_path, default)
 
-    def _navigate_path(self, data: Any, key_path: str, default: Any = None) -> Any:
+    def _navigate_path(self, data: Any, key_path: str | Sequence[str], default: Any = None) -> Any:
         """Navigate a dotted key path through nested data.
 
         Parameters
@@ -157,7 +257,7 @@ class ConfigTarget(Target):
         Any
             Value at path or default.
         """
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current: Any = data
 
         for key in keys:
@@ -174,10 +274,12 @@ class ConfigTarget(Target):
 
         return current
 
-    def set(self, key_path: str, value: Any) -> Result:
-        """Set a value by dotted key path.
+    def set(self, key_path: str | Sequence[str], value: Any) -> Result:
+        """Set a value by key path.
 
-        Creates intermediate dictionaries as needed.
+        Creates intermediate dictionaries as needed. The key path may be a
+        dotted string, a list of literal segments, or a :class:`KeyPath`
+        (see :func:`normalize_key_path`).
 
         Parameters
         ----------
@@ -203,7 +305,7 @@ class ConfigTarget(Target):
         if not isinstance(data, dict):
             return self._operation_failed("set", "Root config must be a mapping for key path access")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:
@@ -215,13 +317,14 @@ class ConfigTarget(Target):
         current[keys[-1]] = value
         return self._save(data)
 
-    def delete(self, key_path: str) -> Result:
-        """Delete a key by dotted key path.
+    def delete(self, key_path: str | Sequence[str]) -> Result:
+        """Delete a key by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key to delete.
+        key_path : str | Sequence[str]
+            Path to the key to delete (dotted string, list of literal segments,
+            or :class:`KeyPath`).
 
         Returns
         -------
@@ -235,7 +338,7 @@ class ConfigTarget(Target):
         if not isinstance(data, dict):
             return self._operation_failed("delete", "Root config must be a mapping")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:

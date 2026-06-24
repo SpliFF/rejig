@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.targets.base import Result, Target
+from rejig.targets.config.base import normalize_key_path
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
@@ -115,13 +117,17 @@ class JsonTarget(Target):
 
         return Result(success=True, message="OK", data=data)
 
-    def get(self, key_path: str, default: Any = None) -> Any:
-        """Get a value by dotted key path.
+    def get(self, key_path: str | Sequence[str], default: Any = None) -> Any:
+        """Get a value by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key (e.g., "scripts.build", "dependencies.react").
+        key_path : str | Sequence[str]
+            Path to the key: a dotted string (``"scripts.build"``,
+            ``"dependencies.react"``), a list of literal segments
+            (``["dependencies", "react"]``), or a :class:`KeyPath` built with
+            ``/`` (``KeyPath("dependencies") / "react"`` — use this when a key
+            contains a literal ``.``).
         default : Any
             Default value if key not found.
 
@@ -143,7 +149,7 @@ class JsonTarget(Target):
         if not isinstance(data, dict):
             return default
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current: Any = data
         for key in keys:
             if isinstance(current, dict) and key in current:
@@ -158,13 +164,15 @@ class JsonTarget(Target):
                 return default
         return current
 
-    def set(self, key_path: str, value: Any) -> Result:
-        """Set a value by dotted key path.
+    def set(self, key_path: str | Sequence[str], value: Any) -> Result:
+        """Set a value by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key (e.g., "version", "scripts.build").
+        key_path : str | Sequence[str]
+            Path to the key: a dotted string (``"version"``,
+            ``"scripts.build"``), a list of literal segments, or a
+            :class:`KeyPath` built with ``/``.
         value : Any
             Value to set.
 
@@ -180,7 +188,7 @@ class JsonTarget(Target):
         if not isinstance(data, dict):
             return self._operation_failed("set", "Root JSON must be an object for key path access")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:
@@ -190,13 +198,14 @@ class JsonTarget(Target):
 
         return self._save(data)
 
-    def delete(self, key_path: str) -> Result:
-        """Delete a key by dotted key path.
+    def delete(self, key_path: str | Sequence[str]) -> Result:
+        """Delete a key by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key to delete.
+        key_path : str | Sequence[str]
+            Path to the key to delete: a dotted string, a list of literal
+            segments, or a :class:`KeyPath` built with ``/``.
 
         Returns
         -------
@@ -210,7 +219,7 @@ class JsonTarget(Target):
         if not isinstance(data, dict):
             return self._operation_failed("delete", "Root JSON must be an object")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:

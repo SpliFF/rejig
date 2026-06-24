@@ -1,10 +1,12 @@
 """YamlTarget for operations on YAML configuration files."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.targets.base import Result, Target
+from rejig.targets.config.base import normalize_key_path
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
@@ -157,13 +159,17 @@ class YamlTarget(Target):
 
         return Result(success=True, message="OK", data=data)
 
-    def get(self, key_path: str, default: Any = None) -> Any:
-        """Get a value by dotted key path.
+    def get(self, key_path: str | Sequence[str], default: Any = None) -> Any:
+        """Get a value by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key (e.g., "database.host", "servers.0.name").
+        key_path : str | Sequence[str]
+            Path to the key, in any of three forms: a dotted string
+            (``"database.host"``, ``"servers.0.name"``), a list of literal
+            segments (``["database", "host"]``), or a :class:`KeyPath` built
+            with ``/`` (``KeyPath("database") / "host"`` — use this when a key
+            contains a literal ``.``).
         default : Any
             Default value if key not found.
 
@@ -178,6 +184,7 @@ class YamlTarget(Target):
         "localhost"
         >>> yaml_file.get("database.port", 5432)
         5432
+        >>> yaml_file.get(["security", "ignore", "CVE-2026.0001"])  # literal dot
         """
         data = self._load()
         if data is None:
@@ -186,7 +193,7 @@ class YamlTarget(Target):
         if not isinstance(data, dict):
             return default
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current: Any = data
         for key in keys:
             if isinstance(current, dict) and key in current:
@@ -201,13 +208,16 @@ class YamlTarget(Target):
                 return default
         return current
 
-    def set(self, key_path: str, value: Any) -> Result:
-        """Set a value by dotted key path.
+    def set(self, key_path: str | Sequence[str], value: Any) -> Result:
+        """Set a value by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key (e.g., "database.host").
+        key_path : str | Sequence[str]
+            Path to the key: a dotted string (``"database.host"``), a list of
+            literal segments (``["database", "host"]``), or a :class:`KeyPath`
+            built with ``/`` (``KeyPath("database") / "host"`` — use this when a
+            key contains a literal ``.``).
         value : Any
             Value to set.
 
@@ -220,6 +230,7 @@ class YamlTarget(Target):
         --------
         >>> yaml_file.set("database.host", "localhost")
         >>> yaml_file.set("database.port", 5432)
+        >>> yaml_file.set(["security", "ignore", "CVE-2026.0001"], "reviewed")
         """
         data = self._load()
         if data is None:
@@ -228,7 +239,7 @@ class YamlTarget(Target):
         if not isinstance(data, dict):
             return self._operation_failed("set", "Root YAML must be a mapping for key path access")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:
@@ -238,13 +249,14 @@ class YamlTarget(Target):
 
         return self._save(data)
 
-    def delete(self, key_path: str) -> Result:
-        """Delete a key by dotted key path.
+    def delete(self, key_path: str | Sequence[str]) -> Result:
+        """Delete a key by key path.
 
         Parameters
         ----------
-        key_path : str
-            Dotted path to the key to delete.
+        key_path : str | Sequence[str]
+            Path to the key to delete: a dotted string, a list of literal
+            segments, or a :class:`KeyPath` built with ``/``.
 
         Returns
         -------
@@ -258,7 +270,7 @@ class YamlTarget(Target):
         if not isinstance(data, dict):
             return self._operation_failed("delete", "Root YAML must be a mapping")
 
-        keys = key_path.split(".")
+        keys = normalize_key_path(key_path)
         current = data
         for key in keys[:-1]:
             if key not in current:
@@ -271,7 +283,7 @@ class YamlTarget(Target):
         del current[keys[-1]]
         return self._save(data)
 
-    def get_section(self, section_path: str) -> dict[str, Any] | None:
+    def get_section(self, section_path: str | Sequence[str]) -> dict[str, Any] | None:
         """Get a section as a dictionary.
 
         Parameters
@@ -289,7 +301,7 @@ class YamlTarget(Target):
             return value
         return None
 
-    def set_section(self, section_path: str, data: dict[str, Any]) -> Result:
+    def set_section(self, section_path: str | Sequence[str], data: dict[str, Any]) -> Result:
         """Set an entire section.
 
         Parameters
@@ -306,7 +318,7 @@ class YamlTarget(Target):
         """
         return self.set(section_path, data)
 
-    def has_key(self, key_path: str) -> bool:
+    def has_key(self, key_path: str | Sequence[str]) -> bool:
         """Check if a key exists.
 
         Parameters
@@ -322,7 +334,7 @@ class YamlTarget(Target):
         sentinel = object()
         return self.get(key_path, sentinel) is not sentinel
 
-    def keys(self, section_path: str | None = None) -> list[str]:
+    def keys(self, section_path: str | Sequence[str] | None = None) -> list[str]:
         """Get keys at a section path.
 
         Parameters
@@ -369,7 +381,7 @@ class YamlTarget(Target):
         except YAMLError as e:
             return self._operation_failed("rewrite", f"Invalid YAML: {e}", e)
 
-    def append_to_list(self, key_path: str, value: Any) -> Result:
+    def append_to_list(self, key_path: str | Sequence[str], value: Any) -> Result:
         """Append a value to a list at the specified key path.
 
         Parameters
@@ -391,7 +403,7 @@ class YamlTarget(Target):
         current.append(value)
         return self.set(key_path, current)
 
-    def remove_from_list(self, key_path: str, value: Any) -> Result:
+    def remove_from_list(self, key_path: str | Sequence[str], value: Any) -> Result:
         """Remove a value from a list at the specified key path.
 
         Parameters

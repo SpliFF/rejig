@@ -43,7 +43,7 @@ from rejig.targets.base import (
     Target,
     TargetList,
 )
-from rejig.targets.config import IniTarget, JsonTarget, TomlTarget, YamlTarget
+from rejig.targets.config import IniTarget, JsonTarget, KeyPath, TomlTarget, YamlTarget
 from rejig.targets.python import (
     ClassTarget,
     CodeBlockTarget,
@@ -84,6 +84,7 @@ __all__ = [
     "JsonTarget",
     "YamlTarget",
     "IniTarget",
+    "KeyPath",
     # Text targets
     "TextFileTarget",
     "TextBlock",
