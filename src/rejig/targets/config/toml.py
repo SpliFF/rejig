@@ -1,31 +1,16 @@
 """TomlTarget for operations on TOML configuration files."""
 from __future__ import annotations
 
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.targets.base import Result, Target
 from rejig.targets.config.base import normalize_key_path
+from rejig._tomlkit_io import TomlError, dump_toml, load_toml, loads_toml, toml_available
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
-
-# Python 3.11+ has tomllib built-in
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None  # type: ignore
-
-# For writing TOML, we need tomli-w or tomlkit
-try:
-    import tomli_w
-except ImportError:
-    tomli_w = None  # type: ignore
 
 
 class TomlTarget(Target):
@@ -71,25 +56,24 @@ class TomlTarget(Target):
         if self._data is not None:
             return self._data
 
-        if tomllib is None:
+        if not toml_available():
             return None
 
         if not self.exists():
             return None
 
         try:
-            with open(self.path, "rb") as f:
-                self._data = tomllib.load(f)
+            self._data = load_toml(self.path)
             return self._data
-        except (OSError, tomllib.TOMLDecodeError):
+        except (OSError, TomlError):
             return None
 
     def _save(self, data: dict[str, Any]) -> Result:
         """Save data to the TOML file."""
-        if tomli_w is None:
+        if not toml_available():
             return self._operation_failed(
                 "save",
-                "tomli-w is required to write TOML files. Install with: pip install tomli-w",
+                "tomlkit is required to write TOML files. Install with: pip install tomlkit",
             )
 
         try:
@@ -100,8 +84,7 @@ class TomlTarget(Target):
                     files_changed=[self.path],
                 )
 
-            with open(self.path, "wb") as f:
-                tomli_w.dump(data, f)
+            dump_toml(data, self.path)
 
             self._data = data
             return Result(
@@ -137,10 +120,10 @@ class TomlTarget(Target):
         Result
             Result with parsed dict in `data` field if successful.
         """
-        if tomllib is None:
+        if not toml_available():
             return self._operation_failed(
                 "get_data",
-                "tomllib (Python 3.11+) or tomli is required. Install with: pip install tomli",
+                "tomlkit is required to read TOML files. Install with: pip install tomlkit",
             )
 
         data = self._load()
@@ -431,15 +414,15 @@ class TomlTarget(Target):
         Result
             Result of the operation.
         """
-        if tomllib is None:
+        if not toml_available():
             return self._operation_failed(
                 "rewrite",
-                "tomllib (Python 3.11+) or tomli is required. Install with: pip install tomli",
+                "tomlkit is required to read TOML files. Install with: pip install tomlkit",
             )
 
         try:
             # Validate TOML by parsing it
-            data = tomllib.loads(new_content)
+            data = loads_toml(new_content)
             return self._save(data)
         except Exception as e:
             return self._operation_failed("rewrite", f"Invalid TOML: {e}", e)

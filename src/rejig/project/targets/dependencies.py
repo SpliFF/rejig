@@ -314,13 +314,12 @@ class DependenciesTarget(TomlTarget):
         section = current[final_key]
 
         if isinstance(section, list):
-            # PEP 621 format
-            new_deps = []
-            for dep in section:
-                dep_name = self._normalize_name(dep.split("[")[0].split("<")[0].split(">")[0].split("=")[0].split("!")[0])
-                if dep_name != normalized:
-                    new_deps.append(dep)
-            current[final_key] = new_deps
+            # PEP 621 format: delete matching entries in place so the rest of the
+            # array keeps its formatting and comments.
+            for i in range(len(section) - 1, -1, -1):
+                dep_name, _ = self._split_name_version(section[i])
+                if self._normalize_name(dep_name) == normalized:
+                    del section[i]
         elif isinstance(section, dict):
             # Poetry format
             if name in section:
@@ -354,9 +353,54 @@ class DependenciesTarget(TomlTarget):
         --------
         >>> deps.update("django", ">=5.0")
         """
-        # Remove then add
-        self.remove(name)
-        return self.add(name, version, extras)
+        # Update the existing entry's version in place so its position and any
+        # surrounding comments are preserved (a remove + re-add would relocate
+        # the key and orphan its comment). Fall back to adding when absent.
+        if not self.has(name):
+            return self.add(name, version, extras)
+
+        data = self._load()
+        if data is None:
+            return self._operation_failed("update", "Failed to load pyproject.toml")
+
+        key_path = self._get_key_path()
+        is_poetry = key_path.startswith("tool.poetry")
+        normalized = self._normalize_name(name)
+
+        # Navigate to the section; it exists because has() returned True.
+        keys = key_path.split(".")
+        current = data
+        for key in keys[:-1]:
+            current = current[key]
+        section = current[keys[-1]]
+
+        if is_poetry:
+            # Poetry: a table mapping name -> spec. Rewrite the matched value in
+            # place, keeping the key where it is.
+            spec: str | dict[str, Any]
+            if extras:
+                spec = {"version": version or "*", "extras": extras}
+            else:
+                spec = version or "*"
+            for existing in list(section.keys()):
+                if self._normalize_name(existing) == normalized:
+                    section[existing] = spec
+                    break
+        else:
+            # PEP 621: a list of requirement strings. Reassign the matched
+            # element by index to preserve the array's formatting.
+            new_spec = name
+            if extras:
+                new_spec += f"[{','.join(extras)}]"
+            if version:
+                new_spec += version
+            for i, dep in enumerate(section):
+                dep_name, _ = self._split_name_version(dep)
+                if self._normalize_name(dep_name) == normalized:
+                    section[i] = new_spec
+                    break
+
+        return self._save(data)
 
     def clear(self) -> Result:
         """Remove all dependencies from this section.

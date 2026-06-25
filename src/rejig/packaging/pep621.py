@@ -4,29 +4,15 @@ Parses standard pyproject.toml files following PEP 621.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.packaging.models import Dependency, PackageConfig, PackageMetadata
 from rejig.core.results import Result
+from rejig._tomlkit_io import dump_toml, load_toml, toml_available
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
-
-# Python 3.11+ has tomllib built-in
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None  # type: ignore
-
-try:
-    import tomli_w
-except ImportError:
-    tomli_w = None  # type: ignore
 
 
 class PEP621Parser:
@@ -66,15 +52,14 @@ class PEP621Parser:
         PackageConfig | None
             Parsed configuration, or None if parsing failed.
         """
-        if tomllib is None:
+        if not toml_available():
             return None
 
         if not path.exists():
             return None
 
         try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
+            data = load_toml(path)
         except Exception:
             return None
 
@@ -200,18 +185,17 @@ class PEP621Parser:
         Result
             Result of the operation.
         """
-        if tomllib is None or tomli_w is None:
+        if not toml_available():
             return Result(
                 success=False,
-                message="tomllib and tomli-w are required for pyproject.toml operations",
+                message="tomlkit is required for pyproject.toml operations. Install with: pip install tomlkit",
             )
 
         if not path.exists():
             return Result(success=False, message=f"File not found: {path}")
 
         try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
+            data = load_toml(path)
         except Exception as e:
             return Result(success=False, message=f"Failed to parse TOML: {e}")
 
@@ -266,8 +250,7 @@ class PEP621Parser:
             )
 
         try:
-            with open(path, "wb") as f:
-                tomli_w.dump(data, f)
+            dump_toml(data, path)
             return Result(
                 success=True,
                 message=f"Added {spec} to {path}",
@@ -295,18 +278,17 @@ class PEP621Parser:
         Result
             Result of the operation.
         """
-        if tomllib is None or tomli_w is None:
+        if not toml_available():
             return Result(
                 success=False,
-                message="tomllib and tomli-w are required for pyproject.toml operations",
+                message="tomlkit is required for pyproject.toml operations. Install with: pip install tomlkit",
             )
 
         if not path.exists():
             return Result(success=False, message=f"File not found: {path}")
 
         try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
+            data = load_toml(path)
         except Exception as e:
             return Result(success=False, message=f"Failed to parse TOML: {e}")
 
@@ -347,8 +329,7 @@ class PEP621Parser:
             )
 
         try:
-            with open(path, "wb") as f:
-                tomli_w.dump(data, f)
+            dump_toml(data, path)
             return Result(
                 success=True,
                 message=f"Removed {name} from {path}",

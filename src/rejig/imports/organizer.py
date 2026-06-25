@@ -292,10 +292,9 @@ class ImportOrganizer:
         pyproject = root / "pyproject.toml"
         if pyproject.exists():
             try:
-                import tomllib
+                from rejig._tomlkit_io import load_toml
 
-                with open(pyproject, "rb") as f:
-                    data = tomllib.load(f)
+                data = load_toml(pyproject)
 
                 # PEP 621
                 if "project" in data and "name" in data["project"]:

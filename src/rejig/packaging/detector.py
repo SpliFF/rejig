@@ -4,23 +4,14 @@ Detects which package manager format is used in a project.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rejig.packaging.models import PackageConfig, PackageFormat
+from rejig._tomlkit_io import load_toml, toml_available
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
-
-# Python 3.11+ has tomllib built-in
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None  # type: ignore
 
 
 class FormatDetector:
@@ -110,12 +101,11 @@ class FormatDetector:
 
     def _detect_pyproject_format(self, path: Path) -> PackageFormat | None:
         """Detect the specific format of a pyproject.toml file."""
-        if tomllib is None:
+        if not toml_available():
             return None
 
         try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
+            data = load_toml(path)
         except Exception:
             return None
 

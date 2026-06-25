@@ -4,29 +4,15 @@ Converts between different package manager formats.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from rejig.packaging.models import Dependency, PackageConfig, PackageFormat, PackageMetadata
 from rejig.core.results import Result
+from rejig._tomlkit_io import dump_toml, load_toml, toml_available
 
 if TYPE_CHECKING:
     from rejig.core.rejig import Rejig
-
-# Python 3.11+ has tomllib built-in
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None  # type: ignore
-
-try:
-    import tomli_w
-except ImportError:
-    tomli_w = None  # type: ignore
 
 
 class PackageConfigConverter:
@@ -117,18 +103,17 @@ class PackageConfigConverter:
         Result
             Result of the operation.
         """
-        if tomli_w is None:
+        if not toml_available():
             return Result(
                 success=False,
-                message="tomli-w is required to write TOML files",
+                message="tomlkit is required to write TOML files. Install with: pip install tomlkit",
             )
 
         # Load existing data if preserving
         data: dict[str, Any] = {}
-        if preserve_existing and output.exists() and tomllib:
+        if preserve_existing and output.exists() and toml_available():
             try:
-                with open(output, "rb") as f:
-                    data = tomllib.load(f)
+                data = load_toml(output)
             except Exception:
                 pass
 
@@ -210,8 +195,7 @@ class PackageConfigConverter:
             )
 
         try:
-            with open(output, "wb") as f:
-                tomli_w.dump(data, f)
+            dump_toml(data, output)
             return Result(
                 success=True,
                 message=f"Wrote PEP 621 config to {output}",
@@ -242,10 +226,10 @@ class PackageConfigConverter:
         """
         from rejig.packaging.poetry import PoetryParser
 
-        if tomllib is None or tomli_w is None:
+        if not toml_available():
             return Result(
                 success=False,
-                message="tomllib and tomli-w are required for conversion",
+                message="tomlkit is required for conversion. Install with: pip install tomlkit",
             )
 
         # Parse existing Poetry config
@@ -260,8 +244,7 @@ class PackageConfigConverter:
 
         # Load existing TOML to preserve non-poetry sections
         try:
-            with open(pyproject_path, "rb") as f:
-                data = tomllib.load(f)
+            data = load_toml(pyproject_path)
         except Exception as e:
             return Result(success=False, message=f"Failed to read TOML: {e}")
 
@@ -345,8 +328,7 @@ class PackageConfigConverter:
             )
 
         try:
-            with open(pyproject_path, "wb") as f:
-                tomli_w.dump(data, f)
+            dump_toml(data, pyproject_path)
             return Result(
                 success=True,
                 message=f"Converted {pyproject_path} from Poetry to PEP 621",

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rejig"
-version = "0.1.4"
+version = "0.1.5"
 description = "A Python library for programmatic code refactoring and transformation."
 readme = "README.md"
 license = "MIT"
@@ -36,11 +36,10 @@ dependencies = [
     # YAML round-trip editing (rj.yaml()); ruamel.yaml preserves comments, quote
     # styles and key order so writes produce minimal diffs.
     "ruamel.yaml>=0.17.0",
-    # TOML round-trip editing (rj.toml(), pyproject manipulation). tomllib is
-    # stdlib on 3.11+, so tomli is only needed for the 3.10 read path; tomli-w
-    # has no stdlib equivalent and is always required to write TOML.
-    "tomli-w>=1.0.0",
-    "tomli>=2.0.0; python_version < '3.11'",
+    # TOML round-trip editing (rj.toml(), pyproject manipulation). tomlkit
+    # preserves comments, key order and quote style so edits change only the
+    # targeted line(s); it both reads and writes on every supported Python.
+    "tomlkit>=0.11.0",
 ]
 
 [project.optional-dependencies]
