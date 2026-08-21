@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6]
+
+### Fixed
+
+- **Removing a dependency no longer orphans its comment**: `DependenciesTarget.remove()`
+  deleted only the key/value pair, so the comment documenting an entry survived it
+  and was left stranded above whatever followed. The attached comment block now goes
+  with the entry, along with one separator blank line so nothing is doubled up or
+  left against the table header. A comment separated from the key by a blank line
+  introduces the section rather than the entry, and is still preserved.
+- **`remove()` no longer reports success without removing anything**: the Poetry
+  branch looked the key up with the caller's raw spelling while `has()` compared
+  PEP 503 normalised names, so `remove("foo_bar")` against a `foo-bar` key passed
+  the guard, matched nothing, and still returned success. The key is now resolved
+  by the same normalised comparison as `has()`.
+- `__version__` was left at `0.1.4` by the 0.1.5 release; it now tracks
+  `pyproject.toml` again.
+
+### Added
+
+- `_tomlkit_io.remove_key(table, key, comments=True)`: removes a key from a tomlkit
+  table together with its attached comment block. Pass `comments=False` for the
+  plain key-only removal.
+
+
 ## [0.1.5]
 
 ### Added

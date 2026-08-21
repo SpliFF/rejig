@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from rejig._tomlkit_io import remove_key
 from rejig.core.results import Result
 from rejig.targets.config.toml import TomlTarget
 
@@ -321,9 +322,15 @@ class DependenciesTarget(TomlTarget):
                 if self._normalize_name(dep_name) == normalized:
                     del section[i]
         elif isinstance(section, dict):
-            # Poetry format
-            if name in section:
-                del section[name]
+            # Poetry format. Resolve the key by normalised comparison to match the
+            # has() check above, so a caller spelling "foo_bar" still removes the
+            # "foo-bar" key rather than silently doing nothing. remove_key takes
+            # the entry's attached comment block with it.
+            actual_key = next(
+                (k for k in section if self._normalize_name(k) == normalized), None
+            )
+            if actual_key is not None:
+                remove_key(section, actual_key)
 
         return self._save(data)
 
